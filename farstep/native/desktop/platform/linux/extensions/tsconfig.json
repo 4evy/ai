@@ -1,0 +1,15 @@
+{
+  "extends": "../../../../../../tsconfig.json",
+  "compilerOptions": {
+    "erasableSyntaxOnly": false,
+    "types": []
+  },
+  "include": [
+    "gnome/**/*.ts",
+    "shared/**/*.ts",
+    "kde/**/*.ts",
+    "native/**/*.ts",
+    "nested/**/*.ts"
+  ],
+  "exclude": ["**/node_modules/**", "**/dist/**", "**/build/**", "**/tmp/**"]
+}

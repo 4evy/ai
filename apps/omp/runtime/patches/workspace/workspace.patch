@@ -1,0 +1,100 @@
+diff --git a/packages/coding-agent/src/tools/browser/launch.ts b/packages/coding-agent/src/tools/browser/launch.ts
+--- a/packages/coding-agent/src/tools/browser/launch.ts
++++ b/packages/coding-agent/src/tools/browser/launch.ts
+@@ -36,6 +36,7 @@
+ import stealthPluginsScript from "../puppeteer/10_stealth_plugins.txt" with { type: "text" };
+ import stealthHardwareScript from "../puppeteer/11_stealth_hardware.txt" with { type: "text" };
+ import stealthCodecsScript from "../puppeteer/12_stealth_codecs.txt" with { type: "text" };
++import { isolateBrowserLaunch, launchWorkspaceBrowser } from "./workspace";
+ import stealthWorkerScript from "../puppeteer/13_stealth_worker.txt" with { type: "text" };
+ import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+ import { withDownload } from "../../downloads/activity";
+@@ -562,7 +563,7 @@
+ 	try {
+ 		if (userDataDir) await seedOwnedProfilePreferences(userDataDir);
+ 		const executablePath = await ensureChromiumExecutable();
+-		const browser = await puppeteer.launch({
++		const browser = await launchWorkspaceBrowser(puppeteer, {
+ 			headless: opts.headless,
+ 			defaultViewport: opts.headless ? initialViewport : null,
+ 			executablePath,
+@@ -673,10 +674,11 @@
+ 		args: buildHeadlessLaunchArgs(vp),
+ 		userDataDir: opts.userDataDir,
+ 	});
+-	return {
++	return isolateBrowserLaunch(
+ 		executablePath,
+-		args: [...defaults.filter(arg => !ignored.has(arg)), "--no-startup-window", "--remote-debugging-port=0"],
+-	};
++		[...defaults.filter(arg => !ignored.has(arg)), "--no-startup-window", "--remote-debugging-port=0"],
++		opts.headless,
++	);
+ }
+ 
+ /**
+diff --git a/packages/coding-agent/src/tools/browser/registry.ts b/packages/coding-agent/src/tools/browser/registry.ts
+--- a/packages/coding-agent/src/tools/browser/registry.ts
++++ b/packages/coding-agent/src/tools/browser/registry.ts
+@@ -23,6 +23,7 @@
+ import { ensureSharedBrowser } from "./shared-daemon";
+ import type { TernKind } from "./tern/kind";
+ import { TernSocketClient } from "./tern/wire";
++import { isolateBrowserLaunch } from "./workspace";
+ 
+ export type PuppeteerBrowserKind =
+ 	| {
+@@ -334,6 +335,9 @@
+ 	}
+ 	const appArgs = kind.args ?? [];
+ 	const reused = await findReusableCdp(exe, { signal: opts.signal, appArgs });
++	if (reused && process.platform === "linux") {
++		throw new ToolError("An existing browser cannot be adopted into an isolated workspace; attach explicitly with app.cdp_url instead");
++	}
+ 	let cdpUrl: string;
+ 	let pid: number;
+ 	let subprocess: Subprocess | undefined;
+@@ -344,7 +348,8 @@
+ 	} else {
+ 		const port = await findFreeCdpPort();
+ 		const launchArgs = [...appArgs, `--remote-debugging-port=${port}`];
+-		const child = Bun.spawn([exe, ...launchArgs], {
++		const launch = await isolateBrowserLaunch(exe, launchArgs, false, true);
++		const child = Bun.spawn([launch.executablePath, ...launch.args], {
+ 			cwd: opts.cwd,
+ 			stdout: "ignore",
+ 			stderr: "ignore",
+diff --git a/packages/coding-agent/src/tools/browser/shared-daemon.ts b/packages/coding-agent/src/tools/browser/shared-daemon.ts
+--- a/packages/coding-agent/src/tools/browser/shared-daemon.ts
++++ b/packages/coding-agent/src/tools/browser/shared-daemon.ts
+@@ -66,7 +66,8 @@
+ 
+ /** Stable broker daemon name for the shared automation browser. */
+ export function sharedBrowserDaemonName(headless: boolean): string {
+-	return headless ? "omp.browser.headless" : "omp.browser.headed";
++	if (headless) return "omp.browser.headless";
++	return process.platform === "linux" ? "omp.browser.workspace" : "omp.browser.headed";
+ }
+ 
+ /** True for the broker daemon names of the project-shared browsers. */
+diff --git a/packages/coding-agent/src/utils/browser-session.ts b/packages/coding-agent/src/utils/browser-session.ts
+--- a/packages/coding-agent/src/utils/browser-session.ts
++++ b/packages/coding-agent/src/utils/browser-session.ts
+@@ -9,6 +9,8 @@
+ import { gracefulKillTreeOnce } from "../tools/browser/attach";
+ import { ensureChromiumExecutable, loadPuppeteer, removeUserDataDir } from "../tools/browser/launch";
+ 
++import { launchWorkspaceBrowser } from "../tools/browser/workspace";
++
+ const LOGIN_TIMEOUT_MS = 5 * 60_000;
+ 
+ /** Own an isolated sign-in browser; return one cookie value in preference order, never the cookie jar. */
+@@ -33,7 +35,7 @@
+ 		lifetime.throwIfAborted();
+ 		// Do not race launch: retain ownership even if cancellation happens before it resolves.
+ 		// Unlike general browser tooling, authentication keeps sandbox and TLS checks enabled.
+-		browser = await puppeteer.launch({
++		browser = await launchWorkspaceBrowser(puppeteer, {
+ 			executablePath,
+ 			headless: false,
+ 			defaultViewport: null,

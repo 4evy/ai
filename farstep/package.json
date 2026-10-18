@@ -1,0 +1,66 @@
+{
+  "name": "farstep",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "bun@1.4.3",
+  "type": "module",
+  "scripts": {
+    "check": "bun run typecheck",
+    "typecheck": "bun x --no-install tsc --noEmit -p tsconfig.json && bun x --no-install tsc --noEmit -p native/desktop/platform/linux/extensions/tsconfig.json",
+    "package:native": "bun packaging/build.ts",
+    "package:windows": "bun packaging/build.ts --format windows",
+    "build:gnome": "bun run build:extensions --desktop gnome",
+    "build:extensions": "bun native/desktop/platform/linux/extensions/build.ts",
+    "build:kde": "bun run build:extensions --desktop kde",
+    "build": "bun --bun x --no-install vite build && bun run build:extensions --bundler vite --out dist/extensions"
+  },
+  "dependencies": {
+    "@ai/core": "workspace:*",
+    "@effect/opentelemetry": "4.0.5",
+    "@logtape/file": "2.4.1",
+    "@logtape/logtape": "2.4.1",
+    "@logtape/redaction": "2.4.1",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@oh-my-pi/pi-natives": "18.12.0",
+    "@oh-my-pi/pi-utils": "18.12.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.223.0",
+    "@opentelemetry/resources": "2.12.0",
+    "@opentelemetry/sdk-trace-base": "2.12.0",
+    "@optique/core": "1.3.6",
+    "@optique/valibot": "1.3.6",
+    "@valibot/to-json-schema": "1.8.0",
+    "dependency-graph": "1.0.0",
+    "drizzle-orm": "0.45.4",
+    "effect": "4.0.5",
+    "fast-json-stable-stringify": "2.1.0",
+    "leven": "4.1.0",
+    "plist": "5.0.0",
+    "valibot": "1.5.0",
+    "zx": "8.8.5"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:",
+    "@girs/gjs": "5.5.0",
+    "@girs/gnome-shell": "50.0.4",
+    "@oai/sky": "file:./sky",
+    "vite": "catalog:"
+  },
+  "exports": {
+    ".": "./farstep.ts",
+    "./client/*": "./client/*.ts",
+    "./packaging/*": "./packaging/*.ts",
+    "./runtime/sky/runtime/pins.json": "./runtime/sky/runtime/pins.json",
+    "./protocol/*": "./protocol/*.ts",
+    "./remote/*": "./remote/*.ts",
+    "./skylight/*": "./skylight/*.ts",
+    "./remote/*.md": "./remote/*.md",
+    "./skylight/*.md": "./skylight/*.md",
+    "./transport/*": "./transport/*.ts",
+    "./runtime/sky/runtime/*": "./runtime/sky/runtime/*.ts",
+    "./cli": "./runtime/main.ts"
+  },
+  "imports": {
+    "#farstep/*": "./*.ts"
+  }
+}

@@ -1,0 +1,127 @@
+diff --git a/packages/ai/src/utils/schema/typescript.ts b/packages/ai/src/utils/schema/typescript.ts
+--- a/packages/ai/src/utils/schema/typescript.ts
++++ b/packages/ai/src/utils/schema/typescript.ts
+@@ -22,6 +22,10 @@
+ 	 * `//` line comments, `,` delimiters, no indentation.
+ 	 */
+ 	readonly style?: "default" | "harmony";
++	/** Collect reachable definitions as named aliases instead of expanding them */
++	readonly definitions?: Map<string, string>;
++	/** Prefix aliases when several tool schemas share a declaration scope */
++	readonly referencePrefix?: string;
+ }
+ 
+ interface Ctx {
+@@ -30,6 +34,9 @@
+ 	readonly harmony: boolean;
+ 	readonly defs: Record<string, unknown> | undefined;
+ 	readonly seen: Set<unknown>;
++	readonly definitions: Map<string, string> | undefined;
++	readonly referencePrefix: string;
++	readonly references: Map<string, string>;
+ }
+ 
+ const SAFE_KEY = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+@@ -72,9 +79,16 @@
+ }
+ 
+ function convertArray(node: Record<string, unknown>, ctx: Ctx, pad: string): string {
+-	const prefixItems = node.prefixItems;
+-	if (Array.isArray(prefixItems)) {
+-		return `[${prefixItems.map(item => convert(item, ctx, pad)).join(", ")}]`;
++	const prefixItems = Array.isArray(node.prefixItems)
++		? node.prefixItems
++		: Array.isArray(node.items)
++			? node.items
++			: undefined;
++	if (prefixItems) {
++		const members = prefixItems.map(item => convert(item, ctx, pad));
++		const rest = Array.isArray(node.prefixItems) ? node.items : node.additionalItems;
++		if (rest !== undefined && rest !== false) members.push(`...Array<${convert(rest, ctx, pad)}>`);
++		return `[${members.join(", ")}]`;
+ 	}
+ 	const items = node.items;
+ 	if (items === undefined || items === true) return "unknown[]";
+@@ -155,14 +169,24 @@
+ 	const ref = node.$ref;
+ 	if (typeof ref === "string") {
+ 		const match = LOCAL_REF.exec(ref);
+-		const resolved = match && ctx.defs ? ctx.defs[match[1]] : undefined;
++		const key = match?.[1].replace(/~1/g, "/").replace(/~0/g, "~");
++		const resolved = key !== undefined && ctx.defs ? ctx.defs[key] : undefined;
++		if (resolved !== undefined && ctx.definitions) {
++			const existing = ctx.references.get(ref);
++			if (existing) return existing;
++			const name = `${ctx.referencePrefix}Schema${ctx.references.size}`;
++			ctx.references.set(ref, name);
++			ctx.definitions.set(name, "unknown");
++			ctx.definitions.set(name, convert(resolved, ctx, ""));
++			return name;
++		}
+ 		if (isJsonObject(resolved) && !ctx.seen.has(resolved)) {
+ 			ctx.seen.add(resolved);
+ 			const out = convert(resolved, ctx, pad);
+ 			ctx.seen.delete(resolved);
+ 			return out;
+ 		}
+-		return ref.slice(ref.lastIndexOf("/") + 1);
++		return "unknown";
+ 	}
+ 
+ 	if ("const" in node) return literal(node.const);
+@@ -207,6 +231,9 @@
+ 		harmony,
+ 		defs,
+ 		seen: new Set(),
++		definitions: options?.definitions,
++		referencePrefix: options?.referencePrefix ?? "",
++		references: new Map(),
+ 	};
+ 	return convert(schema, ctx, "");
+ }
+diff --git a/packages/ai/src/dialect/inventory.ts b/packages/ai/src/dialect/inventory.ts
+--- a/packages/ai/src/dialect/inventory.ts
++++ b/packages/ai/src/dialect/inventory.ts
+@@ -12,7 +12,12 @@
+ export function renderToolInventory(tools: readonly InbandTool[]): string {
+ 	if (tools.length === 0) return "";
+ 	const declarations = tools.map(tool => {
+-		const params = jsonSchemaToTypeScript(toolWireSchema(tool), { style: "harmony" });
++		const definitions = new Map<string, string>();
++		const params = jsonSchemaToTypeScript(toolWireSchema(tool), {
++			style: "harmony",
++			definitions,
++			referencePrefix: tool.name,
++		});
+ 		const lines: string[] = [];
+ 		const description = tool.description ?? "";
+ 		if (description) {
+@@ -23,6 +28,7 @@
+ 			if (description) lines.push("//");
+ 			for (const line of examples.split("\n")) lines.push(`// ${line}`.trimEnd());
+ 		}
++		for (const [name, value] of definitions) lines.push(`type ${name} = ${value};`);
+ 		lines.push(params === "{}" ? `type ${tool.name} = ();` : `type ${tool.name} = (_: ${params});`);
+ 		return lines.join("\n");
+ 	});
+diff --git a/packages/coding-agent/src/tools/xdev.ts b/packages/coding-agent/src/tools/xdev.ts
+--- a/packages/coding-agent/src/tools/xdev.ts
++++ b/packages/coding-agent/src/tools/xdev.ts
+@@ -105,7 +105,8 @@
+ }
+ 
+ function renderDocs(inst: Tool, heading = "#", descriptionCap?: number): string {
+-	const schema = jsonSchemaToTypeScript(toolWireSchema(inst as AiTool));
++	const definitions = new Map<string, string>();
++	const schema = jsonSchemaToTypeScript(toolWireSchema(inst as AiTool), { definitions });
+ 	let description = inst.description ?? "";
+ 	if (descriptionCap !== undefined && description.length > descriptionCap) {
+ 		description = `${description.slice(0, descriptionCap).trimEnd()}… (full docs: read ${XD_URL_PREFIX}${inst.name})`;
+@@ -117,6 +118,7 @@
+ 		"",
+ 		`${heading}# Schema`,
+ 		"```ts",
++		...Array.from(definitions, ([name, value]) => `type ${name} = ${value};`),
+ 		`type Args = ${schema};`,
+ 		"```",
+ 		`Execute by writing JSON to ${XD_URL_PREFIX}${inst.name}.`,

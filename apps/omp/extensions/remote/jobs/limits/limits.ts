@@ -1,0 +1,2 @@
+export const DEFAULT_TERMINATION_WAIT_MS = 2000;
+export const MAX_TERMINATION_WAIT_MS = 10_000;

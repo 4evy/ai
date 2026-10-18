@@ -1,0 +1,17 @@
+# @MARKER@
+[Unit]
+Description=Farstep privileged system service for UID @OWNER@
+After=local-fs.target
+
+[Service]
+Type=simple
+# Enter the distro shell's service domain before loading Nix ELF interpreters
+ExecStart=@SHELL@ --noprofile --norc -p -c 'exec @BINARY@ run @OWNER@'
+Restart=on-failure
+RestartSec=2
+UMask=0077
+KillMode=control-group
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,26 @@
+{
+  "profiles": {
+    "runtime": [
+      "ssh/ssh.patch",
+      "workspace/workspace.patch",
+      "compression/compression.patch",
+      "mcp/mcp.patch",
+      "quota/quota.patch",
+      "schema/schema.patch"
+    ],
+    "sdk": ["ssh/ssh.patch", "compression/compression.patch", "mcp/mcp.patch"]
+  },
+  "dependencies": {},
+  "overlays": [
+    {
+      "source": "overlays/workspace/workspace.ts",
+      "target": "packages/coding-agent/src/tools/browser/workspace.ts",
+      "profiles": ["runtime"]
+    },
+    {
+      "source": "overlays/compression/compression.ts",
+      "target": "packages/coding-agent/src/ssh/transfer-compression.ts",
+      "profiles": ["runtime", "sdk"]
+    }
+  ]
+}

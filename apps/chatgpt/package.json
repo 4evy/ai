@@ -1,0 +1,23 @@
+{
+  "name": "chatgpt",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "bun run typecheck",
+    "typecheck": "bun x --no-install tsc -p tsconfig.json",
+    "build": "bun --bun x --no-install vite build"
+  },
+  "dependencies": {
+    "@ai/core": "workspace:*",
+    "@nodelib/fs.walk": "3.0.1",
+    "acorn": "8.19.0",
+    "acorn-walk": "8.3.5",
+    "atomically": "2.1.1",
+    "effect": "4.0.5"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

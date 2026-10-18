@@ -1,0 +1,19 @@
+Usage: @COMMAND@ [--browser EXECUTABLE] [--refresh] [-- ARGS...]
+
+Read a Chromium browser's user agent from an isolated, non-headless process
+without opening a startup window. A graphical session is required.
+
+  --browser EXECUTABLE  Command on PATH or executable path (including Nix wrappers)
+  --refresh             Ignore the cached value
+  --help, -h            Show this help
+  -- ARGS...            Arguments passed before --version and probe flags
+
+CHROMIUM_BROWSER sets the default executable. Otherwise, discover a known
+Chromium browser on PATH, then in macOS application directories.
+Cache entries are separate for each executable, argument list, and version.
+
+Examples:
+  @COMMAND@ --browser chromium
+  @COMMAND@ --browser /nix/store/…/bin/chromium
+  @COMMAND@ --browser "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+  @COMMAND@ --browser my-browser-wrapper -- --lang=en-US

@@ -1,0 +1,26 @@
+{
+  "ghidra": {
+    "version": "12.1.4",
+    "url": "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_12.1.4_build/ghidra_12.1.4_PUBLIC_20260921.zip",
+    "sha256": "ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db"
+  },
+  "gradle": {
+    "version": "9.8.1",
+    "url": "https://downloads.gradle.org/distributions/gradle-9.8.1-bin.zip",
+    "sha256": "dce76f55f8e251a3a1f130eb120f30b3d271de2b76c9b0729d316b5a1b6dc01f"
+  },
+  "uvVersion": "0.13.1",
+  "platforms": {
+    "win32-x64": {
+      "jdk": {
+        "version": "jdk-21.0.12.1+1",
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip",
+        "sha256": "f9d6e191ab098c0d416e7d588a24420a8621cd2f4720dab2459b8b7b2d2d8b4e"
+      },
+      "uv": {
+        "url": "https://github.com/astral-sh/uv/releases/download/0.13.1/uv-x86_64-pc-windows-msvc.zip",
+        "sha256": "3b2661a463a5baea7f5076ea2b25ab71d77f36a6c0d809e5350651792f80a672"
+      }
+    }
+  }
+}

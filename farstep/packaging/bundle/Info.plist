@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>CFBundleIdentifier</key>
+    <string>org.farstep.Farstep</string>
+    <key>CFBundleName</key>
+    <string>Farstep</string>
+    <key>CFBundleDisplayName</key>
+    <string>Farstep</string>
+    <key>CFBundleExecutable</key>
+    <string>Farstep</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>@VERSION@</string>
+    <key>CFBundleVersion</key>
+    <string>@VERSION@</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Farstep captures your screen to let your authorized agent see and control your desktop</string>
+    <key>NSAccessibilityUsageDescription</key>
+    <string>Farstep sends keyboard and pointer input for your authorized desktop sessions</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Farstep runs automation requested by your agent in other applications</string>
+    <key>NSSystemAdministrationUsageDescription</key>
+    <string>Farstep installs system access and configures its application firewall rules</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>Farstep jobs access files on your Desktop at your request</string>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>Farstep jobs access your Documents at your request</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>Farstep jobs access your Downloads at your request</string>
+    <key>NSNetworkVolumesUsageDescription</key>
+    <string>Farstep jobs access your mounted network volumes at your request</string>
+    <key>NSRemovableVolumesUsageDescription</key>
+    <string>Farstep jobs access your removable volumes at your request</string>
+  </dict>
+</plist>

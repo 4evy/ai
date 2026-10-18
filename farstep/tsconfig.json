@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "erasableSyntaxOnly": false
+  },
+  "include": [
+    "runtime/**/*.ts",
+    "client/**/*.ts",
+    "protocol/**/*.ts",
+    "transport/**/*.ts",
+    "packaging/**/*.ts",
+    "native/desktop/platform/linux/extensions/build.ts",
+    "farstep.ts",
+    "vite.config.ts",
+    "remote/**/*.ts",
+    "skylight/**/*.ts"
+  ],
+  "extends": "../tsconfig.json",
+  "exclude": ["**/node_modules/**", "**/dist/**", "**/build/**"]
+}

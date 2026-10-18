@@ -1,0 +1,60 @@
+name: Nix check
+on:
+  workflow_call:
+    inputs:
+      task:
+        description: Nix check to run
+        required: true
+        type: string
+      runner:
+        description: GitHub-hosted runner
+        default: ubuntu-26.04
+        type: string
+      system:
+        description: Flake system matching the runner
+        default: x86_64-linux
+        type: string
+      package:
+        description: Flake package to build
+        default: ai-configs
+        type: string
+permissions: {}
+jobs:
+  check:
+    name: ${{ inputs.task }} (${{ inputs.system }})
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.system == 'aarch64-linux' && inputs.package == 'farstep' && 180 || 90 }}
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Reclaim space for Nix builds
+        if: runner.os == 'Linux'
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /usr/share/swift
+          df -h /
+      - name: Install the repository's Bun version
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+          no-cache: true
+      - name: Install Nix
+        uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+        with:
+          github_access_token: ${{ github.token }}
+          extra_nix_config: |
+            extra-substituters = https://nix-community.cachix.org
+            extra-trusted-public-keys = nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=
+      - name: Run the selected check
+        env:
+          TASK: ${{ inputs.task }}
+          NIX_SYSTEM: ${{ inputs.system }}
+          PACKAGE: ${{ inputs.package }}
+        run: bun .github/scripts/nix/nix.ts

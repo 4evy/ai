@@ -1,0 +1,44 @@
+name: Bun check
+on:
+  workflow_call:
+    inputs:
+      task:
+        description: Repository check to run
+        required: true
+        type: string
+      workspace:
+        description: Workspace to typecheck or build
+        default: root
+        type: string
+      runner:
+        description: GitHub-hosted runner
+        default: ubuntu-26.04
+        type: string
+permissions: {}
+jobs:
+  check:
+    name: ${{ inputs.task }} (${{ inputs.workspace }})
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the repository's Bun version
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+          no-cache: true
+      - name: Install frozen dependencies without lifecycle scripts
+        run: bun .github/scripts/bun/bun.ts install
+      - name: Run the selected check
+        env:
+          TASK: ${{ inputs.task }}
+          WORKSPACE: ${{ inputs.workspace }}
+        run: bun .github/scripts/bun/bun.ts

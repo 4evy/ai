@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Farstep" Manufacturer="4evy" Version="@VERSION@" Language="1033" ProductCode="@PRODUCT_CODE@" UpgradeCode="@UPGRADE_CODE@" Scope="perUser">
+    <MajorUpgrade AllowSameVersionUpgrades="yes" Schedule="afterInstallInitialize" DowngradeErrorMessage="A newer Farstep version is installed"/>
+    <MediaTemplate EmbedCab="yes" CompressionLevel="mszip"/>
+    <SetProperty Id="ARPINSTALLLOCATION" Value="[INSTALLFOLDER]" After="CostFinalize"/>
+    <StandardDirectory Id="System64Folder"/>
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="UserPrograms" Name="Programs">
+        <Directory Id="FarstepRoot" Name="Farstep">
+          <Directory Id="FarstepPackages" Name="packages">
+            <Directory Id="INSTALLFOLDER" Name="@VERSION@"><Component Id="Root" Guid="@ROOT_GUID@"><RegistryValue Root="HKCU" Key="Software\4evy\Farstep\packages\@VERSION@" Name="Installed" Type="integer" Value="1" KeyPath="yes"/><RemoveFolder Id="RemoveVersion" On="uninstall"/><RemoveFolder Id="RemovePackages" Directory="FarstepPackages" On="uninstall"/><RemoveFolder Id="RemoveRoot" Directory="FarstepRoot" On="uninstall"/></Component>
+              @DIRECTORIES@
+            </Directory>
+          </Directory>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+    <Feature Id="Farstep" Title="Farstep" Level="1"><ComponentRef Id="Root"/>
+      @COMPONENTS@
+    </Feature>
+    <CustomAction Id="Activate" Directory="System64Folder" ExeCommand="@ACTIVATE@" Return="check"/>
+    <CustomAction Id="Deactivate" Directory="System64Folder" ExeCommand="@DEACTIVATE@" Return="check"/>
+    <CustomAction Id="CheckVersion" Directory="System64Folder" ExeCommand="@CHECK_VERSION@" Return="check"/>
+    <InstallExecuteSequence>
+      <Custom Action="CheckVersion" Before="InstallInitialize" Condition="NOT Installed AND NOT REMOVE~=&quot;ALL&quot;"/>
+      <Custom Action="Activate" After="InstallFinalize" Condition="NOT REMOVE~=&quot;ALL&quot;"/>
+      <Custom Action="Deactivate" Before="RemoveFiles" Condition="REMOVE~=&quot;ALL&quot;"/>
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

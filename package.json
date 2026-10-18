@@ -1,0 +1,66 @@
+{
+  "name": "ai-tools",
+  "private": true,
+  "packageManager": "bun@1.4.3",
+  "workspaces": {
+    "packages": [
+      "packages/core",
+      "apps/chatgpt",
+      "apps/omp",
+      "farstep"
+    ],
+    "catalog": {
+      "@types/bun": "1.4.3",
+      "typescript": "7.0.2",
+      "vite": "8.3.4"
+    }
+  },
+  "scripts": {
+    "test": "bun test ./packages/core",
+    "check": "bun run check:biome && bun run check:github && bun run check:rust && bun run check:sky && bun run check:patches && bun run typecheck && bun run test && bun run check:dependencies && bun run check:architecture && bun run build",
+    "check:biome": "bun x --no-install biome check .",
+    "check:github": "bun .github/scripts/check/check.ts",
+    "check:rust": "bun tools/scripts/rust/rust.ts",
+    "check:sky": "bun tools/scripts/sky/sky.ts --check-local",
+    "check:patches": "bun tools/scripts/omp/patches/patches.ts --check",
+    "check:powershell": "pwsh -NoProfile -File tools/scripts/powershell/powershell.ps1 -Check",
+    "format": "nix fmt --",
+    "format:powershell": "nix fmt -- --formatters powershell",
+    "typecheck": "bun x --no-install tsc -p tsconfig.json && bun run --sequential --workspaces typecheck",
+    "sky:sync": "bun tools/scripts/sky/sky.ts",
+    "sky:check": "bun tools/scripts/sky/sky.ts --check",
+    "sky:update": "bun tools/scripts/sky/update.ts",
+    "sky:verify": "bun tools/scripts/sky/update.ts --check",
+    "check:dependencies": "bun x --no-install knip --include dependencies,unlisted,unresolved",
+    "dependencies:report": "bun x --no-install knip --no-exit-code",
+    "check:architecture": "bun x --no-install tsc -p tools/scripts/dependencies/tsconfig.json && bun tools/scripts/dependencies/check.ts --config tools/scripts/dependencies/cruiser.json --output-type err-long packages/core farstep apps/codex apps/claude apps/chatgpt apps/omp/lib apps/omp/extensions",
+    "build": "bun run build:root && bun run --sequential --workspaces build",
+    "build:root": "bun --bun x --no-install vite build",
+    "build:report": "bun tools/scripts/vite/report.ts"
+  },
+  "devDependencies": {
+    "@actions/core": "3.0.1",
+    "@actions/exec": "3.0.0",
+    "@biomejs/biome": "2.5.15",
+    "@types/bun": "catalog:",
+    "diff": "9.0.0",
+    "farstep": "workspace:*",
+    "knip": "6.41.0",
+    "omp-agent-runtime": "workspace:*",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  },
+  "patchedDependencies": {
+    "@oh-my-pi/pi-coding-agent@18.12.0": "apps/omp/runtime/npm/agent/agent.patch"
+  },
+  "dependencies": {
+    "@optique/core": "1.3.6",
+    "@optique/valibot": "1.3.6",
+    "valibot": "1.5.0",
+    "vscode-jsonrpc": "9.0.3",
+    "effect": "4.0.5",
+    "@ai/core": "workspace:*",
+    "atomically": "2.1.1"
+  },
+  "type": "module"
+}

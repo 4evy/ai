@@ -1,0 +1,59 @@
+[package]
+name = "farstep-service"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+process-wrap = { workspace = true, features = [
+  "tokio1",
+  "process-group",
+  "job-object",
+  "kill-on-drop",
+] }
+clap = { workspace = true, features = [
+  "std",
+  "derive",
+  "help",
+  "usage",
+  "error-context",
+] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+tokio = { workspace = true, features = [
+  "macros",
+  "rt-multi-thread",
+  "net",
+  "io-util",
+  "io-std",
+  "process",
+  "signal",
+  "sync",
+  "time",
+] }
+tokio-util = { workspace = true, features = ["rt"] }
+scopeguard = { workspace = true, features = ["use_std"] }
+
+[target.'cfg(unix)'.dependencies]
+backon = { workspace = true, features = ["std", "tokio-sleep"] }
+rustix = { workspace = true, features = ["fs", "process"] }
+tempfile.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+futures-util.workspace = true
+zbus_systemd = { workspace = true, features = ["systemd1", "zbus-async-tokio"] }
+
+[target.'cfg(windows)'.dependencies]
+base64.workspace = true
+win-custody.workspace = true
+windows-service.workspace = true
+windows = { workspace = true, features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_Security_Authorization",
+  "Win32_System_Pipes",
+] }

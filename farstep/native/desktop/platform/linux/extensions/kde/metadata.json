@@ -1,0 +1,12 @@
+{
+  "KPlugin": {
+    "Id": "farstep-workspaces",
+    "Name": "Farstep isolated workspaces",
+    "Description": "Routes scoped GUI launches to reserved Plasma desktops before activation",
+    "Version": "1.0.0",
+    "License": "MIT"
+  },
+  "X-Plasma-API": "declarativescript",
+  "X-Plasma-MainScript": "ui/main.qml",
+  "KPackageStructure": "KWin/Script"
+}

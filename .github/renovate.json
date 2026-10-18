@@ -1,0 +1,277 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track the coherent patched OMP release",
+      "managerFilePatterns": ["/^apps\\/omp\\/runtime\\/source\\.json$/"],
+      "matchStrings": ["\"version\":\\s*\"(?<currentValue>[^\"\\s]+)\""],
+      "depNameTemplate": "@oh-my-pi/pi-coding-agent",
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Track the Bun workspace catalog at its owning manifest",
+      "managerFilePatterns": ["/^package\\.json$/"],
+      "matchStrings": [
+        "\"catalog\":\\s*\\{[^}]+\\}",
+        "\"(?<depName>[^\"\\s]+)\":\\s*\"(?<currentValue>[^\"\\s]+)\""
+      ],
+      "matchStringsStrategy": "recursive",
+      "datasourceTemplate": "npm"
+    },
+    {
+      "customType": "regex",
+      "description": "Track the Skylight Linux runtime and bundle revision from the first-party RPM feed",
+      "managerFilePatterns": ["/^farstep/runtime/sky/runtime/pins\\.json$/"],
+      "matchStrings": [
+        "https://persistent\\.oaistatic\\.com/codex-app-prod/linux/rpm/x86_64/chatgpt-(?<currentValue>[^\"/]+)\\.x86_64\\.rpm"
+      ],
+      "depNameTemplate": "chatgpt",
+      "datasourceTemplate": "rpm",
+      "registryUrlTemplate": "https://persistent.oaistatic.com/codex-app-prod/linux/rpm/x86_64/repodata/",
+      "versioningTemplate": "rpm"
+    },
+    {
+      "customType": "regex",
+      "description": "Track the Skylight macOS runtime independently from Linux build numbers",
+      "managerFilePatterns": ["/^farstep/runtime/sky/runtime/pins\\.json$/"],
+      "matchStrings": [
+        "https://persistent\\.oaistatic\\.com/codex-app-prod/ChatGPT-darwin-arm64-(?<currentValue>[^\"/]+)\\.zip"
+      ],
+      "depNameTemplate": "chatgpt-macos",
+      "datasourceTemplate": "custom.chatgpt-macos",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "Track Ghidra MCP at an exact upstream commit",
+      "managerFilePatterns": ["/^apps/ghidra/mcp/source\\.json$/"],
+      "matchStrings": ["\"rev\":\\s*\"(?<currentDigest>[a-f0-9]{40})\""],
+      "currentValueTemplate": "main",
+      "depNameTemplate": "bethington/ghidra-mcp",
+      "packageNameTemplate": "https://github.com/bethington/ghidra-mcp",
+      "datasourceTemplate": "git-refs",
+      "versioningTemplate": "git"
+    },
+    {
+      "customType": "regex",
+      "description": "Track Apple API headers at an exact upstream commit",
+      "managerFilePatterns": [
+        "/^apps/ghidra/extensions/apple-api-types/source\\.json$/"
+      ],
+      "matchStrings": ["\"rev\":\\s*\"(?<currentDigest>[a-f0-9]{40})\""],
+      "currentValueTemplate": "master",
+      "depNameTemplate": "PoomSmart/IDAObjcTypes",
+      "packageNameTemplate": "https://github.com/PoomSmart/IDAObjcTypes",
+      "datasourceTemplate": "git-refs",
+      "versioningTemplate": "git"
+    },
+    {
+      "customType": "regex",
+      "description": "Track Windows API headers at an exact upstream commit",
+      "managerFilePatterns": [
+        "/^apps/ghidra/extensions/windows-api-types/source\\.json$/"
+      ],
+      "matchStrings": ["\"rev\":\\s*\"(?<currentDigest>[a-f0-9]{40})\""],
+      "currentValueTemplate": "master",
+      "depNameTemplate": "winsiderss/systeminformer",
+      "packageNameTemplate": "https://github.com/winsiderss/systeminformer",
+      "datasourceTemplate": "git-refs",
+      "versioningTemplate": "git"
+    },
+    {
+      "customType": "regex",
+      "description": "Track the Ghidra release",
+      "managerFilePatterns": ["/^apps/ghidra/native/source\\.json$/"],
+      "matchStrings": [
+        "\"ghidra\":\\s*\\{\\s*\"version\":\\s*\"(?<currentValue>[^\"\\s]+)\""
+      ],
+      "depNameTemplate": "NationalSecurityAgency/ghidra",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver",
+      "extractVersionTemplate": "^Ghidra_(?<version>.+)_build$"
+    },
+    {
+      "customType": "regex",
+      "description": "Track the Gradle distribution",
+      "managerFilePatterns": ["/^apps/ghidra/native/source\\.json$/"],
+      "matchStrings": [
+        "\"gradle\":\\s*\\{\\s*\"version\":\\s*\"(?<currentValue>[^\"\\s]+)\""
+      ],
+      "depNameTemplate": "gradle",
+      "datasourceTemplate": "gradle-version",
+      "versioningTemplate": "gradle"
+    },
+    {
+      "customType": "regex",
+      "description": "Track the uv distribution",
+      "managerFilePatterns": ["/^apps/ghidra/native/source\\.json$/"],
+      "matchStrings": ["\"uvVersion\":\\s*\"(?<currentValue>[^\"\\s]+)\""],
+      "depNameTemplate": "astral-sh/uv",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Track the Temurin 21 distributions",
+      "managerFilePatterns": ["/^apps/ghidra/native/source\\.json$/"],
+      "matchStrings": [
+        "\"jdk\":\\s*\\{\\s*\"version\":\\s*\"jdk-(?<currentValue>[^\"\\s]+)\""
+      ],
+      "depNameTemplate": "adoptium/temurin21-binaries",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "maven",
+      "extractVersionTemplate": "^jdk-(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Track the Nix Bun runtime",
+      "managerFilePatterns": ["/^tools/nix/javascript/runtime/runtime\\.nix$/"],
+      "matchStrings": ["version = \"(?<currentValue>[^\"\\s]+)\""],
+      "depNameTemplate": "bun",
+      "datasourceTemplate": "npm"
+    },
+    {
+      "customType": "regex",
+      "description": "Track the PowerShell analyzer",
+      "managerFilePatterns": [
+        "/^tools/nix/fmt/analyzer\\.nix$/",
+        "/^\\.github/scripts/powershell/powershell\\.ts$/",
+        "/^tools/scripts/powershell/powershell\\.ps1$/"
+      ],
+      "matchStrings": [
+        "version = \"(?<currentValue>[^\"\\s]+)\"",
+        "PSScriptAnalyzer -RequiredVersion (?<currentValue>[^\\s]+)",
+        "ModuleName = 'PSScriptAnalyzer'; ModuleVersion = '(?<currentValue>[^']+)'"
+      ],
+      "depNameTemplate": "PowerShell/PSScriptAnalyzer",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v?(?<version>\\d+\\.\\d+\\.\\d+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Track changes to the mutable Windows x64 Sky archive",
+      "managerFilePatterns": ["/^farstep/runtime/sky/runtime/pins\\.json$/"],
+      "matchStrings": [
+        "\"platform\":\\s*\"win32\",\\s*\"arch\":\\s*\"x64\",\\s*\"url\":\\s*\"[^\"\\s]+\",\\s*\"sha256\":\\s*\"(?<currentDigest>[a-f0-9]{64})\""
+      ],
+      "currentValueTemplate": "1",
+      "depNameTemplate": "chatgpt-windows-x64",
+      "datasourceTemplate": "custom.chatgpt-windows",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "Track changes to the mutable Windows arm64 Sky archive",
+      "managerFilePatterns": ["/^farstep/runtime/sky/runtime/pins\\.json$/"],
+      "matchStrings": [
+        "\"platform\":\\s*\"win32\",\\s*\"arch\":\\s*\"arm64\",\\s*\"url\":\\s*\"[^\"\\s]+\",\\s*\"sha256\":\\s*\"(?<currentDigest>[a-f0-9]{64})\""
+      ],
+      "currentValueTemplate": "1",
+      "depNameTemplate": "chatgpt-windows-arm64",
+      "datasourceTemplate": "custom.chatgpt-windows",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "Track pinned OpenCode plugins in the settings source",
+      "managerFilePatterns": ["/^config/settings/opencode\\.nix$/"],
+      "matchStrings": [
+        "\"(?<depName>@[^\"\\s/]+/[^\"@\\s]+)@(?<currentValue>[^\"\\s]+)\""
+      ],
+      "datasourceTemplate": "npm"
+    },
+    {
+      "customType": "regex",
+      "description": "Track the minimum Rust toolchain installed by native CI",
+      "managerFilePatterns": ["/^Cargo\\.toml$/"],
+      "matchStrings": ["rust-version = \"(?<currentValue>[^\"\\s]+)\""],
+      "depNameTemplate": "rust",
+      "datasourceTemplate": "rust-version",
+      "versioningTemplate": "semver-coerced"
+    },
+    {
+      "customType": "regex",
+      "description": "Track GitHub runner versions in matrices and reusable workflow defaults",
+      "managerFilePatterns": ["/^\\.github/workflows/.+\\.yml$/"],
+      "matchStrings": [
+        "(?:runner:|default:)\\s*(?:\\[[^\\]]+\\]|(?:ubuntu|macos|windows)-[^\\s\\n]+)",
+        "(?<depName>ubuntu|macos|windows)-(?<currentValue>\\d+(?:\\.\\d+)?(?:-arm)?)"
+      ],
+      "matchStringsStrategy": "recursive",
+      "datasourceTemplate": "github-runners",
+      "versioningTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Update Skylight runtimes together and regenerate their shared private Sky declarations",
+      "matchManagers": ["custom.regex"],
+      "matchFileNames": ["farstep/runtime/sky/runtime/pins.json"],
+      "matchDepNames": [
+        "chatgpt",
+        "chatgpt-macos",
+        "chatgpt-windows-x64",
+        "chatgpt-windows-arm64"
+      ],
+      "groupName": "skylight-runtime"
+    },
+    {
+      "description": "Let the OMP source pin own all matching runtime and extension dependencies",
+      "matchManagers": ["npm", "bun"],
+      "matchPackageNames": ["@oh-my-pi/**"],
+      "enabled": false
+    },
+    {
+      "description": "Keep the Bun binary and all packageManager fields on one release",
+      "matchPackageNames": ["bun"],
+      "groupName": "bun"
+    },
+    {
+      "description": "Refresh all native Ghidra artifacts as one distribution",
+      "matchManagers": ["custom.regex"],
+      "matchFileNames": ["apps/ghidra/native/source.json"],
+      "groupName": "ghidra-native"
+    },
+    {
+      "description": "Do not resolve private Sky declarations through the public npm registry",
+      "matchPackageNames": ["@oai/sky"],
+      "enabled": false
+    }
+  ],
+  "customDatasources": {
+    "chatgpt-macos": {
+      "defaultRegistryUrlTemplate": "https://persistent.oaistatic.com/codex-app-prod/appcast.xml",
+      "format": "plain",
+      "transformTemplates": [
+        "{\"releases\": releases[$contains(version, \"<sparkle:shortVersionString>\")].{\"version\": $substringBefore($substringAfter(version, \"<sparkle:shortVersionString>\"), \"</\")}}"
+      ]
+    }
+  },
+  "postUpgradeTasks": {
+    "commands": ["bash tools/scripts/renovate/artifacts.sh"],
+    "fileFilters": [
+      "flake.lock",
+      "**/bun.lock",
+      "**/package.json",
+      "**/bun.nix",
+      "apps/omp/runtime/**",
+      "farstep/runtime/sky/runtime/pins.json",
+      "farstep/sky/**",
+      "apps/omp/**",
+      "apps/ghidra/**/source.json",
+      "tools/nix/javascript/runtime/runtime.nix",
+      "tools/nix/fmt/analyzer.nix"
+    ],
+    "executionMode": "branch"
+  },
+  "nix": {
+    "enabled": true
+  },
+  "lockFileMaintenance": {
+    "enabled": true
+  }
+}

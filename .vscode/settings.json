@@ -1,0 +1,68 @@
+{
+  "editor.formatOnSave": true,
+  "editor.tabSize": 2,
+  "js/ts.experimental.useTsgo": true,
+  "js/ts.tsdk.path": "./node_modules/typescript",
+  "js/ts.tsdk.promptToUseWorkspaceVersion": true,
+  "js/ts.updateImportsOnFileMove.enabled": "always",
+  "rust-analyzer.linkedProjects": ["./Cargo.toml"],
+  "rust-analyzer.check.command": "clippy",
+  "nix.enableLanguageServer": true,
+  "nix.serverPath": "nixd",
+  "nix.formatterPath": "nixfmt",
+  "nix.serverSettings": {
+    "nixd": {
+      "formatting": {
+        "command": ["nixfmt"]
+      }
+    }
+  },
+  "[javascript][javascriptreact][typescript][typescriptreact][json][jsonc]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.biome": "explicit",
+      "source.organizeImports.biome": "explicit"
+    }
+  },
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.tabSize": 4
+  },
+  "[nix]": {
+    "editor.defaultFormatter": "jnoortheen.nix-ide"
+  },
+  "[toml]": {
+    "editor.defaultFormatter": "tamasfe.even-better-toml"
+  },
+  "files.watcherExclude": {
+    "**/.git/**": true,
+    "**/.jj/**": true,
+    "**/.generated/**": true,
+    "**/.cache/**": true,
+    "**/.direnv/**": true,
+    "**/.fallow/**": true,
+    "**/.history/**": true,
+    "**/.vscode-test/**": true,
+    "**/node_modules/**": true,
+    "**/target/**": true,
+    "**/dist/**": true,
+    "**/coverage/**": true
+  },
+  "search.exclude": {
+    ".generated": true,
+    "node_modules": true,
+    "target": true,
+    "farstep/sky/upstream": true
+  },
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/target": true,
+    "**/dist": true,
+    ".generated": true,
+    ".cache": true,
+    ".fallow": true,
+    "**/.direnv": true,
+    "**/.history": true,
+    "**/.vscode-test": true
+  }
+}

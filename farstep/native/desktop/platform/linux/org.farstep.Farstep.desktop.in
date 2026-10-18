@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Farstep
+Comment=Farstep desktop control
+Exec=@PACKAGE@/bin/farstep status
+Terminal=false
+NoDisplay=true
+DBusActivatable=false

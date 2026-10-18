@@ -1,0 +1,159 @@
+name: CI
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  quality:
+    name: ${{ matrix.task }}
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [biome, dependencies, architecture, sky, patches]
+    uses: $/.github/workflows/bun-check.yml
+    permissions:
+      contents: read
+    with:
+      task: ${{ matrix.task }}
+  workspaces:
+    name: ${{ matrix.task }} (${{ matrix.workspace }})
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [typecheck, build]
+        workspace: [root, core, chatgpt, omp, farstep]
+    uses: $/.github/workflows/bun-check.yml
+    permissions:
+      contents: read
+    with:
+      task: ${{ matrix.task }}
+      workspace: ${{ matrix.workspace }}
+  tests:
+    name: Process tests (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-26.04, ubuntu-26.04-arm, macos-26, windows-2025]
+    uses: $/.github/workflows/bun-check.yml
+    permissions:
+      contents: read
+    with:
+      task: test
+      runner: ${{ matrix.runner }}
+  nix-checks:
+    name: ${{ matrix.task }}
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [evaluate, just, github, format]
+    uses: $/.github/workflows/nix-check.yml
+    permissions:
+      contents: read
+    with:
+      task: ${{ matrix.task }}
+  native:
+    name: ${{ matrix.task }} (${{ matrix.platform.system }})
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [native-lint, native-tests]
+        platform:
+          - runner: ubuntu-26.04
+            system: x86_64-linux
+          - runner: ubuntu-26.04-arm
+            system: aarch64-linux
+          - runner: macos-26
+            system: aarch64-darwin
+    uses: $/.github/workflows/nix-check.yml
+    permissions:
+      contents: read
+    with:
+      task: ${{ matrix.task }}
+      runner: ${{ matrix.platform.runner }}
+      system: ${{ matrix.platform.system }}
+  packages:
+    name: Package ${{ matrix.package }} (${{ matrix.platform.system }})
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [ai-javascript, farstep-native, ai-configs, farstep]
+        platform:
+          - runner: ubuntu-26.04
+            system: x86_64-linux
+          - runner: ubuntu-26.04-arm
+            system: aarch64-linux
+          - runner: macos-26
+            system: aarch64-darwin
+    uses: $/.github/workflows/nix-check.yml
+    permissions:
+      contents: read
+    with:
+      task: package
+      package: ${{ matrix.package }}
+      runner: ${{ matrix.platform.runner }}
+      system: ${{ matrix.platform.system }}
+  powershell:
+    name: PowerShell (${{ matrix.shell }})
+    runs-on: windows-2025
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [pwsh, powershell]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the repository's Bun version
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+          no-cache: true
+      - name: Install PSScriptAnalyzer
+        env:
+          POWERSHELL: ${{ matrix.shell }}
+        run: bun .github/scripts/powershell/powershell.ts install
+      - name: Check PowerShell formatting, syntax, and lint
+        env:
+          POWERSHELL: ${{ matrix.shell }}
+        run: bun .github/scripts/powershell/powershell.ts
+  windows-native:
+    name: Windows native (${{ matrix.task }})
+    runs-on: windows-2025
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [clippy, tests]
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the repository's Bun version
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+          no-cache: true
+      - name: Install the declared minimum Rust version
+        run: bun .github/scripts/native/native.ts rust-install
+      - name: Check Windows native code
+        env:
+          TASK: ${{ matrix.task }}
+        run: bun .github/scripts/native/native.ts

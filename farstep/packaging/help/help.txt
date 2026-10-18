@@ -1,0 +1,32 @@
+Build Farstep for Windows from locked sources
+
+Usage: bun run farstep/packaging/build.ts --format windows
+       --output DIRECTORY [--release NUMBER]
+
+Unix packages are built with nix build .#farstep
+Use Home Manager, NixOS, or nix-darwin for settings and services
+
+Windows: build on Windows x64 or arm64 using Rust, cargo, standalone Bun,
+a .NET SDK and WiX 7.0.0
+  dotnet tool install --global wix --version 7.0.0 --allow-roll-forward
+WiX 7 requires OSMF EULA acceptance before building
+  After reviewing its terms: wix eula accept wix7
+Add --add-source https://api.nuget.org/v3/index.json if NuGet has no sources
+Set FARSTEP_WIX if wix.exe is not on PATH or in the default .dotnet/tools folder
+
+The output contains a bootstrap payload and farstep-VERSION-windows-ARCH.msi
+Run bin/farstep.cmd install from that payload. Farstep enables WinGet's
+LocalManifestFiles setting when necessary, serves the checksummed installer on
+loopback and invokes winget install with a temporary local manifest
+
+Windows Installer owns files under %LOCALAPPDATA%\Programs\Farstep and
+configures the interactive desktop task, LocalSystem service, private account
+storage and program firewall rules. UAC requires the same Windows account
+Increment --release for each rebuild and use the new payload's bin/farstep.cmd
+upgrade. The first two version components are at most 255, the last two 65535
+MSI major upgrades replace the previous package and retain private user data
+
+Run bin/farstep.cmd uninstall or winget uninstall --name Farstep --exact to
+deactivate and remove installed files. User data is retained
+Local builds use no published source, so winget upgrade --all cannot fetch new
+builds. Supply a newly built payload for each upgrade

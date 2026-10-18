@@ -1,0 +1,134 @@
+{
+  "apple": {
+    "extensionName": "ApplePrivateApiTypes",
+    "description": "Public and private Apple API headers and Ghidra parser profiles",
+    "headersRoot": ".",
+    "licenseFile": "LICENSE",
+    "entryHeaders": ["IDA.h"],
+    "includePaths": [],
+    "profiles": {
+      "ApplePrivateApiTypes_arm64": {
+        "flags": ["-D__EA64__", "-DGHIDRA", "-D__ARM__"],
+        "language": "AARCH64:LE:64:v8A",
+        "compiler": "default"
+      },
+      "ApplePrivateApiTypes_x86_64": {
+        "flags": ["-D__EA64__", "-DGHIDRA"],
+        "language": "x86:LE:64:default",
+        "compiler": "gcc"
+      }
+    }
+  },
+  "windows": {
+    "extensionName": "WindowsNativeApiTypes",
+    "description": "System Informer PHNT native Windows API headers and Ghidra parser profiles",
+    "headersRoot": "phnt/include",
+    "licenseFile": "LICENSE.txt",
+    "entryHeaders": ["phnt_windows.h", "phnt.h"],
+    "includePaths": ["."],
+    "profiles": {
+      "WindowsNativeApiTypes_x86_64": {
+        "flags": [
+          "-D_MSC_VER=1924",
+          "-D_INTEGRAL_MAX_BITS=64",
+          "-DWINVER=0x0a00",
+          "-D_WIN32_WINNT=0x0a00",
+          "-D_WIN32",
+          "-D_USE_ATTRIBUTES_FOR_SAL",
+          "-D_CRTBLD",
+          "-D_OPENMP_NOFORCE_MANIFEST",
+          "-DCONST=const",
+          "-D_CRT_SECURE_NO_WARNINGS",
+          "-D_CRT_NONSTDC_NO_DEPRECATE",
+          "-D_CRT_NONSTDC_NO_WARNINGS",
+          "-D_CRT_OBSOLETE_NO_DEPRECATE",
+          "-D_ALLOW_KEYWORD_MACROS",
+          "-D_ASSERT_OK",
+          "-DSTRSAFE_NO_DEPRECATE",
+          "-D__possibly_notnullterminated",
+          "-D__unaligned=",
+          "-D__inner_checkReturn=",
+          "-DWINAPI_PARTITION_APP=1",
+          "-DWINAPI_PARTITION_SYSTEM=1",
+          "-DWINAPI_PARTITION_GAMES=1",
+          "-DSECURITY_WIN32",
+          "-DPHNT_VERSION=PHNT_WINDOWS_11_25H2",
+          "-DPHNT_MODE=PHNT_MODE_USER",
+          "-D_AMD64_",
+          "-D_M_AMD64",
+          "-D_M_X64",
+          "-D_WIN64"
+        ],
+        "language": "x86:LE:64:default",
+        "compiler": "windows"
+      },
+      "WindowsNativeApiTypes_x86": {
+        "flags": [
+          "-D_MSC_VER=1924",
+          "-D_INTEGRAL_MAX_BITS=64",
+          "-DWINVER=0x0a00",
+          "-D_WIN32_WINNT=0x0a00",
+          "-D_WIN32",
+          "-D_USE_ATTRIBUTES_FOR_SAL",
+          "-D_CRTBLD",
+          "-D_OPENMP_NOFORCE_MANIFEST",
+          "-DCONST=const",
+          "-D_CRT_SECURE_NO_WARNINGS",
+          "-D_CRT_NONSTDC_NO_DEPRECATE",
+          "-D_CRT_NONSTDC_NO_WARNINGS",
+          "-D_CRT_OBSOLETE_NO_DEPRECATE",
+          "-D_ALLOW_KEYWORD_MACROS",
+          "-D_ASSERT_OK",
+          "-DSTRSAFE_NO_DEPRECATE",
+          "-D__possibly_notnullterminated",
+          "-D__unaligned=",
+          "-D__inner_checkReturn=",
+          "-DWINAPI_PARTITION_APP=1",
+          "-DWINAPI_PARTITION_SYSTEM=1",
+          "-DWINAPI_PARTITION_GAMES=1",
+          "-DSECURITY_WIN32",
+          "-DPHNT_VERSION=PHNT_WINDOWS_11_25H2",
+          "-DPHNT_MODE=PHNT_MODE_USER",
+          "-D_X86_",
+          "-D_M_IX86=600"
+        ],
+        "language": "x86:LE:32:default",
+        "compiler": "windows"
+      },
+      "WindowsNativeApiTypes_arm64": {
+        "flags": [
+          "-D_MSC_VER=1924",
+          "-D_INTEGRAL_MAX_BITS=64",
+          "-DWINVER=0x0a00",
+          "-D_WIN32_WINNT=0x0a00",
+          "-D_WIN32",
+          "-D_USE_ATTRIBUTES_FOR_SAL",
+          "-D_CRTBLD",
+          "-D_OPENMP_NOFORCE_MANIFEST",
+          "-DCONST=const",
+          "-D_CRT_SECURE_NO_WARNINGS",
+          "-D_CRT_NONSTDC_NO_DEPRECATE",
+          "-D_CRT_NONSTDC_NO_WARNINGS",
+          "-D_CRT_OBSOLETE_NO_DEPRECATE",
+          "-D_ALLOW_KEYWORD_MACROS",
+          "-D_ASSERT_OK",
+          "-DSTRSAFE_NO_DEPRECATE",
+          "-D__possibly_notnullterminated",
+          "-D__unaligned=",
+          "-D__inner_checkReturn=",
+          "-DWINAPI_PARTITION_APP=1",
+          "-DWINAPI_PARTITION_SYSTEM=1",
+          "-DWINAPI_PARTITION_GAMES=1",
+          "-DSECURITY_WIN32",
+          "-DPHNT_VERSION=PHNT_WINDOWS_11_25H2",
+          "-DPHNT_MODE=PHNT_MODE_USER",
+          "-D_ARM64_",
+          "-D_M_ARM64",
+          "-D_WIN64"
+        ],
+        "language": "AARCH64:LE:64:v8A",
+        "compiler": "windows"
+      }
+    }
+  }
+}

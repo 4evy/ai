@@ -1,0 +1,71 @@
+# Local environment files; keep sanitized examples trackable
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+!.env.*.example
+!.env.*.sample
+!.env.*.template
+
+# Personal records and runtime state
+auth.json
+credentials.json
+sessions/
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite-journal
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+*.sqlite3-journal
+
+# Dependencies and build outputs across workspaces
+node_modules/
+target/
+dist/
+build/
+tmp/
+Sources/
+*.tsbuildinfo
+
+# Nix output links
+/result
+/result-*
+
+# Generated configuration and tool caches
+.direnv/
+.rumdl_cache/
+.cache/
+.generated/
+.fallow/
+.vite/
+.vite-temp/
+
+# Logs, diagnostic reports, and coverage
+*.log
+*.log.*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+coverage/
+.nyc_output/
+*.lcov
+
+# Editor history, extension test downloads, and personal VS Code workspaces
+.history/
+.vscode-test/
+*.local.code-workspace
+
+# Local workspace metadata, filesystem debris, and editor backups
+.jj/
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~

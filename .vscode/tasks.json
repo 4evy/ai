@@ -1,0 +1,50 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Repository: install dependencies",
+      "type": "process",
+      "command": "just",
+      "args": ["install"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Repository: check",
+      "type": "process",
+      "command": "just",
+      "args": ["check"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "Rust: check Farstep desktop (Linux)",
+      "type": "process",
+      "command": "cargo",
+      "args": ["check", "--locked", "--package", "farstep-desktop"],
+      "group": "build",
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "Rust: build Farstep desktop (Linux)",
+      "type": "process",
+      "command": "cargo",
+      "args": ["build", "--locked", "--package", "farstep-desktop"],
+      "group": "build",
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "Nix: check flake",
+      "type": "process",
+      "command": "nix",
+      "args": ["flake", "check", "--no-build"],
+      "problemMatcher": []
+    },
+    {
+      "label": "OMP: check patches",
+      "type": "process",
+      "command": "just",
+      "args": ["omp", "patches", "check"],
+      "problemMatcher": []
+    }
+  ]
+}

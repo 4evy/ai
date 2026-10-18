@@ -1,0 +1,296 @@
+{
+  // Run all gates with bun x fallow@3.33.1 --fail-on-issues
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/v3.33.1/schema.json",
+  "minimumVersion": "3.33.1",
+  "entry": [
+    "apps/browser/chromium/chromium.ts",
+    "apps/browser/firefox/firefox.ts",
+    "apps/codex/codex.ts",
+    "apps/claude/claude.ts",
+    "apps/ghidra/macos/macos.ts",
+    "apps/chatgpt/{launcher,configure/configure,plugins/plugins,policy/policy,repl/repl}.ts",
+    "packages/core/core.ts",
+    "farstep/transport/relay/relay.ts",
+    "farstep/runtime/main.ts",
+    "farstep/runtime/sky/linux/service.ts",
+    "farstep/runtime/platform/macos/package/package.ts"
+  ],
+  // Describe host and build conventions without executing repository code
+  "framework": [
+    {
+      "name": "ai-tooling",
+      "detection": { "type": "fileExists", "pattern": "tools/scripts/**/*.ts" },
+      "entryPointRole": "support",
+      "entryPoints": [
+        "tools/scripts/**/*.ts",
+        "config/settings/generate/generate.ts",
+        "apps/omp/runtime/*.ts",
+        "farstep/packaging/build.ts",
+        "farstep/native/desktop/platform/linux/extensions/build.ts"
+      ],
+      "usedExports": [
+        {
+          // The Node REPL imports this hook from its trusted service bundle
+          "pattern": "farstep/runtime/sky/linux/service.ts",
+          "exports": ["handleRpc"]
+        },
+        {
+          // Lazy platform tables call the loaded namespace through Management
+          "pattern": "farstep/runtime/platform/{linux/installer/installer,macos/installer,windows/installer}.ts",
+          "exports": [
+            "status",
+            "prepareUpgrade",
+            "cancelUpgrade",
+            "install",
+            "uninstall"
+          ]
+        },
+        {
+          // Desktop selection also dispatches through a loaded namespace
+          "pattern": "farstep/runtime/platform/{linux/desktop,macos/desktop/desktop,windows/desktop}.ts",
+          "exports": ["desktopEndpoint"]
+        }
+      ],
+      // Patch generation uses this library; deployed launchers do not
+      "toolingDependencies": ["diff"]
+    },
+    {
+      "name": "omp-extensions",
+      "detection": {
+        "type": "fileExists",
+        "pattern": "apps/omp/extensions/*/index.ts"
+      },
+      "entryPointRole": "runtime",
+      "entryPoints": ["apps/omp/extensions/*/index.ts"],
+      "usedExports": [
+        { "pattern": "apps/omp/extensions/*/index.ts", "exports": ["default"] }
+      ]
+    },
+    {
+      "name": "omp-overlays",
+      "detection": {
+        "type": "fileExists",
+        "pattern": "apps/omp/runtime/overlays/**/*.ts"
+      },
+      // Profiles copy these modules into the upstream runtime before execution
+      "entryPointRole": "support",
+      "manifestEntries": [
+        {
+          "manifests": "apps/omp/runtime/profiles.json",
+          "entries": [{ "path": "${overlays[*].source}" }]
+        }
+      ],
+      "usedExports": [
+        {
+          "pattern": "apps/omp/runtime/overlays/shortcuts/shortcuts.ts",
+          "exports": ["handleThinkingEffortShortcut"]
+        },
+        {
+          "pattern": "apps/omp/runtime/overlays/workspace/workspace.ts",
+          "exports": ["isolateBrowserLaunch"]
+        },
+        {
+          "pattern": "apps/omp/runtime/overlays/environment/environment.ts",
+          "exports": ["isolatedPtyArgv"]
+        },
+        {
+          "pattern": "apps/omp/runtime/overlays/compression/compression.ts",
+          "exports": ["isSameMachineSSH", "requireZstd", "boundedTransferBytes"]
+        }
+      ]
+    },
+    {
+      "name": "farstep-desktop",
+      "detection": {
+        "type": "fileExists",
+        "pattern": "farstep/native/desktop/platform/linux/extensions/shared/service.ts"
+      },
+      // GNOME, KWin and GJS launch these files outside the Bun import graph
+      "entryPointRole": "runtime",
+      "entryPoints": [
+        "farstep/native/desktop/platform/linux/extensions/gnome/extension.ts",
+        "farstep/native/desktop/platform/linux/extensions/kde/{main,broker}.ts",
+        "farstep/native/desktop/platform/linux/extensions/native/{broker,ready}.ts",
+        "farstep/native/desktop/platform/linux/extensions/nested/{main,ready}.ts",
+        "farstep/runtime/platform/linux/installer/workspace/settings.js"
+      ],
+      "usedExports": [
+        {
+          "pattern": "farstep/native/desktop/platform/linux/extensions/gnome/extension.ts",
+          "exports": ["default"]
+        },
+        {
+          "pattern": "farstep/native/desktop/platform/linux/extensions/kde/main.ts",
+          "exports": ["createRouter"]
+        }
+      ],
+      "usedClassMembers": [{ "extends": "Extension", "members": ["enable", "disable"] }]
+    }
+  ],
+  "ignorePatterns": [
+    "farstep/sky/upstream/**",
+    "apps/omp/runtime/upstream/**",
+    ".generated/**",
+    "target/**",
+    "tmp/**",
+    "result/**",
+    // Distribution manifests and the isolated dependency-cruiser toolchain
+    "tools/runtime/**",
+    "farstep/dependencies/**",
+    "tools/scripts/dependencies/**"
+  ],
+  // GJS provides these module schemes outside npm
+  "ignoreDependencies": ["gi", "resource"],
+  "ignoreUnresolvedImports": ["gi://**", "resource:///**"],
+  // Resolve conditional package exports the same way as the Bun runtime
+  "resolve": { "conditions": ["bun"] },
+  "includeEntryExports": true,
+  // Schemas, inferred types and Effect helpers form a module's shared surface
+  // Completely unreferenced exports remain reportable, as in the Knip config
+  "ignoreExportsUsedInFile": true,
+  // Resolve symbols and inherited contracts before reporting dead code
+  "typeAware": {
+    "enabled": true,
+    "require": "best-effort",
+    "projects": [
+      "tsconfig.json",
+      "packages/core/tsconfig.json",
+      "apps/chatgpt/tsconfig.json",
+      "apps/omp/tsconfig.json",
+      "farstep/tsconfig.json",
+      "farstep/native/desktop/platform/linux/extensions/tsconfig.json"
+    ]
+  },
+  // Keep the adapter type facade alongside concrete subpath imports
+  "ignoreExports": [{ "file": "packages/core/core.ts", "exports": ["*"] }],
+  // Native streams and JSON-RPC invoke these hooks through their base contracts
+  "usedClassMembers": [
+    { "extends": "Transform", "members": ["_transform"] },
+    { "extends": "AbstractMessageReader", "members": ["listen", "dispose"] },
+    { "extends": "AbstractMessageWriter", "members": ["write", "end"] }
+  ],
+  "overrides": [
+    {
+      // Gio calls these XML-named handlers, including their Async forms
+      "files": ["farstep/native/desktop/platform/linux/extensions/shared/service.ts"],
+      "rules": { "unused-class-members": "off" }
+    },
+    {
+      // WorkspaceService calls these adapters through WorkspaceLeases
+      // Fallow does not follow those calls back to the concrete implementations
+      "files": [
+        "farstep/native/desktop/platform/linux/extensions/gnome/leases.ts",
+        "farstep/native/desktop/platform/linux/extensions/shared/leases/leases.ts"
+      ],
+      "rules": { "unused-class-members": "off" }
+    },
+    {
+      // Packaging stages OMP; its build imports are not a deployed cycle
+      "files": ["farstep/packaging/**"],
+      "rules": { "package-cycle": "off" }
+    }
+  ],
+  "failOnParseError": true,
+  "rules": {
+    "unused-files": "error",
+    "unused-exports": "error",
+    "unused-types": "error",
+    // Source packages do not need to re-export private signature types
+    "private-type-leaks": "off",
+    "deprecated-exports-in-use": "error",
+    "unused-dependencies": "error",
+    "unused-dev-dependencies": "error",
+    "unused-optional-dependencies": "error",
+    "unused-enum-members": "error",
+    "unused-class-members": "error",
+    "unresolved-imports": "error",
+    "unlisted-dependencies": "error",
+    "duplicate-exports": "error",
+    "type-only-dependencies": "error",
+    "test-only-dependencies": "error",
+    "dev-dependencies-in-production": "error",
+    "circular-dependencies": "error",
+    "re-export-cycle": "error",
+    "package-cycle": "error",
+    "boundary-violation": "error",
+    "complexity-cyclomatic": "error",
+    "complexity-cognitive": "error",
+    "complexity-crap": "error",
+    "stale-suppressions": "error",
+    "require-suppression-reason": "error",
+    // Import boundaries are configured below; no separate policy pack is in use
+    "policy-violation": "off",
+    "unused-catalog-entries": "error",
+    "empty-catalog-groups": "error",
+    "unresolved-catalog-references": "error",
+    "unused-dependency-overrides": "error",
+    "misconfigured-dependency-overrides": "error"
+  },
+  // Preserve the core and Farstep dependency direction from dependency-cruiser
+  "boundaries": {
+    "zones": [
+      {
+        "name": "core",
+        "patterns": ["packages/core/**"]
+      },
+      {
+        "name": "farstep",
+        "patterns": [
+          "farstep/runtime/**",
+          "farstep/client/**",
+          "farstep/protocol/**",
+          "farstep/remote/**",
+          "farstep/skylight/**",
+          "farstep/protocol/desktop/desktop.ts",
+          "farstep/farstep.ts"
+        ]
+      },
+      {
+        "name": "omp",
+        "patterns": ["apps/omp/**"]
+      },
+      {
+        "name": "hosts",
+        "patterns": ["apps/codex/**", "apps/claude/**", "apps/chatgpt/**"]
+      }
+    ],
+    "rules": [
+      {
+        "from": "core",
+        "allow": ["core"]
+      },
+      {
+        "from": "farstep",
+        "allow": ["farstep", "core"]
+      }
+    ]
+  },
+  "duplicates": {
+    "enabled": true,
+    // Keep API names and literals so different Effect pipelines stay distinct
+    "mode": "mild",
+    "near": false,
+    // Short gen, pipe, and acquireRelease scaffolding is normal Effect usage
+    "minTokens": 60,
+    "minLines": 8,
+    "minOccurrences": 2,
+    // Zero disables the duplication gate
+    "threshold": 1,
+    "crossLanguage": true,
+    "skipLocal": false,
+    "ignoreImports": true
+  },
+  "health": {
+    "maxCyclomatic": 12,
+    "maxCognitive": 15,
+    // Enable CRAP with measured coverage; graph estimates are insufficient
+    "maxCrap": 0,
+    "crapRefactorBand": 0,
+    "maxUnitSize": 120,
+    "suggestInlineSuppression": false
+  },
+  // Existing findings in changed files must pass too
+  "audit": {
+    "gate": "all"
+  }
+}

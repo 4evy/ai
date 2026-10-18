@@ -1,0 +1,22 @@
+Usage: @COMMAND@ [--browser EXECUTABLE] [--refresh] [-- ARGS...]
+
+Read a Firefox browser's actual HTTP user agent from an isolated process
+without opening a visible startup window. On macOS, the probe is non-headless
+and requires a graphical session. On Linux, it runs headless.
+
+  --browser EXECUTABLE  Command on PATH or executable path (including Nix wrappers)
+  --refresh             Ignore the cached value
+  --help, -h            Show this help
+  -- ARGS...            Arguments passed before --version and probe flags
+
+FIREFOX_BROWSER sets the default executable. Otherwise, discover Firefox on
+PATH, then in macOS application directories.
+Cache entries are separate for each executable, argument list, and version.
+The probe reads Firefox's HTTP user agent through its DevTools server over a
+private Unix socket. macOS and Linux are supported.
+
+Examples:
+  @COMMAND@ --browser firefox
+  @COMMAND@ --browser /nix/store/…/bin/firefox
+  @COMMAND@ --browser "/Applications/Firefox.app/Contents/MacOS/firefox"
+  @COMMAND@ --browser my-browser-wrapper -- --headless

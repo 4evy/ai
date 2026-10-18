@@ -1,0 +1,134 @@
+{
+  "$schema": "https://raw.githubusercontent.com/sverweij/dependency-cruiser/main/schema/configuration.schema.json",
+  "forbidden": [
+    {
+      "name": "core-does-not-depend-on-agent-hosts",
+      "severity": "error",
+      "from": {
+        "path": "^packages/core/"
+      },
+      "to": {
+        "path": "^apps/|^farstep/|omp-agent-runtime(?:/|$)|@oh-my-pi/"
+      }
+    },
+    {
+      "name": "farstep-does-not-depend-on-agent-adapters",
+      "severity": "error",
+      "from": {
+        "path": "^farstep/(?:runtime|client|protocol|transport|remote|skylight|native)/"
+      },
+      "to": {
+        "path": "^apps/|omp-agent-runtime(?:/|$)|@oh-my-pi/(?:pi-agent-core|pi-coding-agent|pi-tui)(?:/|$)"
+      }
+    },
+    {
+      "name": "protocols-do-not-depend-on-applications",
+      "severity": "error",
+      "from": {
+        "path": "^farstep/protocol/"
+      },
+      "to": {
+        "path": "^apps/|^farstep/",
+        "pathNot": "^farstep/protocol/"
+      }
+    },
+    {
+      "name": "transport-only-depends-on-protocol",
+      "severity": "error",
+      "from": {
+        "path": "^farstep/transport/"
+      },
+      "to": {
+        "path": "^farstep/|^apps/",
+        "pathNot": "^farstep/(?:transport|protocol)/"
+      }
+    },
+    {
+      "name": "clients-do-not-depend-on-runtime-or-tools",
+      "severity": "error",
+      "from": {
+        "path": "^farstep/client/"
+      },
+      "to": {
+        "path": "^farstep/(?:runtime|remote|skylight|packaging|native)/"
+      }
+    },
+    {
+      "name": "runtime-does-not-depend-on-clients-or-tools",
+      "severity": "error",
+      "from": {
+        "path": "^farstep/runtime/"
+      },
+      "to": {
+        "path": "^farstep/(?:client|remote|skylight)/"
+      }
+    },
+    {
+      "name": "harnesses-use-farstep-public-layers",
+      "severity": "error",
+      "from": {
+        "path": "^apps/(?:omp/(?:lib|extensions)|chatgpt)/"
+      },
+      "to": {
+        "path": "^farstep/(?:runtime|native|packaging)/"
+      }
+    },
+    {
+      "name": "desktop-extensions-do-not-depend-on-node",
+      "severity": "error",
+      "from": {
+        "path": "^farstep/native/desktop/platform/linux/extensions/(gnome|kde|native|nested)/",
+        "pathNot": "\\.d\\.ts$"
+      },
+      "to": {
+        "dependencyTypes": ["core", "npm", "npm-dev", "npm-optional", "npm-peer"]
+      }
+    },
+    {
+      "name": "shared-code-does-not-depend-on-installers",
+      "severity": "error",
+      "from": {
+        "path": "^packages/core/|^farstep/(?:protocol|transport|client|remote|skylight)/|^apps/omp/lib/"
+      },
+      "to": {
+        "path": "^farstep/runtime/platform/"
+      }
+    },
+    {
+      "name": "runtime-imports-must-resolve",
+      "severity": "error",
+      "from": {},
+      "to": {
+        "couldNotResolve": true,
+        "pathNot": "^(?:gi://|resource:///)"
+      }
+    },
+    {
+      "name": "review-runtime-cycles",
+      "severity": "error",
+      "from": {},
+      "to": {
+        "circular": true,
+        "dependencyTypesNot": ["type-only"],
+        "viaOnly": {
+          "dependencyTypesNot": ["type-only"]
+        }
+      }
+    }
+  ],
+  "options": {
+    "parser": "acorn",
+    "doNotFollow": {
+      "path": "(^|/)node_modules/"
+    },
+    "exclude": {
+      "path": "(^|/)(?:dist|build|target|\\.generated)/|^apps/omp/runtime/upstream/|^farstep/sky/upstream/"
+    },
+    "moduleSystems": ["es6", "cjs"],
+    "enhancedResolveOptions": {
+      "exportsFields": ["exports"],
+      "conditionNames": ["import", "types", "bun", "node", "default"]
+    },
+    "tsPreCompilationDeps": true
+  }
+}

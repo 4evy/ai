@@ -1,0 +1,116 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignore": [
+    "**/node_modules/**",
+    "farstep/sky/upstream/**",
+    "**/dist/**",
+    "**/build/**",
+    ".generated/**"
+  ],
+  "ignoreExportsUsedInFile": true,
+  "workspaces": {
+    ".": {
+      "entry": [
+        ".github/scripts/**/*.ts",
+        "apps/browser/chromium/chromium.ts",
+        "apps/browser/firefox/firefox.ts",
+        "apps/codex/codex.ts",
+        "apps/claude/claude.ts",
+        "apps/opencode/opencode.ts",
+        "config/settings/generate/generate.ts",
+        "apps/ghidra/macos/macos.ts",
+        "apps/ghidra/native/{install,runtime}.ts",
+        "tools/scripts/**/*.ts"
+      ],
+      "project": [
+        ".github/scripts/**/*.ts",
+        "apps/browser/**/*.ts",
+        "apps/codex/**/*.ts",
+        "apps/claude/**/*.ts",
+        "apps/opencode/**/*.ts",
+        "config/settings/**/*.ts",
+        "apps/ghidra/**/*.ts",
+        "tools/scripts/**/*.ts"
+      ]
+    },
+    "apps/chatgpt": {
+      "entry": [
+        "configure/configure.ts",
+        "plugins/plugins.ts",
+        "policy/policy.ts",
+        "repl/repl.ts",
+        "launcher.ts"
+      ],
+      "project": ["**/*.ts"]
+    },
+    "packages/core": {
+      "entry": ["core.ts"],
+      "project": ["**/*.ts"]
+    },
+    "apps/omp": {
+      "entry": ["extensions/*/index.ts", "runtime/*.ts"],
+      "project": ["**/*.ts"],
+      "ignoreDependencies": []
+    },
+    "farstep": {
+      "entry": [
+        "farstep.ts",
+        "transport/relay/relay.ts",
+        "runtime/main.ts",
+        "runtime/jobs/broker/main.ts",
+        "runtime/sky/linux/service.ts",
+        "runtime/platform/macos/package/package.ts",
+        "native/desktop/platform/linux/extensions/{gnome,kde,native,nested}/*.ts"
+      ],
+      "project": [
+        "protocol/**/*.ts",
+        "transport/**/*.ts",
+        "remote/**/*.ts",
+        "skylight/**/*.ts",
+        "protocol/desktop/desktop.ts",
+        "runtime/**/*.ts",
+        "client/**/*.ts",
+        "packaging/**/*.ts",
+        "native/desktop/platform/linux/extensions/**/*.ts"
+      ],
+      // gi/resource are GJS module schemes, not npm packages
+      "ignoreDependencies": [
+        "@logtape/logtape",
+        "@logtape/file",
+        "@logtape/redaction",
+        "@effect/opentelemetry",
+        "@opentelemetry/sdk-trace-base",
+        "@opentelemetry/exporter-trace-otlp-http",
+        "@valibot/to-json-schema",
+        "gi",
+        "resource",
+        "@opentelemetry/resources"
+      ]
+    },
+    // Distribution manifests package sources owned by the workspaces above
+    "tools/runtime": {
+      "entry": [],
+      "project": [],
+      "ignoreDependencies": [".*"]
+    },
+    "farstep/dependencies": {
+      "entry": [],
+      "project": [],
+      "ignoreDependencies": [".*"]
+    },
+    "apps/omp/runtime/upstream": {
+      "entry": [],
+      "project": [],
+      "ignoreDependencies": [".*"]
+    },
+    "farstep/sky": {
+      "entry": [],
+      "project": []
+    },
+    // Keep the analyzer's compiler separate from the TypeScript 7 toolchain
+    "tools/scripts/dependencies": {
+      "entry": ["check.ts"],
+      "project": ["**/*.ts"]
+    }
+  }
+}

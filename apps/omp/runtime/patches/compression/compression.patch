@@ -1,0 +1,61 @@
+diff --git a/packages/coding-agent/src/ssh/file-transfer.ts b/packages/coding-agent/src/ssh/file-transfer.ts
+--- a/packages/coding-agent/src/ssh/file-transfer.ts
++++ b/packages/coding-agent/src/ssh/file-transfer.ts
+@@ -6,6 +6,7 @@
+  * `ssh://` reads/writes round-trip exactly — leading/trailing whitespace, tabs,
+  * and final newlines are preserved.
+  */
++import { createFileTransfer } from "./transfer-compression";
+ import { ptree } from "@oh-my-pi/pi-utils";
+ import { buildRemoteCommand, ensureConnection, ensureHostInfo, type SSHConnectionTarget } from "./connection-manager";
+ import { quotePosixArgument } from "../utils/shell-quote";
+@@ -73,15 +74,13 @@
+ 	remotePath: string,
+ 	opts: RemoteFileReadOptions,
+ ): Promise<RemoteFileReadResult> {
++	if (!Number.isSafeInteger(opts.maxBytes) || opts.maxBytes < 0 || opts.maxBytes >= Number.MAX_SAFE_INTEGER) {
++		throw new Error("ssh://: maxBytes must be a nonnegative safe byte bound");
++	}
+ 	const shell = await ensurePosixRemote(target);
++	const transfer = await createFileTransfer(target, opts);
+ 	const command = `head -c ${opts.maxBytes + 1} ${quotePosixArgument(remotePath)}`;
+-	const args = await buildRemoteCommand(target, wrapInPosixShell(shell, command));
+-	using child = ptree.spawn(["ssh", ...args], {
+-		signal: ptree.combineSignals(opts.signal, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+-	});
+-	// Drain stdout before awaiting exit so a full pipe can't deadlock the child.
+-	const raw = await child.bytes();
+-	await child.exitedCleanly;
++	const raw = await transfer.read(shell, command, opts.maxBytes + 1);
+ 	const truncated = raw.length > opts.maxBytes;
+ 	return { bytes: truncated ? raw.subarray(0, opts.maxBytes) : raw, truncated };
+ }
+@@ -120,6 +119,7 @@
+ 	if (remotePath.endsWith("/")) {
+ 		throw new Error("ssh://: destination is a directory path (trailing '/'); ssh:// write requires a file path");
+ 	}
++	const transfer = await createFileTransfer(target, opts);
+ 	const dest = quotePosixArgument(remotePath);
+ 	const tmp = quotePosixArgument(`${remotePath}.omp-tmp.${crypto.randomUUID()}`);
+ 	// Stage stdin into the temp first (so the remote never blocks on an unread
+@@ -135,18 +135,13 @@
+ 	const command =
+ 		`t=${tmp}; trap 'rm -f -- "$t"' 0; ` +
+ 		`mkdir -p -- "$(dirname "$t")" && ` +
+-		`cat > "$t" && { ` +
++		`${transfer.inputCommand} > "$t" && { ` +
+ 		`if [ -d ${dest} ]; then echo 'ssh://: destination is a directory' >&2; exit 1; ` +
+ 		`elif [ -f ${dest} ] && [ ! -L ${dest} ]; then cat "$t" > ${dest} || exit 1; ` +
+ 		`elif [ -e ${dest} ] && [ ! -L ${dest} ]; then echo 'ssh://: destination is a special file (not a regular file)' >&2; exit 1; ` +
+ 		`else mv "$t" ${dest}; fi; ` +
+ 		`}`;
+-	const args = await buildRemoteCommand(target, wrapInPosixShell(shell, command), { allowStdin: true });
+-	using child = ptree.spawn(["ssh", ...args], {
+-		stdin: content,
+-		signal: ptree.combineSignals(opts.signal, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+-	});
+-	await child.exitedCleanly;
++	await transfer.write(shell, command, content);
+ }
+ 
+ /** Classification of a remote path, used by the read handler's directory dispatch. */

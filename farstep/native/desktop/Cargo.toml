@@ -1,0 +1,236 @@
+[package]
+name = "farstep-desktop"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["desktop", "systemd"]
+# The CLI is also usable without a graphical backend
+cli = [
+  "dep:farstep-protocol",
+  "dep:tokio",
+  "tokio/macros",
+  "tokio/rt-multi-thread",
+]
+systemd = [
+  "cli",
+  "dep:clap",
+  "dep:zbus",
+  "dep:zbus_systemd",
+  "dep:futures-util",
+  "dep:serde_json",
+  "zbus_systemd/login1",
+]
+# Target-specific dependencies are activated only on the host platform
+desktop = [
+  "dep:farstep-desktop-runtime",
+  "cli",
+  "dep:clap",
+  "farstep-desktop-runtime/server",
+  "farstep-desktop-runtime/image",
+  "tokio/net",
+  "tokio/io-util",
+  "tokio/process",
+  "tokio/signal",
+  "tokio/sync",
+  "tokio/time",
+  "dep:ashpd",
+  "dep:async-io",
+  "dep:async-trait",
+  "dep:axuielement",
+  "dep:backon",
+  "dep:base64",
+  "dep:command-fds",
+  "dep:core-foundation",
+  "dep:core-graphics",
+  "dep:derive_more",
+  "dep:dirs",
+  "dep:dlopen2",
+  "dep:enigo",
+  "dep:enumflags2",
+  "dep:futures-util",
+  "dep:gstreamer",
+  "dep:gstreamer-app",
+  "dep:gstreamer-video",
+  "dep:libc",
+  "dep:objc2",
+  "dep:objc2-app-kit",
+  "dep:objc2-core-graphics",
+  "dep:objc2-foundation",
+  "dep:procfs",
+  "dep:reis",
+  "dep:rustix",
+  "dep:scopeguard",
+  "dep:screencapturekit",
+  "dep:serde",
+  "dep:serde_json",
+  "dep:smithay-client-toolkit",
+  "dep:tempfile",
+  "dep:tokio-util",
+  "dep:uuid",
+  "dep:wayland-client",
+  "dep:wayland-protocols-misc",
+  "dep:wayland-protocols-wlr",
+  "dep:win-custody",
+  "dep:windows",
+  "dep:wl-clipboard-rs",
+  "dep:wl-proxy",
+  "dep:xkbcommon",
+  "dep:zbus",
+  "dep:zbus_systemd",
+]
+
+[[bin]]
+name = "farstep-desktop"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[dependencies]
+farstep-protocol = { path = "../protocol", optional = true }
+farstep-desktop-runtime = { path = "../desktop-runtime", default-features = false, optional = true }
+scopeguard = { workspace = true, optional = true }
+clap = { workspace = true, optional = true, features = [
+  "std",
+  "derive",
+  "help",
+  "usage",
+  "error-context",
+] }
+tokio = { workspace = true, optional = true }
+tokio-util = { workspace = true, optional = true, features = ["rt"] }
+
+[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
+async-trait = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true, features = ["v4"] }
+enigo = { workspace = true, optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+serde = { workspace = true, optional = true, features = ["derive"] }
+axuielement = { workspace = true, optional = true }
+command-fds = { workspace = true, optional = true }
+objc2 = { workspace = true, optional = true }
+objc2-app-kit = { workspace = true, optional = true, features = [
+  "std",
+  "libc",
+  "NSRunningApplication",
+  "NSWorkspace",
+] }
+objc2-core-graphics = { workspace = true, optional = true, features = [
+  "CGEvent",
+] }
+objc2-foundation = { workspace = true, optional = true, features = [
+  "std",
+  "NSBundle",
+  "NSData",
+  "NSError",
+  "NSJSONSerialization",
+  "NSProcessInfo",
+  "NSString",
+  "NSURL",
+] }
+core-foundation = { workspace = true, optional = true }
+core-graphics = { workspace = true, optional = true }
+screencapturekit = { workspace = true, optional = true, features = [
+  "async",
+  "macos_14_0",
+] }
+libc = { workspace = true, optional = true }
+dlopen2 = { workspace = true, optional = true }
+rustix = { workspace = true, optional = true, features = ["fs", "process"] }
+tempfile = { workspace = true, optional = true }
+backon = { workspace = true, optional = true, features = [
+  "std",
+  "std-blocking-sleep",
+  "tokio-sleep",
+] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+base64 = { workspace = true, optional = true }
+win-custody = { workspace = true, optional = true }
+windows = { workspace = true, optional = true, features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_Security",
+  "Win32_Security_Authorization",
+  "Win32_System_Memory",
+  "Win32_System_Threading",
+  "Win32_System_StationsAndDesktops",
+  "Win32_System_RemoteDesktop",
+  "Win32_UI_HiDpi",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_UI_Shell",
+  "Win32_Storage_FileSystem",
+  "Win32_Storage_Xps",
+  "Win32_System_JobObjects",
+  "Win32_UI_Input_KeyboardAndMouse",
+] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+async-io = { workspace = true, optional = true }
+procfs = { workspace = true, optional = true }
+backon = { workspace = true, optional = true, features = [
+  "std",
+  "std-blocking-sleep",
+  "tokio-sleep",
+] }
+derive_more = { workspace = true, optional = true, features = [
+  "deref",
+  "deref_mut",
+  "from",
+  "into",
+] }
+async-trait = { workspace = true, optional = true }
+ashpd = { workspace = true, optional = true, features = [
+  "tokio",
+  "remote_desktop",
+  "screencast",
+  "clipboard",
+  "open_uri",
+] }
+reis = { workspace = true, optional = true }
+gstreamer = { workspace = true, optional = true }
+gstreamer-app = { workspace = true, optional = true }
+gstreamer-video = { workspace = true, optional = true }
+enigo = { workspace = true, optional = true, features = ["wayland"] }
+wl-clipboard-rs = { workspace = true, optional = true }
+wayland-client = { workspace = true, optional = true }
+wayland-protocols-misc = { workspace = true, optional = true, features = [
+  "client",
+] }
+wayland-protocols-wlr = { workspace = true, optional = true, features = [
+  "client",
+] }
+smithay-client-toolkit = { workspace = true, optional = true, features = [
+  "calloop",
+] }
+futures-util = { workspace = true, optional = true, features = ["io"] }
+uuid = { workspace = true, optional = true, features = ["v4"] }
+enumflags2 = { workspace = true, optional = true }
+zbus = { workspace = true, optional = true, features = ["tokio", "proxy"] }
+zbus_systemd = { workspace = true, optional = true, features = [
+  "systemd1",
+  "zbus-async-tokio",
+] }
+rustix = { workspace = true, optional = true, features = [
+  "process",
+  "fs",
+  "event",
+  "net",
+] }
+wl-proxy = { workspace = true, optional = true, features = [
+  "suite-wayland-protocols",
+  "suite-wlr-protocols",
+  "suite-external",
+  "suite-hyprland-protocols",
+  "suite-cosmic-protocols",
+] }
+xkbcommon = { workspace = true, optional = true }
+tempfile = { workspace = true, optional = true }
+dirs = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }

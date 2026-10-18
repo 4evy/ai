@@ -1,0 +1,16 @@
+[Unit]
+Description=Farstep desktop service
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=@PACKAGE@/bin/farstep-desktop daemon
+EnvironmentFile=@ENVIRONMENT_FILE@
+Environment=FARSTEP_PACKAGE_PATH=@PACKAGE@
+UMask=0077
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

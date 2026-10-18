@@ -1,0 +1,46 @@
+[package]
+name = "farstep-desktop-runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = []
+backend = [
+  "dep:farstep-protocol",
+  "dep:serde_json",
+  "dep:async-trait",
+  "dep:tokio-util",
+]
+server = [
+  "backend",
+  "farstep-protocol/schema",
+  "dep:rmcp",
+  "dep:tokio",
+  "dep:base64",
+]
+image = ["dep:farstep-protocol", "dep:bytes", "dep:png"]
+
+[dependencies]
+farstep-protocol = { path = "../protocol", optional = true }
+async-trait = { workspace = true, optional = true }
+rmcp = { workspace = true, optional = true, features = [
+  "macros",
+  "server",
+  "transport-async-rw",
+] }
+tokio-util = { workspace = true, optional = true, features = ["rt"] }
+tokio = { workspace = true, optional = true, features = [
+  "macros",
+  "io-util",
+  "sync",
+  "time",
+] }
+serde_json = { workspace = true, optional = true }
+base64 = { workspace = true, optional = true }
+bytes = { workspace = true, optional = true }
+png = { workspace = true, optional = true }

@@ -1,0 +1,13 @@
+diff --git a/packages/coding-agent/src/mcp/tool-bridge.ts b/packages/coding-agent/src/mcp/tool-bridge.ts
+--- a/packages/coding-agent/src/mcp/tool-bridge.ts
++++ b/packages/coding-agent/src/mcp/tool-bridge.ts
+@@ -267,6 +267,9 @@
+ 	return false;
+ }
+ 
++// Share native result formatting with in-process extension tools
++export { buildResult as buildMCPToolResult };
++
+ /** Build a CustomToolResult from a callTool response. */
+ function buildResult(
+ 	result: MCPToolCallResult,
