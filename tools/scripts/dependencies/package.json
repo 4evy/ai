@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "devDependencies": {
-    "dependency-cruiser": "18.6.0",
-    "typescript": "6.0.2"
+    "oxc-parser": "0.155.0",
+    "oxc-resolver": "11.24.2"
   }
 }

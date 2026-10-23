@@ -107,7 +107,6 @@
       "entry": [],
       "project": []
     },
-    // Keep the analyzer's compiler separate from the TypeScript 7 toolchain
     "tools/scripts/dependencies": {
       "entry": ["check.ts"],
       "project": ["**/*.ts"]

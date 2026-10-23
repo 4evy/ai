@@ -33,7 +33,7 @@
     "sky:verify": "bun tools/scripts/sky/update.ts --check",
     "check:dependencies": "bun x --no-install knip --include dependencies,unlisted,unresolved",
     "dependencies:report": "bun x --no-install knip --no-exit-code",
-    "check:architecture": "bun x --no-install tsc -p tools/scripts/dependencies/tsconfig.json && bun tools/scripts/dependencies/check.ts --config tools/scripts/dependencies/cruiser.json --output-type err-long packages/core farstep apps/codex apps/claude apps/chatgpt apps/omp/lib apps/omp/extensions",
+    "check:architecture": "bun x --no-install tsc -p tools/scripts/dependencies/tsconfig.json && bun tools/scripts/dependencies/check.ts packages/core farstep apps/codex apps/claude apps/chatgpt apps/omp/lib apps/omp/extensions",
     "build": "bun run build:root && bun run --sequential --workspaces build",
     "build:root": "bun --bun x --no-install vite build",
     "build:report": "bun tools/scripts/vite/report.ts"

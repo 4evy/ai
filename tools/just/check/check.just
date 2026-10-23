@@ -40,7 +40,7 @@ dependencies:
 report:
     bun run dependencies:report
 
-# Check module boundaries with dependency-cruiser
+# Check module boundaries with the Oxc TypeScript parser
 architecture:
     bun run check:architecture
 
