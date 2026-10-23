@@ -19,6 +19,7 @@ import type * as PressKey from "./PressKey";
 import type * as Scroll from "./Scroll";
 import type * as StartAudioRecording from "./StartAudioRecording";
 import type * as StopAudioRecording from "./StopAudioRecording";
+import type * as TypeCharacters from "./TypeCharacters";
 import type * as TypeText from "./TypeText";
 export type FullDesktopComputerUseClient = {
     target: "linux";
@@ -41,6 +42,7 @@ export type FullDesktopComputerUseClient = {
     scroll: Scroll.Function;
     start_audio_recording?: StartAudioRecording.Function;
     stop_audio_recording?: StopAudioRecording.Function;
+    type_characters: TypeCharacters.Function;
     type_text: TypeText.Function;
     launch_app: LaunchApp.Function;
     get_window_state: GetWindowState.Function;

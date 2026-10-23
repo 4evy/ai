@@ -23,6 +23,7 @@ export type * as KeyUp from "./KeyUp";
 export type * as Scroll from "./Scroll";
 export type * as StartAudioRecording from "./StartAudioRecording";
 export type * as StopAudioRecording from "./StopAudioRecording";
+export type * as TypeCharacters from "./TypeCharacters";
 export type * as TypeText from "./TypeText";
 export type * as LaunchApp from "./LaunchApp";
 export type * as GetWindowState from "./GetWindowState";
