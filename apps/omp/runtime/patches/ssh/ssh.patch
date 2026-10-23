@@ -26,3 +26,15 @@ diff --git a/packages/coding-agent/src/ssh/connection-manager.ts b/packages/codi
  	}
  
  	args.push("-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new");
+@@ -824,7 +833,9 @@
+ 	// Configured sockets may have been replaced by a user's master since the
+-	// last check. Never exit a socket that omp doesn't own.
++	// last check, so never stop a socket that OMP doesn't own
+ 	if (owner === "config") return;
+-	await runSshSync(["-O", "exit", ...buildCommonArgs(host, owner), target]);
++	// Other OMP processes share this master, so drain its active channels
++	// instead of disconnecting their helpers when one process finishes
++	await runSshSync(["-O", "stop", ...buildCommonArgs(host, owner), target]);
+ }
+ 
+ export async function closeConnection(hostName: string): Promise<void> {

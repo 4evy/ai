@@ -888,6 +888,20 @@ diff --git a/src/ssh/connection-manager.ts b/src/ssh/connection-manager.ts
  	}
  
  	args.push("-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new");
+@@ -822,9 +831,11 @@
+ 	const target = buildSshTarget(host.username, host.host);
+ 	const owner = await resolveControlPathOwner(host);
+ 	// Configured sockets may have been replaced by a user's master since the
+-	// last check. Never exit a socket that omp doesn't own.
++	// last check, so never stop a socket that OMP doesn't own
+ 	if (owner === "config") return;
+-	await runSshSync(["-O", "exit", ...buildCommonArgs(host, owner), target]);
++	// Other OMP processes share this master, so drain its active channels
++	// instead of disconnecting their helpers when one process finishes
++	await runSshSync(["-O", "stop", ...buildCommonArgs(host, owner), target]);
+ }
+ 
+ export async function closeConnection(hostName: string): Promise<void> {
 diff --git a/src/ssh/file-transfer.ts b/src/ssh/file-transfer.ts
 --- a/src/ssh/file-transfer.ts
 +++ b/src/ssh/file-transfer.ts
