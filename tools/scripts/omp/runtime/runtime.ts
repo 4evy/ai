@@ -123,7 +123,8 @@ async function installClosure(tree: string): Promise<void> {
       "--production",
       "--ignore-scripts",
       "--linker=hoisted",
-      "--backend=copyfile",
+      // APFS clones isolate writes without duplicating the dependency cache
+      process.platform === "darwin" ? "--backend=clonefile" : "--backend=copyfile",
     ],
     tree,
   );
