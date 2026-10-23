@@ -9,14 +9,14 @@
 }:
 let
   hashes = {
-    aarch64-darwin = "sha256-gK/UwGm0am+o8+xSC+vHUKeEPkqNW5WD0prUNsAKNAM=";
-    aarch64-linux = "sha256-76mBPaXtckI7+Ef5FujSxHwNd2rdlyNUAmp14Q2pqiE=";
-    x86_64-linux = "sha256-H8LtrIQxApCeOhvh2NmALMYHHPB05n6IIx9P/g+LOXs=";
+    aarch64-darwin = "sha256-wkDX8My5DCY6hJ/NsJt+5iYw2SE0jtaq/ahrnVd7xRA=";
+    aarch64-linux = "sha256-uqa7NvUdblhWHgK76oJQOKnfRU9nPW13bou/hvjHhQ4=";
+    x86_64-linux = "sha256-4ERutVmVdy65iUvrrppr42jZhai5Jx7hJEhvmUbu3XY=";
   };
 in
 bun.overrideAttrs (
   finalAttrs: old: {
-    version = "1.4.3";
+    version = "1.4.4";
     src = finalAttrs.passthru.sources.${stdenvNoCC.hostPlatform.system};
     passthru = old.passthru // {
       sources = lib.attrsets.mapAttrs (

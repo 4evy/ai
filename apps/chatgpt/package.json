@@ -13,7 +13,7 @@
     "acorn": "8.19.0",
     "acorn-walk": "8.3.5",
     "atomically": "2.1.1",
-    "effect": "4.0.5"
+    "effect": "4.0.6"
   },
   "devDependencies": {
     "@types/bun": "catalog:",
