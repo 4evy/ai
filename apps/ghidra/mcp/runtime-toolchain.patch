@@ -1,0 +1,10 @@
+diff --git a/build.gradle b/build.gradle
+--- a/build.gradle
++++ b/build.gradle
+@@ -57,5 +57,5 @@
+ java {
+     toolchain {
+-        languageVersion = JavaLanguageVersion.of(21)
++        languageVersion = JavaLanguageVersion.of(JavaVersion.current().majorVersion as int)
+     }
+ }

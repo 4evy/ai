@@ -1,0 +1,21 @@
+diff --git a/src/main/java/com/xebyte/core/DataTypeService.java b/src/main/java/com/xebyte/core/DataTypeService.java
+--- a/src/main/java/com/xebyte/core/DataTypeService.java
++++ b/src/main/java/com/xebyte/core/DataTypeService.java
+@@ -1202 +1202 @@
+-                boolean deleted = dtm.remove(dataType, null);
++                boolean deleted = dtm.remove(dataType);
+@@ -1517 +1517 @@
+-                        deleted.set(dtm.remove(existing, null));
++                        deleted.set(dtm.remove(existing));
+@@ -1787 +1787 @@
+-                boolean deleted = dtm.remove(dataType, null);
++                boolean deleted = dtm.remove(dataType);
+diff --git a/src/main/java/com/xebyte/core/ServiceUtils.java b/src/main/java/com/xebyte/core/ServiceUtils.java
+--- a/src/main/java/com/xebyte/core/ServiceUtils.java
++++ b/src/main/java/com/xebyte/core/ServiceUtils.java
+@@ -755,2 +755,3 @@
+-        if (d instanceof ghidra.program.model.lang.SleighLanguageDescription sld) {
+-            generic.jar.ResourceFile sla = sld.getSlaFile();
++        if (d instanceof ghidra.app.plugin.processors.sleigh.SleighLanguageDescription sld) {
++            var languageFile = sld.getLanguageFile();
++            generic.jar.ResourceFile sla = languageFile != null ? languageFile.getSlaFile() : null;

@@ -3,7 +3,7 @@
   stdenvNoCC,
   fetchFromGitHub,
   python3Packages,
-  openjdk21,
+  openjdk25,
   gradle,
   ghidra-bin,
   unzip,
@@ -17,12 +17,28 @@
   nix,
   jq,
   gnused,
+  bun,
+  uv,
   makeBinaryWrapper,
   desktopToDarwinBundle,
   apiTypeExtensions ? [ ],
   extraExtensions ? [ ],
 }:
 let
+  bridgePython = python3Packages.overrideScope (
+    _self: super: {
+      mcp = super.mcp.overridePythonAttrs (old: {
+        inherit (pin.sdk) version;
+        src = fetchFromGitHub {
+          owner = "modelcontextprotocol";
+          repo = "python-sdk";
+          tag = "v${pin.sdk.version}";
+          inherit (pin.sdk) hash;
+        };
+        nativeCheckInputs = old.nativeCheckInputs ++ [ python3Packages.blockbuster ];
+      });
+    }
+  );
   pin = lib.trivial.importJSON ./source.json;
   src = fetchFromGitHub {
     owner = "bethington";
@@ -41,15 +57,18 @@ let
     ];
     maintainers = [ lib.maintainers._4evy ];
   };
-  bridgeApp = python3Packages.buildPythonApplication {
+  bridgeApp = bridgePython.buildPythonApplication {
     pname = "ghidra-mcp-bridge";
     inherit (pin) version;
     inherit src;
-    patches = [ ./explicit-backend.patch ];
+    patches = map (name: ./. + "/${name}") pin.patches;
+    postPatch = ''
+      cp ${./uv.lock} uv.lock
+    '';
     pyproject = true;
     strictDeps = true;
-    build-system = [ python3Packages.hatchling ];
-    dependencies = with python3Packages; [
+    build-system = [ bridgePython.hatchling ];
+    dependencies = with bridgePython; [
       mcp
       pydantic
     ];
@@ -63,8 +82,9 @@ let
     pname = "ghidra-mcp-extension";
     inherit (pin) version;
     inherit src;
+    patches = map (name: ./. + "/${name}") pin.patches;
     nativeBuildInputs = [
-      openjdk21
+      openjdk25
       gradle
       unzip
     ];
@@ -156,8 +176,8 @@ let
     runtimeEnv = {
       GHIDRA_HOME = "${ghidra-bin}/lib/ghidra";
       GHIDRA_MCP_MODULE_PATH_FILE = "${ghidra}/lib/ghidra/module-path";
-      JAVA_HOME = openjdk21.home;
-      GHIDRA_MCP_JAVA = lib.meta.getExe openjdk21;
+      JAVA_HOME = openjdk25.home;
+      GHIDRA_MCP_JAVA = lib.meta.getExe openjdk25;
       GHIDRA_MCP_JAR = "${server}/share/java/GhidraMCP-${pin.upstreamVersion}.jar";
     };
     text = builtins.readFile ./httpd.sh;
@@ -221,12 +241,17 @@ symlinkJoin {
     updateScript = aiUpdateScript {
       attrPath = "ghidra-mcp";
       extraArgs = [ "--override-filename=apps/ghidra/mcp/source.json" ];
-      checkFiles = [ "apps/ghidra/mcp/source.json" ];
+      checkFiles = [
+        "apps/ghidra/mcp/source.json"
+        "apps/ghidra/mcp/uv.lock"
+      ];
       runtimeInputs = [
         coreutils
         nix
         jq
         gnused
+        bun
+        uv
       ];
       beforeUpdate = ''
         set -- "--version=branch=''${GHIDRA_MCP_BRANCH:-main}" "$@"

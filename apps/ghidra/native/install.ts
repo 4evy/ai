@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, readdir, rename, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { parseArgs } from "node:util";
 import { writeFile as atomicWrite } from "atomically";
@@ -12,6 +12,7 @@ import profiles from "../extensions/profiles.json";
 import windowsPin from "../extensions/windows-api-types/source.json";
 import mcpPin from "../mcp/source.json";
 import { download, extract, replaceFile } from "./archive";
+import { applyBridgePatches, readBridgeInputs } from "./bridge";
 import { installationHome, installed, platform } from "./common.ts";
 import { headers } from "./headers";
 import { command } from "./platform.ts";
@@ -41,6 +42,7 @@ export async function install(args: string[]): Promise<void> {
     throw new Error(`Unsupported Ghidra host: ${key}`);
   const binaries = source.platforms[key];
   const host = platform();
+  const bridgeInputs = await readBridgeInputs();
   const fingerprint = createHash("sha256")
     .update(
       JSON.stringify({
@@ -50,6 +52,13 @@ export async function install(args: string[]): Promise<void> {
         ghidra: source.ghidra,
         gradle: source.gradle,
         mcp: mcpPin,
+        bridgeInputs: {
+          patches: bridgeInputs.patches.map(({ name, contents }) => ({
+            name,
+            sha256: createHash("sha256").update(contents).digest("hex"),
+          })),
+          lockSha256: createHash("sha256").update(bridgeInputs.lock).digest("hex"),
+        },
         apple: applePin,
         windows: windowsPin,
         profiles,
@@ -144,11 +153,8 @@ export async function install(args: string[]): Promise<void> {
       ),
       mcp,
     );
-    await replaceFile(
-      join(mcp, "python/bridge_mcp_ghidra/static_tools.py"),
-      "    # Try UDS first\n    instances = discovery.discover_instances()",
-      '    # A configured backend takes priority over unrelated local instances\n    instances = ([] if os.getenv("GHIDRA_MCP_URL")\n                 else discovery.discover_instances())',
-    );
+    await applyBridgePatches(mcp, bridgeInputs);
+    await writeFile(join(mcp, "uv.lock"), bridgeInputs.lock);
     console.error("Building the Ghidra MCP extension");
     await command(
       [...gradle, "--no-daemon", "buildExtension", `-PGHIDRA_INSTALL_DIR=${ghidra}`],

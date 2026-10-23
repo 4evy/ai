@@ -1,0 +1,614 @@
+Migrate the Ghidra MCP 7.0.0 bridge to MCP Python SDK 2.2
+
+Use MCPServer and its public middleware, registration, progress, and
+subscription interfaces. Keep legacy per-connection notifications alongside
+modern subscriptions, with opt-in name-cursor pagination and truthful
+capabilities. Expected Ghidra failures remain error-marked tool results.
+
+diff --git a/pyproject.toml b/pyproject.toml
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -15,13 +15,7 @@
+     "Programming Language :: Python :: 3.13",
+ ]
+ dependencies = [
+-    # Core MCP server framework. The upper bound is load-bearing, not caution:
+-    # the bridge imports `mcp.server.fastmcp`, which 2.x removed when FastMCP
+-    # became MCPServer, so an installed wheel that resolves 2.x dies at import.
+-    # uv.lock pins 1.28.1, so nothing in this repo exercises the range -- only
+-    # `pip install ghidra-mcp-bridge` does. Widen it with the 2.x migration,
+-    # not before; test_mcp_requirement_excludes_the_2x_sdk holds the line.
+-    "mcp>=1.28.1,<2.0.0",
++    "mcp>=2.2.0,<3",
+     # registry.py annotates generated tool parameters with Annotated[T, Field(...)]
+     # directly -- mcp pulls this in transitively, but the bridge imports it by
+     # name now and should declare it rather than rely on a dependency's dependency.
+diff --git a/python/bridge_mcp_ghidra/server.py b/python/bridge_mcp_ghidra/server.py
+--- a/python/bridge_mcp_ghidra/server.py
++++ b/python/bridge_mcp_ghidra/server.py
+@@ -1,110 +1,63 @@
+-"""The FastMCP server singleton and its initialization-options patch."""
++"""The MCPServer singleton, capability policy, and optional tool pagination"""
+ 
+-from mcp import types
+-from mcp.server.fastmcp import FastMCP, Context  # noqa: F401  (Context re-exported)
+-from mcp.server.lowlevel.server import NotificationOptions
++from typing import Any, cast
++
++from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
++from mcp.server.mcpserver import MCPServer, Context  # noqa: F401  (Context re-exported)
+ 
+-# `state` imports only from `config`, so this cannot cycle back through here.
+ from . import state as _state
+ 
+-# The MCP server singleton. All static and dynamically registered tools attach
+-# to this object.
+-mcp = FastMCP("ghidra-mcp")
+-
+-# Enable tools/list_changed notifications so clients re-fetch tools after
+-# dynamic registration.
+-_orig_init_options = mcp._mcp_server.create_initialization_options
+-
+-
+-def _patched_init_options(**kwargs):
+-    options = _orig_init_options(
+-        notification_options=NotificationOptions(tools_changed=True), **kwargs
+-    )
+-    _drop_unimplemented_capabilities(options)
+-    return options
+-
+-
+-def _drop_unimplemented_capabilities(options) -> None:
+-    """Stop advertising `prompts` and `resources` while there are none.
+-
+-    FastMCP registers handlers for both unconditionally, so the handshake
+-    claimed both capabilities and then answered `prompts/list` and
+-    `resources/list` with empty arrays — clients render dead sections for
+-    features this bridge does not provide. Gated on emptiness rather than
+-    hardcoded off, so the capability reappears by itself if a prompt or
+-    resource is ever registered.
+-    """
+-    capabilities = getattr(options, "capabilities", None)
+-    if capabilities is None:  # pragma: no cover - SDK shape changed
+-        return
+-    if not mcp._prompt_manager.list_prompts():
+-        capabilities.prompts = None
+-    resources = mcp._resource_manager.list_resources()
+-    templates = mcp._resource_manager.list_templates()
+-    if not resources and not templates:
+-        capabilities.resources = None
++# All static and dynamically registered tools attach to this server
++mcp = MCPServer("ghidra-mcp", subscriptions=_state.tools_changed_bus)
++_tool_page_size: int | None = None
+ 
+ 
+ def enable_tool_pagination(page_size: int) -> None:
+-    """Serve `tools/list` in pages of ``page_size``.
++    """Serve tools/list in optional name-sorted pages of ``page_size``
+ 
+-    Off unless asked for, and that is not timidity: pagination is optional in the
+-    spec, a client that ignores ``nextCursor`` sees only the first page, and this
+-    server exposes ~250 tools. Claude Code, for instance, has explicit cursor
+-    loops for ``resources/list`` and ``skills/list`` but none for ``tools/list``,
+-    so defaulting this on would hide most of the toolset from it. Turn it on for
+-    a client that cannot take a single ~100KB response (159 tools measured at
+-    98,834 bytes).
+-
+-    The cursor is the last name returned, over a name-sorted list, rather than an
+-    index: the tool list is not fixed here — ``load_tool_group`` and a reconnect
+-    both rewrite it — and an index cursor would then skip or repeat entries.
+-    Resuming after a name works even if that tool has since been unloaded, so a
+-    stale cursor degrades to a correct continuation instead of an error.
++    Pagination stays off by default because clients that ignore nextCursor
++    would otherwise see only the first page. The cursor is the last tool name,
++    not an index, so unloading that tool or changing earlier entries does not
++    skip or repeat the remaining tools.
+     """
++    global _tool_page_size
++    _tool_page_size = page_size
++
+ 
+-    @mcp._mcp_server.list_tools()
+-    async def _list_tools_paginated(
+-        request: types.ListToolsRequest,
+-    ) -> types.ListToolsResult:
+-        tools = sorted(await mcp.list_tools(), key=lambda t: t.name)
+-        cursor = request.params.cursor if request.params else None
+-        if cursor:
+-            tools = [tool for tool in tools if tool.name > cursor]
+-        page = tools[:page_size]
+-        remaining = len(tools) > page_size
+-        return types.ListToolsResult(
+-            tools=page,
+-            nextCursor=page[-1].name if (page and remaining) else None,
+-        )
+-
+-
+-mcp._mcp_server.create_initialization_options = _patched_init_options
+-
+-
+-# Capture the client's session the first time it lists tools.
+-#
+-# Enabling the tools_changed capability above is only half of it: something has
+-# to hold a reference to the session so a background thread can actually send
+-# the notification. That reference used to be captured only inside
+-# connect_instance/load_tool_group/unload_tool_group/import_file, i.e. only
+-# after the client called one of those tools -- which it never does when the
+-# tools it wants are the ones still missing. tools/list is the one request
+-# every MCP client issues right after initialize, so capturing here guarantees
+-# a target exists before the auto-connect retry thread can succeed.
+-_orig_list_tools = mcp.list_tools
+-
+-
+-async def _list_tools_capturing_session():
+-    try:
+-        # Set by the low-level server for every request, including this one.
+-        _state.remember_tools_changed_session(mcp._mcp_server.request_context.session)
+-    except (LookupError, AttributeError):
+-        # No active request context (direct call, e.g. from a test) -- nothing
+-        # to capture, and listing tools must not fail because of it.
+-        pass
+-    return await _orig_list_tools()
++async def _bridge_middleware(ctx: ServerRequestContext, call_next: CallNext) -> HandlerResult:
++    """Customize validated SDK responses without replacing protocol handlers"""
++    if ctx.method == "subscriptions/listen":
++        # Modern clients receive changes on their opted-in subscription stream
++        with _state.tools_changed_subscription():
++            return await call_next(ctx)
++
++    result = cast(dict[str, Any], await call_next(ctx))
++    if ctx.method == "tools/list":
++        # SDK 2 passes context explicitly, and builds a new session proxy for
++        # every request. Capture only after its validation and init gate pass
++        _state.remember_tools_changed_request(ctx)
++        if _tool_page_size is not None:
++            tools = sorted(result["tools"], key=lambda tool: tool["name"])
++            cursor = (ctx.params or {}).get("cursor")
++            if cursor:
++                tools = [tool for tool in tools if tool["name"] > cursor]
++            page = tools[:_tool_page_size]
++            result["tools"] = page
++            if page and len(tools) > _tool_page_size:
++                result["nextCursor"] = page[-1]["name"]
++            else:
++                result.pop("nextCursor", None)
++    elif ctx.method in {"initialize", "server/discover"}:
++        # Middleware receives wire dictionaries after SDK validation. Preserve
++        # metadata and protocol-era fields while changing only our capabilities
++        capabilities = result["capabilities"]
++        if not await mcp.list_prompts():
++            capabilities.pop("prompts", None)
++        if not await mcp.list_resources() and not await mcp.list_resource_templates():
++            capabilities.pop("resources", None)
++        if "tools" in capabilities:
++            capabilities["tools"]["listChanged"] = True
++    return result
+ 
+ 
+-mcp.list_tools = _list_tools_capturing_session
+-mcp._mcp_server.list_tools()(_list_tools_capturing_session)
++mcp.middleware.append(_bridge_middleware)
+diff --git a/python/bridge_mcp_ghidra/registry.py b/python/bridge_mcp_ghidra/registry.py
+--- a/python/bridge_mcp_ghidra/registry.py
++++ b/python/bridge_mcp_ghidra/registry.py
+@@ -44,13 +44,9 @@
+     # the server genuinely serves -- AnnotationScanner tries the canonical name
+     # and then each alias -- and /mcp/schema publishes them as of 7.0.0.
+     #
+-    # The bridge has to declare them too. FastMCP validates arguments against
+-    # this signature with a pydantic model whose `extra` policy is `ignore`, so
+-    # an alias the signature does not name was SILENTLY DROPPED here and the
+-    # request went out without the value; and when the canonical name was
+-    # required, the call was rejected client-side for a spelling the server
+-    # accepts. Declaring each alias as an optional parameter and folding it onto
+-    # the canonical name is what makes the published contract reachable.
++    # The bridge must declare aliases in the signature because MCPServer's
++    # Pydantic model ignores unknown arguments. Optional alias parameters let
++    # the handler fold each accepted spelling onto its canonical name
+     alias_to_canonical: dict[str, str] = {}
+     for _canonical, _pdef in properties.items():
+         for _alias in _pdef.get("aliases") or ():
+@@ -211,10 +207,8 @@
+             default = None
+             py_type = py_type | None if py_type != str else str | None
+ 
+-        # Carry the @Param description from /mcp/schema into the MCP inputSchema.
+-        # FastMCP derives inputSchema from this signature via pydantic, so a bare
+-        # annotation drops the text the server already published and the model
+-        # sees a nameless, undocumented parameter.
++        # Carry @Param descriptions into the schema MCPServer derives from
++        # this signature, so parameters retain their server-side documentation
+         pdesc = pdef.get("description")
+         annotation = Annotated[py_type, Field(description=pdesc)] if pdesc else py_type
+ 
+@@ -265,7 +259,7 @@
+ 
+ 
+ def _signature_with_context(signature: inspect.Signature) -> inspect.Signature:
+-    """Append the FastMCP `ctx` parameter, which it keeps out of inputSchema."""
++    """Append the injected Context parameter without exposing it in input_schema"""
+     ctx_param = inspect.Parameter(
+         "ctx",
+         inspect.Parameter.KEYWORD_ONLY,
+@@ -276,29 +270,14 @@
+ 
+ 
+ def _start_progress_heartbeat(ctx: Context | None, tool_name: str):
+-    """Tick progress notifications while a call is in flight, or return None.
+-
+-    Endpoint timeouts here reach 600s (`dispatch.get_timeout` scales batch
+-    renames and comment writes by item count), and nothing was sent during the
+-    wait: a client had no way to tell a long decompile from a hung session, and
+-    some give up on their own idle timer.
+-
+-    Started only when the client actually asked for progress — the notification
+-    is silently dropped without a progressToken, so spawning a task per call for
+-    a client that never asked would be pure overhead.
+-    """
++    """Report elapsed time through the SDK's request-bound progress channel"""
+     if ctx is None:
+         return None
+     try:
+-        meta = ctx.request_context.meta
+-    except (AttributeError, ValueError):
+-        # No active request context (direct call, or a test harness).
+-        return None
+-    if meta is None or meta.progressToken is None:
++        ctx.request_context
++    except ValueError:
++        # Direct calls have no active request context
+         return None
+-    token = meta.progressToken
+-    session = ctx.request_context.session
+-    request_id = ctx.request_context.request_id
+ 
+     async def _tick() -> None:
+         elapsed = 0.0
+@@ -306,20 +285,13 @@
+             while True:
+                 await asyncio.sleep(_PROGRESS_INTERVAL_SECONDS)
+                 elapsed += _PROGRESS_INTERVAL_SECONDS
+-                # Sent through the session rather than ctx.report_progress()
+-                # because that helper omits related_request_id, and without it
+-                # the streamable-HTTP transport routes the notification to the
+-                # standalone GET stream — where it is dropped outright for a
+-                # client that only POSTs. Tying it to the request puts it on
+-                # that call's own stream, which every client is already reading.
+-                #
+-                # No `total`: the server reports nothing a fraction could be
+-                # computed from, and inventing one would misreport completion.
+-                await session.send_progress_notification(
+-                    progress_token=token,
++                # SDK 2 routes this to the originating request, including
++                # StreamableHTTP POSTs and in-process progress callbacks
++                # It is a no-op when progress was not requested, and needs no
++                # wire token. No total is available for the elapsed-time tick
++                await ctx.report_progress(
+                     progress=elapsed,
+                     message=f"{tool_name} still running ({int(elapsed)}s)",
+-                    related_request_id=request_id,
+                 )
+         except asyncio.CancelledError:
+             pass
+@@ -343,20 +315,16 @@
+     sync_handler = _build_tool_function(endpoint, http_method, input_schema)
+ 
+     async def handler(ctx: Context | None = None, **kwargs):
+-        # A heartbeat runs alongside the call, never around it: the await below
+-        # is left exactly as it was so cancellation still reaches
+-        # run_blocking_ghidra_call and aborts the in-flight Ghidra socket.
++        # Keep cancellation connected to the bridge's in-flight socket handle
+         heartbeat = _start_progress_heartbeat(ctx, name)
+         try:
+-            # FastMCP calls synchronous tools directly on its event loop. Keep
+-            # the blocking Ghidra HTTP lifecycle in a worker thread so one slow
+-            # request cannot close or starve the entire MCP session.
++            # Use the bridge worker pool, whose cancellation handle aborts the
++            # HTTP socket instead of merely abandoning a worker thread
+             result = await state.run_blocking_ghidra_call(sync_handler, **kwargs)
+         finally:
+             if heartbeat is not None:
+                 heartbeat.cancel()
+-        # Failures arrive as an ordinary 200 body; raising is what makes the
+-        # tool result carry isError instead of looking like a success.
++        # Raising a tool error makes the result carry isError on the wire
+         return dispatch.raise_on_failure(result)
+ 
+     handler.__signature__ = _signature_with_context(sync_handler.__signature__)
+@@ -369,14 +337,9 @@
+         description=description,
+         annotations=_tool_annotations(tool_def),
+         # Every tool here returns the server's response body as text. Left to
+-        # infer from the `-> str` annotation, FastMCP declares
+-        # outputSchema {"result": {"type": "string"}} and wraps the body in
+-        # structuredContent {"result": "<the json>"} — a structured shape whose
+-        # single field is an opaque string. That advertises a contract the tool
+-        # does not have; a client reading `result` still has to parse the JSON
+-        # itself. Declaring truthful per-tool output schemas needs response
+-        # shapes described on the Java side, which no endpoint does yet, so the
+-        # honest option is to declare none.
++        # inference, MCPServer would advertise a structured result containing
++        # an opaque JSON string. Leave output_schema unset until the Ghidra
++        # endpoints publish real response shapes
+         structured_output=False,
+     )(handler)
+     state._dynamic_tool_names.append(name)
+@@ -430,17 +393,7 @@
+     with state._tool_registry_lock:
+         # Remove previously registered dynamic tools
+         for name in state._dynamic_tool_names:
+-            try:
+-                mcp._tool_manager._tools.pop(name, None)
+-            except Exception as e:
+-                # Reaches into FastMCP internals; if its private structure changes this
+-                # would silently leak tools across reloads. Log so the breakage is visible.
+-                logger.warning(
+-                    "Failed to unregister dynamic tool %r via mcp._tool_manager._tools "
+-                    "(FastMCP internals may have changed): %s",
+-                    name,
+-                    e,
+-                )
++            mcp.remove_tool(name)
+         state._dynamic_tool_names.clear()
+         state._loaded_groups.clear()
+ 
+@@ -502,16 +455,8 @@
+                     to_remove.append(name)
+ 
+         for name in to_remove:
+-            try:
+-                mcp._tool_manager._tools.pop(name, None)
+-                state._dynamic_tool_names.remove(name)
+-            except Exception as e:
+-                # See unregister note above: FastMCP-internals access, log on failure.
+-                logger.warning(
+-                    "Failed to unload tool %r via mcp._tool_manager._tools " "(FastMCP internals may have changed): %s",
+-                    name,
+-                    e,
+-                )
++            mcp.remove_tool(name)
++            state._dynamic_tool_names.remove(name)
+ 
+         if to_remove:
+             state._loaded_groups.discard(group_name)
+@@ -576,7 +521,6 @@
+ 
+ 
+ async def _notify_tools_changed(ctx: Context | None) -> None:
+-    """Send tools/list_changed notification if context is available."""
+-    if ctx is not None and ctx._request_context is not None:
+-        state.remember_tools_changed_context(ctx)
+-        await ctx.request_context.session.send_tool_list_changed()
++    """Notify every legacy connection and modern subscriber of a catalog change"""
++    state.remember_tools_changed_context(ctx)
++    state.notify_tools_changed_from_worker()
+diff --git a/python/bridge_mcp_ghidra/state.py b/python/bridge_mcp_ghidra/state.py
+--- a/python/bridge_mcp_ghidra/state.py
++++ b/python/bridge_mcp_ghidra/state.py
+@@ -16,6 +16,9 @@
+ from functools import partial
+ from contextlib import contextmanager
+ 
++from mcp.server.subscriptions import InMemorySubscriptionBus, ToolsListChanged
++from mcp.types.version import MODERN_PROTOCOL_VERSIONS
++
+ from .config import CORE_GROUPS, MAX_CONCURRENT_GHIDRA_REQUESTS, logger
+ 
+ # --------------------------------------------------------------------------
+@@ -120,12 +123,13 @@
+ # once at a time even though normal HTTP requests may proceed concurrently.
+ _reconnect_lock = threading.RLock()
+ 
+-# Dynamic tool registration reaches into FastMCP internals and mutates shared
+-# name/group state. Keep those mutations serialized even though normal Ghidra
+-# requests are concurrent.
++# Dynamic tool registration mutates the shared MCP tool catalog and name/group
++# state. Serialize those mutations while normal Ghidra requests stay concurrent
+ _tool_registry_lock = threading.RLock()
+ _tools_changed_session_lock = threading.Lock()
+-_tools_changed_targets: list[tuple[asyncio.AbstractEventLoop, object]] = []
++_tools_changed_targets: dict[tuple[asyncio.AbstractEventLoop, str], object] = {}
++_tools_changed_subscription_loops: dict[asyncio.AbstractEventLoop, int] = {}
++tools_changed_bus = InMemorySubscriptionBus()
+ _active_request_handles_lock = threading.Lock()
+ _active_request_handles: set[RequestCancelHandle] = set()
+ 
+@@ -254,61 +258,97 @@
+         return get_connection_snapshot()
+ 
+ 
+-def remember_tools_changed_session(session) -> None:
+-    """Remember one MCP session that can receive tools/list_changed.
+-
+-    Must be called from the session's own event loop — the loop is captured
+-    here so a worker thread can later dispatch the notification back onto it.
++def remember_tools_changed_request(request_context) -> None:
++    """Capture one legacy notification target per transport connection
+ 
+-    Registration used to happen ONLY inside connect_instance/load_tool_group/
+-    unload_tool_group/import_file, which are tools the client has to call
+-    first. That made the whole notification path dead in the one situation it
+-    exists for: a bridge started BEFORE Ghidra registers 35 static tools, the
+-    background retry succeeds seconds later and calls
+-    notify_tools_changed_from_worker() — into an EMPTY target list, because no
+-    static tool had been invoked yet. The client is never told, so the session
+-    runs to its end showing 35 of 273 tools while Ghidra is healthy. Capturing
+-    at tools/list (see server.py) fixes that: every client lists tools right
+-    after initialize, so a target always exists before the retry can win.
++    SDK 2 creates a new session proxy for every request, so proxy identity
++    cannot deduplicate clients. HTTP supplies its session header, SSE its
++    message-endpoint query parameter, and stdio has one connection per loop.
++    Stateless HTTP has no standalone notification channel. Modern clients
++    receive changes through tools_changed_bus instead.
+     """
+-    if session is None:
++    session = request_context.session
++    if session.protocol_version in MODERN_PROTOCOL_VERSIONS:
+         return
+-    try:
+-        loop = asyncio.get_running_loop()
+-    except RuntimeError:
++    request = request_context.request
++    if request is None:
++        key = "stdio"
++    elif session_id := request.headers.get("mcp-session-id"):
++        key = f"http:{session_id}"
++    elif session_id := request.query_params.get("session_id"):
++        key = f"sse:{session_id}"
++    else:
+         return
++    loop = asyncio.get_running_loop()
+     with _tools_changed_session_lock:
+-        for existing_loop, existing_session in _tools_changed_targets:
+-            if existing_loop is loop and existing_session is session:
+-                return
+-        _tools_changed_targets.append((loop, session))
++        _tools_changed_targets[(loop, key)] = session
+ 
+ 
+ def remember_tools_changed_context(ctx) -> None:
+-    """Remember the MCP session behind a FastMCP Context, if it has one."""
+-    if ctx is None or getattr(ctx, "_request_context", None) is None:
++    """Remember an injected MCPServer Context's legacy connection, if any"""
++    if ctx is None:
++        return
++    try:
++        request_context = ctx.request_context
++    except ValueError:
+         return
+-    remember_tools_changed_session(ctx.request_context.session)
++    remember_tools_changed_request(request_context)
++
++
++@contextmanager
++def tools_changed_subscription():
++    """Keep a publication loop only while modern listen requests are active"""
++    loop = asyncio.get_running_loop()
++    with _tools_changed_session_lock:
++        _tools_changed_subscription_loops[loop] = _tools_changed_subscription_loops.get(loop, 0) + 1
++    try:
++        yield
++    finally:
++        with _tools_changed_session_lock:
++            count = _tools_changed_subscription_loops[loop] - 1
++            if count:
++                _tools_changed_subscription_loops[loop] = count
++            else:
++                del _tools_changed_subscription_loops[loop]
++
++
++async def _notify_legacy_tools_changed(key, session) -> None:
++    try:
++        await session.send_tool_list_changed()
++        # SDK 2 drops notifications on closed connections instead of raising
++        # Bound the probe because HTTP clients without a standalone GET stream
++        # cannot answer it. wait_for cancels the pending RPC before pruning
++        await asyncio.wait_for(session.send_ping(), timeout=5.0)
++    except Exception:
++        with _tools_changed_session_lock:
++            if _tools_changed_targets.get(key) is session:
++                del _tools_changed_targets[key]
+ 
+ 
+ def notify_tools_changed_from_worker() -> None:
+-    """Best-effort tools/list_changed notification from a worker thread."""
++    """Notify legacy connections and publish to modern subscribed streams"""
+     with _tools_changed_session_lock:
+-        targets = list(_tools_changed_targets)
+-    stale: list[tuple[asyncio.AbstractEventLoop, object]] = []
+-    for loop, session in targets:
++        targets = list(_tools_changed_targets.items())
++        subscription_loops = list(_tools_changed_subscription_loops)
++    for key, session in targets:
++        loop, _ = key
+         if loop.is_closed():
+-            stale.append((loop, session))
++            with _tools_changed_session_lock:
++                _tools_changed_targets.pop(key, None)
+             continue
++        notification = _notify_legacy_tools_changed(key, session)
+         try:
+-            asyncio.run_coroutine_threadsafe(session.send_tool_list_changed(), loop)
+-        except Exception:
+-            stale.append((loop, session))
+-    if stale:
+-        with _tools_changed_session_lock:
+-            for target in stale:
+-                if target in _tools_changed_targets:
+-                    _tools_changed_targets.remove(target)
++            asyncio.run_coroutine_threadsafe(notification, loop)
++        except RuntimeError:
++            notification.close()
++            with _tools_changed_session_lock:
++                _tools_changed_targets.pop(key, None)
++    for loop in subscription_loops:
++        publication = tools_changed_bus.publish(ToolsListChanged())
++        try:
++            asyncio.run_coroutine_threadsafe(publication, loop)
++        except RuntimeError:
++            publication.close()
+ 
+ 
+ def _get_worker_pool() -> concurrent.futures.ThreadPoolExecutor:
+diff --git a/python/bridge_mcp_ghidra/config.py b/python/bridge_mcp_ghidra/config.py
+--- a/python/bridge_mcp_ghidra/config.py
++++ b/python/bridge_mcp_ghidra/config.py
+@@ -16,9 +16,9 @@
+ #
+ # openWorldHint is left unset throughout: it would be false for nearly every
+ # tool but not all of them, and no client gates behaviour on it.
+-READ_ONLY_TOOL = ToolAnnotations(readOnlyHint=True, destructiveHint=False)
+-WRITE_TOOL = ToolAnnotations(readOnlyHint=False, destructiveHint=False)
+-DESTRUCTIVE_TOOL = ToolAnnotations(readOnlyHint=False, destructiveHint=True)
++READ_ONLY_TOOL = ToolAnnotations(read_only_hint=True, destructive_hint=False)
++WRITE_TOOL = ToolAnnotations(read_only_hint=False, destructive_hint=False)
++DESTRUCTIVE_TOOL = ToolAnnotations(read_only_hint=False, destructive_hint=True)
+ 
+ # ==========================================================================
+ # Request timeouts
+diff --git a/python/bridge_mcp_ghidra/dispatch.py b/python/bridge_mcp_ghidra/dispatch.py
+--- a/python/bridge_mcp_ghidra/dispatch.py
++++ b/python/bridge_mcp_ghidra/dispatch.py
+@@ -3,6 +3,8 @@
+ import json
+ import time
+ 
++from mcp.server.mcpserver.exceptions import ToolError
++
+ from . import discovery
+ from . import registry
+ from . import state
+@@ -15,8 +17,8 @@
+ )
+ 
+ 
+-class GhidraToolError(Exception):
+-    """A tool call that failed, so FastMCP can mark the result ``isError``.
++class GhidraToolError(ToolError):
++    """An expected tool failure, returned by MCPServer with ``isError`` set
+ 
+     Every failure the bridge or the server can report arrives as a normal HTTP
+     200 body — ``Response.Err`` renders ``{"error": ...}``, and dispatch builds
+@@ -24,8 +26,8 @@
+     Returning that string as a successful tool result made a failure
+     indistinguishable from success at the protocol level: clients and agent
+     loops that branch on ``isError`` saw every call succeed, and the model had
+-    to notice the word "error" inside the JSON. Raising is how FastMCP is told
+-    otherwise.
++    to notice the word "error" inside the JSON. Raising ToolError preserves
++    the failure message and marks the MCP result as unsuccessful.
+     """
+ 
+ 
+diff --git a/python/bridge_mcp_ghidra/schema.py b/python/bridge_mcp_ghidra/schema.py
+--- a/python/bridge_mcp_ghidra/schema.py
++++ b/python/bridge_mcp_ghidra/schema.py
+@@ -15,7 +15,7 @@
+     "object": dict,
+     "array": list,
+     # Java Object bindings accept native JSON values. A str annotation makes
+-    # FastMCP reject objects/arrays before the request can reach the server.
++    # MCPServer reject objects/arrays before the request can reach the server
+     "any": Any,
+     "address": str,
+ }

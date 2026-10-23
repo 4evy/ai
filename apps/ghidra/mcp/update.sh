@@ -14,3 +14,4 @@ jq --arg upstreamVersion "$upstream_version" '
 ' "$pin" >"$temporary"
 mv "$temporary" "$pin"
 trap - EXIT
+bun apps/ghidra/mcp/update.ts "$source_path"

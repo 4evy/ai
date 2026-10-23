@@ -62,6 +62,7 @@ pkgs.mkShell {
         nixfmt
         statix
         nix-update
+        uv
         pandoc
         rumdl
         ;

@@ -1,0 +1,245 @@
+--- a/python/bridge_mcp_ghidra/cli.py
++++ b/python/bridge_mcp_ghidra/cli.py
+@@ -10,6 +10,7 @@
+ 
+ import uvicorn
+ from mcp.server.transport_security import TransportSecuritySettings
++from mcp.types.version import HANDSHAKE_PROTOCOL_VERSIONS
+ from starlette.middleware.cors import CORSMiddleware
+ 
+ from . import server
+@@ -240,36 +241,6 @@
+             return b"".join(chunks)
+ 
+ 
+-async def _drop_session(session_id: str) -> None:
+-    """Tear down a session whose creating request was rejected.
+-
+-    ``StreamableHTTPSessionManager`` registers the new transport *before* the
+-    transport validates the request, so a handshake refused for a bad ``Accept``
+-    header, an unsupported ``MCP-Protocol-Version`` or unparseable JSON leaves a
+-    live session behind. The SDK's own reaper (``session_idle_timeout``) is
+-    never enabled by FastMCP, so nothing else collects them.
+-    """
+-    manager = getattr(mcp, "_session_manager", None)
+-    instances = getattr(manager, "_server_instances", None)
+-    if not isinstance(instances, dict):
+-        logger.warning(
+-            "Cannot drop session %s: no _server_instances dict on the session "
+-            "manager (SDK internals may have changed)",
+-            session_id,
+-        )
+-        return
+-    transport = instances.pop(session_id, None)
+-    owners = getattr(manager, "_session_owners", None)
+-    if isinstance(owners, dict):
+-        owners.pop(session_id, None)
+-    if transport is None:
+-        return
+-    try:
+-        await transport.terminate()
+-    except Exception as e:
+-        logger.warning("Failed to terminate rejected session %s: %s", session_id, e)
+-
+-
+ def _is_initialize_request(body: bytes) -> bool:
+     """True when this body is the JSON-RPC ``initialize`` handshake."""
+     try:
+@@ -352,14 +323,11 @@
+     ``Access-Control-Request-Method``. CORS sits *outside* this guard, so
+     genuine preflights are handled there and never arrive here.
+ 
+-    **Refuse session-less requests before the session manager sees them.**
+-    ``StreamableHTTPSessionManager`` creates a live transport for every request
+-    that arrives with no session id — including the ones it is about to reject
+-    — and never reaps them. Measured: 50 bare OPTIONS plus 50 session-less
+-    pings left 100 permanent sessions, each with its own task group, and a
+-    session id handed out with a 405 was afterwards fully usable. A request
+-    carrying an *unknown* session id is already handled correctly upstream
+-    (404, nothing created), so only a missing header is intercepted here.
++    **Refuse legacy session-less requests before creating a transport**
++    Only a legacy ``initialize`` may open a stateful session. The SDK cleans
++    up rejected opening requests, but this gate avoids allocating a transport
++    for requests already known to lack a session. Modern protocol requests
++    have no initialize handshake or session id and go directly to the SDK
+     """
+ 
+     def __init__(self, app, *, guard_sessions: bool):
+@@ -391,6 +359,18 @@
+             return
+ 
+         headers = {k.lower(): v for k, v in scope.get("headers", [])}
++        # Match the SDK's era routing, including unknown versions, whose
++        # rejection belongs to its protocol classifier rather than this gate
++        protocol_version = next(
++            (value for key, value in scope.get("headers", []) if key.lower() == b"mcp-protocol-version"),
++            None,
++        )
++        if (
++            protocol_version is not None
++            and protocol_version.decode("latin-1") not in HANDSHAKE_PROTOCOL_VERSIONS
++        ):
++            await self.app(scope, receive, send)
++            return
+         if b"mcp-session-id" in headers:
+             await self.app(scope, receive, send)
+             return
+@@ -416,27 +396,18 @@
+             replayed = True
+             return {"type": "http.request", "body": body, "more_body": False}
+ 
+-        # A handshake the transport goes on to reject still leaves its freshly
+-        # registered session behind, so watch the status and clean up. Only
+-        # sessions created by *this* request can be dropped here.
+-        new_session: str | None = None
+-        rejected = False
+-
+-        async def watch(message):
+-            nonlocal new_session, rejected
+-            if message["type"] == "http.response.start":
+-                rejected = message["status"] >= 400
+-                for key, value in message.get("headers", []):
+-                    if key.lower() == b"mcp-session-id":
+-                        new_session = value.decode("latin-1")
+-            await send(message)
+-
+-        await self.app(scope, replay, watch)
+-        if rejected and new_session:
+-            await _drop_session(new_session)
++        # MCP 2 owns rejected, failed and cancelled opening-request cleanup
++        await self.app(scope, replay, send)
+ 
+ 
+-def _build_http_app(transport: str, bind_host: str):
++def _build_http_app(
++    transport: str,
++    bind_host: str,
++    *,
++    json_response: bool = False,
++    stateless_http: bool = False,
++    transport_security: TransportSecuritySettings | None = None,
++):
+     """Return the transport's Starlette app wrapped in the bridge's middleware.
+ 
+     Browser-based clients (MCP Inspector) send an OPTIONS preflight before
+@@ -450,11 +421,20 @@
+     outermost, so it claims real preflights before ``TransportEdgeGuard``
+     sees them.
+     """
+-    app = mcp.sse_app() if transport == "sse" else mcp.streamable_http_app()
+-    # The SSE transport carries its session in a query parameter and has no
+-    # `mcp-session-id` header; stateless streamable-HTTP has no session at
+-    # all. Neither can be guarded by header presence.
+-    guard_sessions = transport == "streamable-http" and not mcp.settings.stateless_http
++    security = transport_security if transport_security is not None else _transport_security(bind_host)
++    if transport == "sse":
++        app = mcp.sse_app(host=bind_host, transport_security=security)
++    else:
++        app = mcp.streamable_http_app(
++            host=bind_host,
++            transport_security=security,
++            json_response=json_response,
++            stateless_http=stateless_http,
++        )
++    # Keep the SDK app itself as the root so uvicorn enters its lifespan and
++    # starts the session manager. ASGI middleware forwards lifespan unchanged
++    # SSE uses a query-parameter session, and stateless HTTP has no session
++    guard_sessions = transport == "streamable-http" and not stateless_http
+     app.add_middleware(TransportEdgeGuard, guard_sessions=guard_sessions)
+     # Sits outside TransportEdgeGuard so an unauthenticated request never
+     # reaches the session manager, and inside CORS so a browser still gets its
+@@ -532,17 +512,17 @@
+         action="store_true",
+         default=False,
+         help="streamable-http: answer POSTs with a plain JSON body instead of an "
+-        "SSE stream, for clients that cannot read text/event-stream. Rules out "
+-        "server-initiated messages on the response, so tools/list_changed and "
+-        "progress notifications are not delivered.",
++        "SSE stream, for clients that cannot read text/event-stream. Disables "
++        "progress on POST responses. Legacy stateful clients can still receive "
++        "change notifications on a separate GET stream.",
+     )
+     parser.add_argument(
+         "--stateless-http",
+         action="store_true",
+         default=False,
+-        help="streamable-http: treat every request as standalone — no session id "
+-        "and no server-initiated notifications. Needed to run several bridge "
+-        "workers behind a load balancer.",
++        help="streamable-http: serve legacy requests without a session id or "
++        "standalone notification stream, for workers behind a load balancer. "
++        "Modern protocol requests are already standalone.",
+     )
+     args = parser.parse_args()
+ 
+@@ -580,14 +560,6 @@
+         logger.info("No Ghidra tools registered at startup; retrying in the background")
+         _start_auto_connect_retry()
+ 
+-    mcp.settings.log_level = "INFO"
+-    mcp.settings.host = args.mcp_host
+-    if args.mcp_port:
+-        mcp.settings.port = args.mcp_port
+-    # Both are read when the transport app is constructed, so they have to be
+-    # installed before _build_http_app() runs.
+-    mcp.settings.json_response = args.json_response
+-    mcp.settings.stateless_http = args.stateless_http
+     if (args.json_response or args.stateless_http) and args.transport != "streamable-http":
+         logger.warning(
+             "--json-response/--stateless-http only affect streamable-http; ignored for %s",
+@@ -595,12 +567,13 @@
+         )
+     if args.stateless_http and state._lazy_mode:
+         logger.warning(
+-            "Stateless HTTP cannot deliver tools/list_changed, so a group loaded by "
+-            "load_tool_group() stays invisible to the client. Pass --no-lazy (or set "
+-            "GHIDRA_MCP_LAZY=0) when running stateless; lazy loading is the default."
++            "Legacy stateless HTTP cannot deliver tools/list_changed, so a group "
++            "loaded by load_tool_group() stays invisible to legacy clients. Pass "
++            "--no-lazy (or set GHIDRA_MCP_LAZY=0) when serving them stateless."
+         )
+ 
+     _host = args.mcp_host
++    security = _transport_security(_host)
+     if (
+         args.transport in ("sse", "streamable-http")
+         and _host not in {"127.0.0.1", "localhost", "::1"}
+@@ -639,9 +612,8 @@
+                 "GHIDRA_MCP_DISABLE_REBIND_PROTECTION=1 — any page in the "
+                 "user's browser can drive this server."
+             )
+-            mcp.settings.transport_security = TransportSecuritySettings(enable_dns_rebinding_protection=False)
++            security = TransportSecuritySettings(enable_dns_rebinding_protection=False)
+         else:
+-            security = _transport_security(_host)
+             logger.info(
+                 "Bind %s with DNS-rebinding protection ON; allowed Host "
+                 "headers: %s. Extend with GHIDRA_MCP_ALLOWED_HOSTS=host1,host2 "
+@@ -650,17 +622,22 @@
+                 _host,
+                 security.allowed_hosts,
+             )
+-            mcp.settings.transport_security = security
+     logger.info(f"Starting MCP bridge ({args.transport})")
+     try:
+         if args.transport in ("sse", "streamable-http"):
+             host = args.mcp_host
+-            port = args.mcp_port if args.mcp_port else mcp.settings.port
++            port = args.mcp_port if args.mcp_port else 8000
+             path = "/sse" if args.transport == "sse" else "/mcp"
+             logger.info(f"MCP endpoint: http://{host}:{port}{path}")
+-            app = _build_http_app(args.transport, host)
+-            uvicorn.run(app, host=host, port=port, log_level=mcp.settings.log_level.lower())
++            app = _build_http_app(
++                args.transport,
++                host,
++                json_response=args.json_response,
++                stateless_http=args.stateless_http,
++                transport_security=security,
++            )
++            uvicorn.run(app, host=host, port=port, log_level="info")
+         else:
+-            mcp.run(transport=args.transport)
++            mcp.run(transport="stdio")
+     finally:
+         state.shutdown_worker_pool(wait=False)

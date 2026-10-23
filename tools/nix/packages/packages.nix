@@ -1,6 +1,7 @@
 { bun2nix }:
 pkgs:
 let
+  ghidraNative = pkgs.lib.trivial.importJSON ../../../apps/ghidra/native/source.json;
   bunTools = bun2nix.packages.${pkgs.stdenv.hostPlatform.system}.default.overrideAttrs (old: {
     # Bun 1.4 keeps the package records compatible but advances the lock version
     postPatch = (old.postPatch or "") + ''
@@ -26,6 +27,25 @@ let
       };
       bun2nix = bunTools;
       ai-javascript = self.callPackage ../javascript/javascript.nix { };
+      ghidra-bin = (pkgs.ghidra-bin.override { openjdk21 = pkgs.openjdk25; }).overrideAttrs (old: {
+        inherit (ghidraNative.ghidra) version;
+        versiondate = pkgs.lib.strings.removeSuffix ".zip" (
+          pkgs.lib.lists.last (pkgs.lib.strings.splitString "_" ghidraNative.ghidra.url)
+        );
+        src = pkgs.fetchurl {
+          inherit (ghidraNative.ghidra) url sha256;
+        };
+        nativeBuildInputs = old.nativeBuildInputs ++ [ pkgs.unzip ];
+      });
+      gradle = pkgs.gradle-packages.mkGradle {
+        inherit (ghidraNative.gradle) version;
+        hash = builtins.convertHash {
+          hash = ghidraNative.gradle.sha256;
+          hashAlgo = "sha256";
+          toHashFormat = "sri";
+        };
+        defaultJava = pkgs.openjdk25;
+      };
       ghidra-apple-api-types =
         self.callPackage ../../../apps/ghidra/extensions/apple-api-types/apple-api-types.nix
           { };
@@ -100,4 +120,8 @@ let
   });
 in
 # Keep the public package set limited to derivations, without scope helpers
-removeAttrs (scope.packages scope) [ "aiUpdateScript" ]
+removeAttrs (scope.packages scope) [
+  "aiUpdateScript"
+  "ghidra-bin"
+  "gradle"
+]

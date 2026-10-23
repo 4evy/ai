@@ -1,6 +1,17 @@
 {
-  "version": "7.0.0-unstable-2026-10-14",
+  "version": "7.0.0-unstable-2026-10-21",
   "upstreamVersion": "7.0.0",
-  "rev": "0c9573efc174bbb1ea8f3c2336ec4bb3ebfe9f10",
-  "hash": "sha256-zdlsKxNU1E/fSQ0NcfrufKulk8A05LYEL4qejblUo+g="
+  "rev": "19e64c75f1be1fcbe413e845f65e549f2361b928",
+  "hash": "sha256-0RWq1bX3fHY2DR0HQ75ylNCWQbKczvsk8m8/8eSW/Sk=",
+  "patches": [
+    "explicit-backend.patch",
+    "sdk-server.patch",
+    "sdk-transports.patch",
+    "runtime-toolchain.patch",
+    "ghidra12-api.patch"
+  ],
+  "sdk": {
+    "version": "2.3.0",
+    "hash": "sha256-CnXi78zYxm0/R4fON/DzRYMSDYM/XM/9SE3s+Cf1BR0="
+  }
 }

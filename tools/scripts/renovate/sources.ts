@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import * as v from "valibot";
+import { updateBridgeLock } from "../../../apps/ghidra/mcp/update";
 import { root, run, writeJson } from "./process";
 
 const sourcePinSchema = v.looseObject({
@@ -60,5 +61,7 @@ export async function updateSources(changed: Set<string>): Promise<void> {
     pin.version = `${version}-unstable-${date}`;
     pin.hash = source.hash;
     await writeJson(join(root, path), pin);
+    if (repository === "bethington/ghidra-mcp")
+      await updateBridgeLock(source.storePath);
   }
 }

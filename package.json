@@ -43,7 +43,6 @@
     "@actions/exec": "3.0.0",
     "@biomejs/biome": "2.6.2",
     "@types/bun": "catalog:",
-    "diff": "9.0.0",
     "farstep": "workspace:*",
     "knip": "6.42.1",
     "omp-agent-runtime": "workspace:*",
@@ -60,6 +59,7 @@
     "vscode-jsonrpc": "10.0.0",
     "effect": "4.0.6",
     "@ai/core": "workspace:*",
+    "diff": "9.0.0",
     "atomically": "2.1.1"
   },
   "type": "module"

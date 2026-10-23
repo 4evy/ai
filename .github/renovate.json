@@ -58,6 +58,17 @@
     },
     {
       "customType": "regex",
+      "description": "Track the shared Ghidra bridge MCP Python SDK",
+      "managerFilePatterns": ["/^apps/ghidra/mcp/source\\.json$/"],
+      "matchStrings": [
+        "\"sdk\":\\s*\\{\\s*\"version\":\\s*\"(?<currentValue>[^\"\\s]+)\""
+      ],
+      "depNameTemplate": "mcp",
+      "datasourceTemplate": "pypi",
+      "versioningTemplate": "pep440"
+    },
+    {
+      "customType": "regex",
       "description": "Track Apple API headers at an exact upstream commit",
       "managerFilePatterns": [
         "/^apps/ghidra/extensions/apple-api-types/source\\.json$/"
@@ -116,12 +127,12 @@
     },
     {
       "customType": "regex",
-      "description": "Track the Temurin 21 distributions",
+      "description": "Track the Ghidra-supported Temurin 25 distributions",
       "managerFilePatterns": ["/^apps/ghidra/native/source\\.json$/"],
       "matchStrings": [
         "\"jdk\":\\s*\\{\\s*\"version\":\\s*\"jdk-(?<currentValue>[^\"\\s]+)\""
       ],
-      "depNameTemplate": "adoptium/temurin21-binaries",
+      "depNameTemplate": "adoptium/temurin25-binaries",
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "maven",
       "extractVersionTemplate": "^jdk-(?<version>.+)$"
@@ -263,6 +274,7 @@
       "farstep/sky/**",
       "apps/omp/**",
       "apps/ghidra/**/source.json",
+      "apps/ghidra/mcp/uv.lock",
       "tools/nix/javascript/runtime/runtime.nix",
       "tools/nix/fmt/analyzer.nix"
     ],

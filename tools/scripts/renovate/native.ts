@@ -75,9 +75,11 @@ export async function updateNativeGhidra(): Promise<void> {
   const uv = await release("astral-sh/uv", pin.uvVersion);
   const jdks = new Map<string, Asset[]>();
   for (const [platform, target] of Object.entries(pin.platforms)) {
+    const jdkMajor = /^jdk-(\d+)/.exec(target.jdk.version)?.[1];
+    if (!jdkMajor) throw new Error(`Invalid JDK release: ${target.jdk.version}`);
     let jdk = jdks.get(target.jdk.version);
     if (!jdk) {
-      jdk = await release("adoptium/temurin21-binaries", target.jdk.version);
+      jdk = await release(`adoptium/temurin${jdkMajor}-binaries`, target.jdk.version);
       jdks.set(target.jdk.version, jdk);
     }
     const [os, arch] = platform.split("-");
@@ -88,7 +90,7 @@ export async function updateNativeGhidra(): Promise<void> {
       await artifact(
         jdk,
         (name) =>
-          name.startsWith(`OpenJDK21U-jdk_${jdkArch}_${jdkOS}_hotspot_`) &&
+          name.startsWith(`OpenJDK${jdkMajor}U-jdk_${jdkArch}_${jdkOS}_hotspot_`) &&
           name.endsWith(os === "win32" ? ".zip" : ".tar.gz"),
       ),
     );

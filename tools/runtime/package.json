@@ -29,6 +29,7 @@
     "fast-json-stable-stringify": "2.1.0",
     "leven": "4.1.0",
     "ipaddr.js": "2.5.0",
+    "diff": "9.0.0",
     "plist": "5.0.0"
   }
 }
