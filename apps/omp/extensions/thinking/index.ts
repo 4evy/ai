@@ -1,5 +1,6 @@
 import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
+import { toReasoningEffort } from "@oh-my-pi/pi-tui/thinking";
 
 const EFFORT_SHORTCUTS = [
   {
@@ -14,20 +15,13 @@ const EFFORT_SHORTCUTS = [
   },
 ] as const;
 
-const UNSELECTED_LEVELS = new Set<ThinkingLevel>([
-  ThinkingLevel.Off,
-  ThinkingLevel.Inherit,
-]);
-
 function effortIndex(
   levels: readonly ThinkingLevel[],
   current: ThinkingLevel | undefined,
   defaultLevel: ThinkingLevel | undefined,
 ): number {
-  const index =
-    current === undefined || UNSELECTED_LEVELS.has(current)
-      ? -1
-      : levels.indexOf(current);
+  const effort = toReasoningEffort(current);
+  const index = effort === undefined ? -1 : levels.indexOf(effort);
   if (index >= 0) return index;
   return Math.max(0, defaultLevel === undefined ? -1 : levels.indexOf(defaultLevel));
 }

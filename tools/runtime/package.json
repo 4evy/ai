@@ -7,7 +7,7 @@
     "@modelcontextprotocol/sdk": "1.32.1",
     "@nodelib/fs.walk": "3.0.1",
     "@oai/sky": "file:../../farstep/sky",
-    "@oh-my-pi/pi-utils": "18.12.0",
+    "@oh-my-pi/pi-utils": "18.12.6",
     "@optique/core": "1.3.6",
     "@optique/valibot": "1.3.6",
     "@tailnet/tailscaled": "0.1.2",

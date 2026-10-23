@@ -94,6 +94,7 @@ in
       extensions = lib.options.mkOption {
         type = lib.types.attrsOf lib.types.path;
         default = {
+          mcp = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/mcp";
           remote = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/remote";
           skylight = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/skylight";
           thinking = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/thinking";
