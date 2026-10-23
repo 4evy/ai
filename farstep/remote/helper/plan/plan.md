@@ -2,5 +2,5 @@
 
 ## nix
 
-Nix installation requires a realized /nix/store output in artifact. Build or
-copy the trusted farstep flake output first
+Set artifact to a realized `/nix/store` output. Build or copy the trusted
+Farstep flake output into the target store before installation

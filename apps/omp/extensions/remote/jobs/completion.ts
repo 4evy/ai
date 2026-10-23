@@ -8,6 +8,7 @@ import type {
   JobCompletionNotification,
   JobSnapshot,
 } from "farstep/protocol/jobs/protocol";
+import { REMOTE_TOOLS } from "farstep/remote/tools/names";
 import { assertIdentity } from "./broker";
 import { COMPLETION_TYPE, ENTRY_TYPE, JOB_RECORD_VERSION, nativeKey } from "./records";
 import type { JobSession } from "./session";
@@ -137,6 +138,7 @@ function unavailableResult(
             STATE: String(completed.state),
             CODE: String(code ?? "unknown"),
             UNAVAILABLE: String(unavailable),
+            JOB_TOOL: REMOTE_TOOLS.job,
             FINISHED: String(
               finishedAt === undefined
                 ? ""

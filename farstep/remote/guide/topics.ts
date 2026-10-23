@@ -1,5 +1,7 @@
 import { readGuide } from "@ai/core/guide/guide";
 import { TERMINAL_KEYS } from "../../client/terminal/keys/keys";
+import { MAX_FILE_BYTES } from "../../protocol/files/files";
+import { DEFAULT_CAPTURE_BYTES } from "../../protocol/script/script";
 import {
   SYSTEM_MAX_TIMEOUT_SECONDS,
   SYSTEM_OUTPUT_BYTES,
@@ -60,7 +62,14 @@ export const TOPICS = {
   },
   run: {
     tools: [REMOTE_TOOLS.run, REMOTE_TOOLS.batch],
-    text: readGuide(new URL("./run.md", import.meta.url), EXAMPLES.run, REMOTE_TOOLS),
+    text: readGuide(
+      new URL("./run.md", import.meta.url),
+      {
+        captureMiB: String(DEFAULT_CAPTURE_BYTES / 1024 / 1024),
+        ...EXAMPLES.run,
+      },
+      REMOTE_TOOLS,
+    ),
   },
   jobs: {
     tools: [REMOTE_TOOLS.job],
@@ -94,6 +103,7 @@ export const TOPICS = {
         defaultSeconds: String(SYSTEM_TIMEOUT_SECONDS),
         maximumSeconds: String(SYSTEM_MAX_TIMEOUT_SECONDS),
         outputKiB: String(SYSTEM_OUTPUT_BYTES / 1024),
+        ...EXAMPLES.sudo,
       },
       REMOTE_TOOLS,
     ),
@@ -131,7 +141,10 @@ export const TOPICS = {
     ],
     text: readGuide(
       new URL("./files.md", import.meta.url),
-      EXAMPLES.files,
+      {
+        fileMiB: String(MAX_FILE_BYTES / 1024 / 1024),
+        ...EXAMPLES.files,
+      },
       REMOTE_TOOLS,
     ),
   },

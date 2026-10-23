@@ -1,39 +1,46 @@
 # Coordinate shared work
 
 Before shared work, call {{coordinationTool}} with {{snapshot}}. Omit `target`
-locally or pass a saved SSH connection ID. The registry is per user and host;
-project records use the canonical workspace directory. Follow
-`pagination.nextCursor` while `pagination.hasMore`; `allProjects:true` reads
-across projects. Shared job metadata grants no log access or process control.
+locally or pass a saved SSH connection ID. The registry stores records per user
+and host. Project records use the canonical workspace directory. Follow
+`pagination.nextCursor` while `pagination.hasMore` is true. Use
+`allProjects:true` to read across projects. Shared job metadata grants no log
+access or process control.
 
 The project is the agent session's workspace on that target. A command's `cwd`
-changes its execution directory, not the coordination project; scratch work does
+changes its execution directory, not the coordination project. Scratch work does
 not move the session's project scope.
 
-Create work with {{createWork}} and save `work.id`. Claim with {{claimWork}}.
-Use your title and agreed resource names; replace `WORK_ID` with the returned ID
-and each request placeholder with a new ID. Claims are atomic; conflicts grant
-nothing. Directories and globs do not imply broader ownership.
+## Claim work before changing shared resources
 
-Choose `ttlSeconds` for the expected work duration; the example's duration is
-illustrative. Renew before expiry if the work takes longer.
+Create work with {{createWork}} and save `work.id`. Claim it with {{claimWork}}.
+Use your title and agreed resource names. Replace `WORK_ID` with the returned ID
+and each request placeholder with a new ID. Claims are atomic, so a conflict
+grants nothing. Directories and globs do not imply broader ownership.
 
-Renew before the returned expiry by repeating `claim` with a new `requestId`;
-presence heartbeats do not renew it. Update owned work with `action:"work"`,
-`work` and `status` or `blockers`. Set `status:"done"`, then {{releaseWork}};
-reopen completed work before claiming again. Disconnection leaves claims and
-persistent jobs intact.
+Choose `ttlSeconds` for the expected work duration. The example's duration is
+illustrative. Renew before the returned expiry by repeating `claim` with a new
+`requestId`. Presence heartbeats do not renew claims.
 
-Jobs attach automatically with exactly one live claim. Otherwise use {{linkJob}}
-with the exact native helper job name.
+Update owned work with `action:"work"`, `work` and `status` or `blockers`. Set
+`status:"done"`, then {{releaseWork}}. Reopen completed work before claiming it
+again. Disconnection leaves claims and persistent jobs intact.
 
-Write notes with `action:"note"`, `work` and `body`; continue with the returned
-note's thread ID. `recipient` uses the registry's session ID; addressed notes
-remain shared. Read `inbox` and acknowledge addressed notes. `action:"handoff"`
-with `work`, `recipient` and `body` writes a note and releases claims
-atomically. The recipient must claim the work.
+Jobs attach automatically when you have exactly one live claim. Otherwise use
+{{linkJob}} with the exact native helper job name.
 
-Put fields beside `action`. Set `requestId` before mutations; after uncertainty,
-repeat identical fields and ID to recover the result. A new ID starts a new
-mutation. Durable records must not contain secrets in purpose, titles, resource
-names or notes.
+## Share notes and hand off ownership
+
+Write notes with `action:"note"`, `work` and `body`. Continue a thread with the
+returned note's thread ID. `recipient` uses the registry's session ID. Addressed
+notes remain shared. Read `inbox` and acknowledge addressed notes.
+
+Use `action:"handoff"` with `work`, `recipient` and `body` to write a note and
+release claims atomically. The recipient must then claim the work.
+
+## Recover mutations without repeating them
+
+Put fields beside `action`. Set `requestId` before mutations. After an uncertain
+outcome, repeat identical fields and ID to recover the result. A new ID starts a
+new mutation. Keep secrets out of durable records, including purpose, titles,
+resource names and notes.

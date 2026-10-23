@@ -3,5 +3,5 @@
 ## completion
 
 Job {{JOB}} · {{STATE}} · exit {{CODE}}\
-{{UNAVAILABLE}}. Use job with this exact handle; controls require current-branch
-metadata{{FINISHED}}
+{{UNAVAILABLE}}. Use `{{JOB_TOOL}}` with this exact handle. Controls require
+current-branch metadata{{FINISHED}}

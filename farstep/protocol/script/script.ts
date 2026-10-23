@@ -18,7 +18,11 @@ export const scriptFields = {
       (source) => Buffer.byteLength(source) <= MAX_SOURCE_BYTES,
       "Script exceeds 48 KiB",
     ),
-    v.description(readText(new URL("./script.md", import.meta.url), "script")),
+    v.description(
+      readText(new URL("./script.md", import.meta.url), "script", {
+        SOURCE_KIB: String(MAX_SOURCE_BYTES / 1024),
+      }),
+    ),
   ),
   params: v.pipe(
     v.optional(

@@ -6,6 +6,7 @@ import type {
 import { toError } from "@oh-my-pi/pi-utils/type-guards";
 import { terminalSize } from "farstep/client/terminal/terminal";
 import type { JobSnapshot } from "farstep/protocol/jobs/protocol";
+import { REMOTE_TOOLS } from "farstep/remote/tools/names";
 import type { ExecutionTarget } from "../../connections/types";
 import type { JobSession } from "../session";
 import type {
@@ -158,6 +159,7 @@ async function executeLaunch(
             JOB: String(name),
             NOTICE: String(notice ? `${notice}\n` : ""),
             ERROR: String(toError(error).message),
+            JOB_TOOL: REMOTE_TOOLS.job,
           }),
         },
       ],

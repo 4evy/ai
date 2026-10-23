@@ -4,5 +4,5 @@
 
 Job {{JOB}}\
 {{NOTICE}}{{ERROR}}\
-The start was not retried. Execution outcome is unknown; inspect this exact
-handle with job before any intentional new execution
+The start was not retried. The execution outcome is unknown. Inspect this exact
+handle with `{{JOB_TOOL}}` before starting new work

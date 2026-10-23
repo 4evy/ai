@@ -2,9 +2,9 @@
 
 ## execute
 
-Run a privileged Bash command on Linux/macOS or PowerShell command on Windows
-through the Farstep system service with a 1–{{MAX_SECONDS}} second budget and
-bounded output; commands have full system authority
+Run a privileged Bash command on Linux or macOS, or a PowerShell command on
+Windows, through the Farstep system service. Set a budget of 1–{{MAX_SECONDS}}
+seconds. Output is bounded. Commands have full system authority
 
 ## instructions
 

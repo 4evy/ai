@@ -9,6 +9,7 @@ import { createFileParameters } from "../tools/schemas/files";
 import { createHelperParameters } from "../tools/schemas/helper";
 import { createJobParameters } from "../tools/schemas/jobs";
 import { scratchParameters } from "../tools/schemas/scratch";
+import { createSudoParameters } from "../tools/schemas/sudo";
 
 const { workflowOutputSchema } = createWorkflowSchemas(v.unknown());
 
@@ -18,6 +19,7 @@ const { desktopParameters, screenshotParameters, inputParameters } =
   createDesktopParameters();
 const { readParameters, editParameters } = createFileParameters();
 const { parameters: helperParameters } = createHelperParameters();
+const { sudoParameters } = createSudoParameters();
 const workId = "00000000-0000-4000-8000-000000000001";
 const workspaceId = "00000000-0000-4000-8000-000000000002";
 const fileHash = "0".repeat(64);
@@ -141,6 +143,10 @@ export const EXAMPLES = {
       action: "create",
       name: "compiler-repro",
     }),
+    inspectWorkspace: example(scratchParameters, {
+      action: "inspect",
+      workspace: workspaceId,
+    }),
     removeWorkspace: example(scratchParameters, {
       action: "remove",
       workspace: workspaceId,
@@ -228,7 +234,22 @@ export const EXAMPLES = {
       actionId: "INPUT_ACTION_ID",
     }),
   },
+  sudo: {
+    sudoIdentity: example(sudoParameters, {
+      connection: "CONNECTION_ID",
+      command: "id -u",
+    }),
+  },
   interactive: {
+    terminalLaunch: example(
+      runParameters,
+      {
+        script: 'await $({ stdio: "inherit" })`bash --noprofile --norc`;',
+        pty: true,
+        waitSeconds: 0,
+      },
+      true,
+    ),
     reply: example(jobParameters, {
       action: "reply",
       job: "RETURNED_HANDLE",

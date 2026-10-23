@@ -2,27 +2,34 @@
 
 ## guide
 
-Guidance for native local and managed SSH execution, shared agent coordination,
-scratch workspaces, environments, jobs, remote files, sudo and desktop access.
-Choose a topic; this guide does not connect.
+Read guidance for local and SSH commands, coordination, scratch workspaces,
+environments, jobs, files, privileged commands, and desktop access. Choose a
+topic. Reading a guide does not connect to a machine.
 
 ## coordination
 
-Coordinate independent agents through the target user's durable farstep
-registry. Target defaults to local; use a saved SSH target ID for remote
-coordination. Project scope is the target's canonical workspace directory. Read
-snapshot (sessions, work, claims and safe job metadata), inbox, thread or events
-without consuming messages; paginate using returned pagination.nextCursor.
-Snapshot allProjects is explicit. Writes: session sets purpose; work creates or
-updates durable work; claim atomically claims work and exact resource names with
-an explicit renewable TTL; release drops your claims; link associates one of
-your jobs with claimed work; note appends shared or addressed text; acknowledge
-marks your addressed note; handoff offers claimed work to a recipient session
-ID, sends a durable note and releases your claims. The recipient must explicitly
-claim it. Send only deliberately shared text; commands, environment values, logs
-and job controls are not shared. Claims do not transfer job control. Mutations
-receive a UUID requestId when omitted; provide the same requestId and payload
-explicitly to recover a lost response. No writes are automatically replayed
+Coordinate agents through the target user's durable Farstep registry. Omit
+target locally or use a saved SSH target ID. Project scope is the target's
+canonical workspace directory.
+
+Read snapshot for sessions, work, claims, and safe job metadata. Read inbox,
+thread, or events without consuming messages. Follow pagination.nextCursor
+while pagination.hasMore is true. Set allProjects explicitly for a cross-project
+snapshot.
+
+Use session to set your purpose and work to create or update work. Claim work
+and exact resource names atomically with an explicit renewable TTL. Use release
+to drop your claims and link to associate one of your jobs with claimed work.
+Claims do not transfer job control.
+
+Use note to share text and acknowledge to mark addressed notes. Handoff offers
+claimed work to a recipient session, sends a note, and releases your claims.
+The recipient must claim the work explicitly. Commands, environment values,
+logs, and job controls are not shared.
+
+Mutations receive a UUID requestId when omitted. Save a requestId and its
+payload before a mutation to recover a lost response. Writes are never
+automatically replayed.
 
 ## run
 
@@ -33,8 +40,8 @@ deadlines, interactive job handles and completion delivery.
 ## batch
 
 Run named dependency steps locally or over SSH with bounded concurrency,
-per-step results, semantic readiness, output artifacts and guards. Batches
-persist by default; failure policies never retry work.
+per-step results, readiness checks, output artifacts, and guards. Batches
+persist by default. Failure policies never retry work.
 
 ## job
 
@@ -56,7 +63,7 @@ frame metadata. Capture alone never grants input.
 ## input
 
 Submit input to an explicitly authorized desktop session. Pointer actions
-require the latest captured frame; text receipts report clipboard effects and
+require the latest captured frame. Text receipts report clipboard effects and
 partial submission.
 
 ## helper
@@ -67,38 +74,36 @@ store before activation. Nix must already be installed.
 
 ## scratch
 
-Create, list, inspect or remove private temporary workspaces locally or on a
-saved SSH target. Returns a stable workspace ID, run target/cwd and file-tool
+Create, list, inspect, or remove private temporary workspaces locally or on a
+saved SSH target. Use the returned workspace ID, command cwd, target, and file
 paths. Workspaces survive sessions until explicit removal or OS temporary-file
-cleanup; remove never stops jobs.
+cleanup. Removal never stops jobs.
 
 ## system
 
 Inspect unattended system access or execute a bounded root Bash command on
-Linux/macOS. Target defaults to local; saved SSH target IDs select another
-machine. Requires farstep system enable once on that machine; privileged
-commands have full system authority. No automatic command retries
+Linux or macOS. Omit target locally or use a saved SSH target ID. Run farstep
+system enable once on that machine to grant access. Commands have full system
+authority and are never automatically retried.
 
 ## read
 
-Read remote files using the adapter’s formatting and selectors, or list a
-directory. Uses the saved SSH credentials without requiring farstep. Files up to
-{{LIMIT_MIB}} MiB; returns a full-file SHA-256 for edits.
+Read remote files or list a directory using the saved SSH credentials, without
+requiring Farstep. Supports files up to {{LIMIT_MIB}} MiB and returns a
+full-file SHA-256 for edits.
 
 ## write
 
-Create or overwrite a remote file using adapter write handling and SSH staging.
-Creates parent directories; existing regular-file permissions are preserved.
-Symlinks to files are replaced.
+Create or overwrite a remote file using SSH staging. Creates parent directories
+and preserves existing regular-file permissions. Replaces symlinks to files.
 
 ## edit
 
-Update remote text with adapter replace editing and diff output. Rejects
-ambiguous matches unless replace_all is true. Rechecks content before transfer;
-expectedHash additionally checks against an earlier read. Symlinks to files are
-replaced.
+Update remote text with a diff of the changes. Rejects ambiguous matches unless
+replace_all is true. Rechecks content before transfer. Use expectedHash to
+check against an earlier read as well. Replaces symlinks to files.
 
 ## delete
 
 Delete one remote file or symlink using the saved SSH connection. Refuses
-directories; a symlink's target is retained. Missing files are errors.
+directories and retains a symlink's target. Missing files are errors.
