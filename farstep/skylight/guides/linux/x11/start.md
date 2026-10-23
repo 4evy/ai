@@ -1,10 +1,10 @@
 # Select and observe an X11 app
 
 This target uses the bundled CUA/Sky runtime for X11. An X11 session needs
-DISPLAY and its authentication available to the selected machine's process.
-With XDG_SESSION_TYPE=x11, or DISPLAY without a Wayland session, Skylight uses
-upstream Sky directly. A Wayland session uses Farstep's monitor bridge. Xwayland
-does not expose the full Wayland desktop.
+`DISPLAY` and its authentication available to the selected machine's process.
+With `XDG_SESSION_TYPE=x11`, or `DISPLAY` without a Wayland session, Skylight
+uses upstream Sky directly. A Wayland session uses Farstep's monitor bridge.
+Xwayland does not expose the full Wayland desktop.
 
 In {{skylightTool}}'s code parameter, begin a fresh runtime with inventory.
 cua is initialized automatically:

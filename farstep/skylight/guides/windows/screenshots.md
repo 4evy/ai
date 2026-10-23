@@ -21,6 +21,6 @@ coordinate actions. After screenshot-only observation, fetch accessibility state
 again before using element indices.
 
 Coordinates are window-relative. The selected app retains the latest captured
-screenshot identifier for coordinate input; recapture after changes to window
+screenshot identifier for coordinate input. Recapture after changes to window
 size, position or content. An AX-only observation clears that screenshot
-mapping; capture again before coordinate input.
+mapping, so capture again before coordinate input.

@@ -1,8 +1,8 @@
 # Act on the latest screenshot
 
-Initialize sky with "start". Set observedX and observedY from the latest image.
-Pointer input needs an authoritative mapping; recapture after geometry, scale,
-rotation or output changes:
+Initialize sky with "start". Set `observedX` and `observedY` from the latest
+image. Pointer input needs an authoritative mapping. Recapture after geometry,
+scale, rotation or output changes:
 
 ``` js
 await sky.click({ x: observedX, y: observedY });
@@ -35,14 +35,14 @@ var shots = await sky.get_screenshot();
 for (const shot of shots) await nodeRepl.emitImage(shot.bytes);
 ```
 
-Set textInput.text to the intended text. For an empty replacement, BackSpace
-deletes the selection; type_text leaves the field unchanged. Do not use this
-sequence in terminals: Control+A may move the cursor. Terminal paste may need
-paste_key:"Control_L+Shift_L+v".
+Set `textInput.text` to the intended text. For an empty replacement, BackSpace
+deletes the selection, while `type_text` leaves the field unchanged. Do not use
+this sequence in terminals because Control+A may move the cursor. Terminal
+paste may need `paste_key: "Control_L+Shift_L+v"`.
 
 Check status, mechanism, clipboardChanged, submittedBytes and partial. Bytes
-measure UTF-8 submission, not app acceptance. Delivery depends on the backend;
-clipboard paste may enter history and leave the clipboard changed. Newlines may
+measure UTF-8 submission, not app acceptance. Delivery depends on the backend.
+Clipboard paste may enter history and leave the clipboard changed. Newlines may
 submit commands or forms. Failure stops the snippet before capture: read
 "recovery", then observe before resuming. Never automatically replay or request
 new consent.
@@ -62,9 +62,10 @@ var shots = await sky.get_screenshot();
 for (const shot of shots) await nodeRepl.emitImage(shot.bytes);
 ```
 
-Supply both x and y or omit both. Read "api" for argument constraints. Observe
-after scrolling before choosing another target.
+Supply both `x` and `y` or omit both. Observe after scrolling before choosing
+another target.
 
-Keys use keysyms such as Return and Control_L+a. Finish drag_handle with end()
-before unrelated input; reset, abort or connection loss releases held input.
-Read "api" for signatures.
+Keys use keysyms such as `Return` and `Control_L+a`. Finish `drag_handle` with
+`end()` before unrelated input. Reset, abort or connection loss releases held
+input. For signatures and argument constraints, call {{guideTool}} with
+{{apiGuide}}.

@@ -11,38 +11,22 @@ import { present } from "./runtime/result";
 export default function skylight(api: ExtensionAPI) {
   const feature = createSkylight<ExtensionContext>(createSkyFleet());
   const { guideParameters } = createSkylightParameters();
-  const presentations = new Map<
-    string,
-    (label: string) => ReturnType<typeof skylightPresentation>
-  >([
-    [
-      SKYLIGHT_TOOLS.guide,
-      (label) =>
-        skylightPresentation(
-          label,
-          (input) => {
-            const parsed = v.safeParse(guideParameters, input);
-            return parsed.success ? parsed.output.topic : "Loading guidance";
-          },
-          true,
-        ),
-    ],
-    [
-      SKYLIGHT_TOOLS.skylight,
-      (label) =>
-        skylightPresentation(label, (input) =>
-          isRecord(input) && typeof input.title === "string"
-            ? input.title
-            : isRecord(input) && input.reset
-              ? "Reset runtime"
-              : "Run JavaScript",
-        ),
-    ],
-  ]);
+  const targets: Record<string, (input: unknown) => string> = {
+    [SKYLIGHT_TOOLS.guide]: (input) => {
+      const parsed = v.safeParse(guideParameters, input);
+      return parsed.success ? parsed.output.topic : "Loading guidance";
+    },
+    [SKYLIGHT_TOOLS.skylight]: (input) =>
+      isRecord(input) && typeof input.title === "string"
+        ? input.title
+        : isRecord(input) && input.reset
+          ? "Reset runtime"
+          : "Run JavaScript",
+  };
   for (const tool of feature.tools) {
-    const presentation = presentations.get(tool.name)?.(tool.label) ?? {};
+    const target = targets[tool.name];
     api.registerTool({
-      ...presentation,
+      ...(target ? skylightPresentation(tool.label, target) : {}),
       ...tool,
       parameters: { ...tool.parameters },
       async execute(id, input, signal, update, context) {

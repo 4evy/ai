@@ -2,7 +2,8 @@
 
 Source: {{referencePath}}
 
-Follow cua's documentation for the selected app. cua_repl here means
+Before using this reference, call {{guideTool}} with {{startGuide}}. Follow
+cua's documentation for the selected app. `cua_repl` here means
 {{skylightTool}}.
 
 Use CUA's bound app methods for selection, observations and ordinary input. The

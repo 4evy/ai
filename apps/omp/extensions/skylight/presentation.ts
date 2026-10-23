@@ -1,12 +1,10 @@
 import type { AgentToolResult, ToolDefinition } from "@oh-my-pi/pi-coding-agent";
-import { md } from "@oh-my-pi/pi-tui";
 import { plainToolCard, type ToolCardSnapshot } from "@oh-my-pi/pi-tui/render";
 import {
   describeMCPResult,
   type MCPToolDetails,
   renderMCPResult,
 } from "@oh-my-pi/pi-tui/tools/mcp";
-import { resultText } from "@oh-my-pi/pi-tui/tools/native-view";
 import { formatCount, isRecord } from "@oh-my-pi/pi-utils";
 import type { Guide } from "farstep/skylight/guides/guides";
 
@@ -44,7 +42,6 @@ type SkylightPresentation = Pick<
 export function skylightPresentation(
   label: string,
   target: (input: unknown) => string,
-  markdown = false,
 ): SkylightPresentation {
   return {
     label,
@@ -68,7 +65,6 @@ export function skylightPresentation(
       return {
         ...view,
         tool: { title: label, meta: outputMeta(result) },
-        ...(markdown ? { body: [md(resultText(result))] } : {}),
       };
     },
   };

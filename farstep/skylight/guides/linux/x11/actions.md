@@ -1,11 +1,12 @@
 # Act on fresh X11 window state
 
 Select an app with "start". Read its returned documentation before input. Linux
-always returns full accessibility state. AT-SPI elements support only the
-actions shown in the tree. The x11 fallback tree is observation-only. Use the
-latest screenshot and window-relative coordinates when element input is
-unavailable. Use the exact Secondary Actions names with
-app.performSecondaryAction(index, action) when the tree exposes them.
+always returns full accessibility state. Elements from AT-SPI, Linux's
+accessibility service, support only the actions shown in the tree. The X11
+fallback tree is observation-only. Use the latest screenshot and window-relative
+coordinates when element input is unavailable. Use the exact Secondary Actions
+names with `app.performSecondaryAction(index, action)` when the tree exposes
+them.
 
 After choosing an element from the latest AT-SPI tree:
 
@@ -17,10 +18,10 @@ await app.getAXStateAndScreenshot();
 Re-read state after actions and derive fresh indices. Linux element clicks
 support one left or right click. Use coordinates for other click options.
 
-setValue and selectText are unavailable. Window-targeted typeText and paste
-require a working AT-SPI tree. The x11 fallback alone does not provide text
-entry. After verifying the field's focus and Control+A behavior, replace its
-contents with supported keyboard and text input:
+`setValue` and `selectText` are unavailable. Window-targeted `typeText` and
+`paste` require a working AT-SPI tree. The X11 fallback alone does not provide
+text entry. After verifying the field's focus and Control+A behavior, replace
+its contents with supported keyboard and text input:
 
 ``` js
 await app.pressKey("Control_L+a");
@@ -42,6 +43,6 @@ await app.getAXStateAndScreenshot();
 
 Observe after input before deciding the next action. Some apps omit current
 field values from accessibility text, so inspect the screenshot too. Sky handles
-settling before observations. Do not add animation delays. Read "api" for
-clipboard snapshots, held keys, drag handles and other Sky methods outside the
-bound CUA interface.
+settling before observations. Do not add animation delays. For clipboard
+snapshots, held keys, drag handles and methods outside the bound CUA interface,
+call {{guideTool}} with {{apiGuide}}.

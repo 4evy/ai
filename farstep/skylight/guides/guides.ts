@@ -52,6 +52,7 @@ export async function guideText(
   return readGuide(
     url,
     {
+      ...SKYLIGHT_EXAMPLES,
       referencePath: "bundled CUA and Sky documentation on the selected target",
       reference,
     },
