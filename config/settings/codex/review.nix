@@ -9,6 +9,9 @@
   };
   features = {
     apps = false;
+    # Plugins and hooks can run outside the command sandbox
+    plugins = false;
+    hooks = false;
   };
   plugins = {
     "unified-computer-use@openai-bundled" = {

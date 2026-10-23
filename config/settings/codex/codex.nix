@@ -43,6 +43,8 @@ let
       command =
         host.nodeReplWrapper or (if darwin then "${home}/.local/libexec/ai-node-repl" else nodeRepl);
       startup_timeout_sec = 120;
+      tool_timeout_sec = 1800;
+      default_tools_approval_mode = "approve";
       env = {
         NODE_REPL_NATIVE_PIPE_CONNECT_TIMEOUT_MS = "1000";
         NODE_REPL_NODE_MODULE_DIRS = modules;
@@ -102,6 +104,7 @@ in
       ];
     }
     // lib.attrsets.optionalAttrs automation {
+      hooks = import ./hooks.nix { inherit lib marketplace; };
       marketplaces.${marketplace} = {
         source_type = "local";
         source = "${codexHome}/.tmp/compatibility-marketplaces/${marketplace}";
