@@ -3,6 +3,8 @@ import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { run } from "@ai/core/effect/effect";
+import { executeCommand } from "@ai/core/effect/process/process";
 import { errorMessage } from "@ai/core/error/error";
 import { launchProcess } from "@ai/core/process/launch";
 import { installed } from "../../../apps/ghidra/native/common.ts";
@@ -99,19 +101,20 @@ async function ghidraPackage(): Promise<string> {
       "ghidra-mcp-headless",
     );
   await mkdir(state, { recursive: true });
-  const build = Bun.spawn(
-    [
-      nix,
-      "build",
-      "--out-link",
-      join(state, "package"),
-      "--print-out-paths",
-      `path:${root}#ghidra-mcp`,
-    ],
-    { stdout: "pipe", stderr: "inherit" },
+  const { stdout: output, code } = await run(
+    executeCommand(
+      [
+        nix,
+        "build",
+        "--out-link",
+        join(state, "package"),
+        "--print-out-paths",
+        `path:${root}#ghidra-mcp`,
+      ],
+      { stderr: "inherit" },
+    ),
   );
-  const output = await new Response(build.stdout).text();
-  if ((await build.exited) !== 0) throw new Error("Ghidra MCP package build failed");
+  if (code !== 0) throw new Error("Ghidra MCP package build failed");
   const packagePath = output.trim();
   if (!packagePath.startsWith("/") || packagePath.includes("\n"))
     throw new Error("Ghidra MCP build did not return one package path");

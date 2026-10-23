@@ -1,10 +1,11 @@
 import { lstat, mkdir, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { run } from "@ai/core/effect/effect";
+import { attempt, run } from "@ai/core/effect/effect";
 import { executeCommand } from "@ai/core/effect/process/process";
 import { errorCode } from "@ai/core/error/error";
 import { processCommand } from "@ai/core/process/launch";
+import { Effect } from "effect";
 import { bunBinary } from "../binary";
 import { acquireLock } from "../lock/lock";
 
@@ -14,21 +15,21 @@ const packages = {
   opencode: "@opencode/cli@latest",
 };
 
-async function command(argv: string[], dryRun: boolean): Promise<void> {
+const command = Effect.fnUntraced(function* (argv: string[], dryRun: boolean) {
   if (dryRun) {
     console.log(JSON.stringify({ argv }));
     return;
   }
-  const result = await run(
-    executeCommand(argv, {
-      env: { ...process.env },
-      stdout: "inherit",
-      stderr: "inherit",
-    }),
-  );
+  const result = yield* executeCommand(argv, {
+    env: { ...process.env },
+    stdout: "inherit",
+    stderr: "inherit",
+  });
   if (result.code !== 0)
-    throw new Error(`${argv.slice(1).join(" ")} failed (${result.code})`);
-}
+    return yield* Effect.fail(
+      new Error(`${argv.slice(1).join(" ")} failed (${result.code})`),
+    );
+});
 
 async function daemonInstalled(): Promise<boolean> {
   const home = process.env.CODEX_HOME ?? join(homedir(), ".codex");
@@ -49,59 +50,75 @@ export async function installUpstream(
   dryRun: boolean,
   background: boolean,
 ): Promise<void> {
-  if (dryRun) return install(tool, update, true, background);
-  const directory = join(
-    process.env.XDG_STATE_HOME ?? join(homedir(), ".local/state"),
-    "ai-tools/updates",
+  await run(
+    Effect.gen(function* () {
+      if (dryRun) return yield* install(tool, update, true, background);
+      const directory = join(
+        process.env.XDG_STATE_HOME ?? join(homedir(), ".local/state"),
+        "ai-tools/updates",
+      );
+      yield* attempt(() => mkdir(directory, { recursive: true }), {
+        awaitOnInterrupt: true,
+      });
+      // Bun's global install is shared by every tool and updater process
+      const path = join(directory, "packages.lock");
+      yield* Effect.acquireUseRelease(
+        attempt(() => acquireLock(path)),
+        (lock) =>
+          Effect.gen(function* () {
+            if (!lock)
+              return yield* Effect.fail(
+                new Error("Another AI package update is running. Try again later"),
+              );
+            yield* attempt(() => lock.writeFile(String(process.pid)), {
+              awaitOnInterrupt: true,
+            });
+            yield* install(tool, update, false, background);
+          }),
+        (lock) =>
+          lock
+            ? attempt(() => lock.close()).pipe(
+                Effect.ensuring(
+                  attempt(() => rm(path, { force: true })).pipe(Effect.orDie),
+                ),
+              )
+            : Effect.void,
+      );
+    }),
   );
-  await mkdir(directory, { recursive: true });
-  // Bun's global install is shared by every tool and updater process
-  const path = join(directory, "packages.lock");
-  const lock = await acquireLock(path);
-  if (!lock) throw new Error("Another AI package update is running. Try again later");
-  try {
-    await lock.writeFile(String(process.pid));
-    await install(tool, update, false, background);
-  } finally {
-    await lock.close();
-    await rm(path, { force: true });
-  }
 }
 
-async function install(
+const install = Effect.fnUntraced(function* (
   tool: keyof typeof packages,
   update: boolean,
   dryRun: boolean,
   background: boolean,
-): Promise<void> {
+) {
   const specifier = packages[tool];
   const name = specifier.slice(0, specifier.lastIndexOf("@"));
   // Resolve the channel before removing the old package, so a failed registry
   // lookup leaves the current installation available
-  await command([process.execPath, "info", specifier, "version"], dryRun);
+  yield* command([process.execPath, "info", specifier, "version"], dryRun);
   if (update) {
     const installed = dryRun
       ? true
-      : (
-          await run(
-            executeCommand([process.execPath, "pm", "ls", "--global"], {
-              env: { ...process.env },
-            }),
-          )
-        ).stdout.includes(`${name}@`);
+      : (yield* executeCommand([process.execPath, "pm", "ls", "--global"], {
+          env: { ...process.env },
+        })).stdout.includes(`${name}@`);
     if (installed)
-      await command([process.execPath, "remove", "--global", name], dryRun);
+      yield* command([process.execPath, "remove", "--global", name], dryRun);
   }
-  await command(
+  yield* command(
     [process.execPath, "add", "--global", "--no-cache", "--trust", specifier],
     dryRun,
   );
   const executable = dryRun ? `<Bun ${tool} binary>` : bunBinary(tool);
-  if (!executable) throw new Error(`${tool}: Bun did not install an executable`);
-  await command(processCommand(executable, ["--version"]), dryRun);
+  if (!executable)
+    return yield* Effect.fail(new Error(`${tool}: Bun did not install an executable`));
+  yield* command(processCommand(executable, ["--version"]), dryRun);
   if (tool === "codex" && !background) {
-    if (dryRun || (await daemonInstalled())) {
-      await command(
+    if (dryRun || (yield* attempt(() => daemonInstalled()))) {
+      yield* command(
         processCommand(executable, [
           "app-server",
           "daemon",
@@ -117,4 +134,4 @@ async function install(
     console.log(
       "opencode: the next client connection will replace an outdated background service",
     );
-}
+});

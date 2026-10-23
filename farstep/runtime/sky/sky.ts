@@ -1,4 +1,4 @@
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { attempt, Lifetime, run } from "@ai/core/effect/effect";
 import { Queue } from "@ai/core/effect/queue/queue";
@@ -14,7 +14,7 @@ import { loadIdentity, PROTOCOL_MAJOR, VERSION } from "../state";
 import { registerExchange } from "./exchange/exchange";
 import { SkyKernel } from "./kernel";
 import { MODULES, REFERENCE_PATHS, SKY_BACKEND, SKY_VERSION } from "./runtime/paths";
-import { runtimeServer } from "./runtime/server";
+import { runtimeServerEffect } from "./runtime/server";
 
 // The connection owns one kernel and its input leases; clients never replay cells
 class SkyConnection {
@@ -109,15 +109,21 @@ class SkyConnection {
           structuredContent: { skyBackend: SKY_BACKEND, reference },
         };
       }
-      await runtimeServer(
-        this.cwd,
+      const references = await run(
+        Effect.gen({ self: this }, function* () {
+          yield* runtimeServerEffect(this.cwd);
+          // Cancel sibling reads on failure and await native I/O before shutdown
+          return yield* Effect.forEach(
+            REFERENCE_PATHS,
+            (path) =>
+              attempt(
+                (signal) => readFile(join(MODULES, path), { encoding: "utf8", signal }),
+                { awaitOnInterrupt: true },
+              ).pipe(Effect.map((text) => `Source: ${path}\n\n${text}`)),
+            { concurrency: "unbounded" },
+          );
+        }),
         AbortSignal.any([signal, this.disconnected.signal]),
-      );
-      const references = await Promise.all(
-        REFERENCE_PATHS.map(
-          async (path) =>
-            `Source: ${path}\n\n${await Bun.file(join(MODULES, path)).text()}`,
-        ),
       );
       return { content: [{ type: "text", text: references.join("\n\n") }] };
     });

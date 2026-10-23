@@ -1,6 +1,8 @@
-import { createHash } from "node:crypto";
-import { run } from "@ai/core/effect/effect";
+import { isUtf8 } from "node:buffer";
+import { hash as digest } from "node:crypto";
+import { attempt, run } from "@ai/core/effect/effect";
 import { quotePosixArgument } from "@ai/core/shell/shell";
+import { Effect } from "effect";
 import { MAX_FILE_BYTES } from "../../protocol/files/files";
 import { type ScriptTransport, scriptCommandEffect } from "../execution/execution";
 
@@ -20,7 +22,7 @@ export interface FileTransport {
 }
 
 export function hash(bytes: Uint8Array): string {
-  return createHash("sha256").update(bytes).digest("hex");
+  return digest("sha256", bytes);
 }
 
 export function checkHash(bytes: Uint8Array, expected?: string): void {
@@ -55,25 +57,52 @@ export class RemoteFiles {
     await this.transport.write(path, bytes, signal);
   }
 
-  async edit<T>(
+  edit<T>(
     path: string,
     expectedHash: string | undefined,
     edit: (original: Uint8Array) => Promise<{ result: T; bytes?: Uint8Array }>,
     signal?: AbortSignal,
   ): Promise<{ result: T; sha256?: string }> {
-    if ((await this.stat(path, signal)) !== "file")
-      throw new Error("Edit requires an existing regular file");
-    const original = await this.read(path, signal);
-    checkHash(original, expectedHash);
-    new TextDecoder("utf-8", { fatal: true }).decode(original);
-    if (original.includes(0)) throw new Error("Edit requires text without NUL bytes");
-    const { result, bytes } = await edit(original);
-    if (bytes === undefined) return { result };
-    if (bytes.length > MAX_FILE_BYTES)
-      throw new Error("Edited file exceeds the 16 MiB transfer limit");
-    checkHash(await this.read(path, signal), hash(original));
-    await this.write(path, bytes, signal);
-    return { result, sha256: hash(bytes) };
+    return run(
+      Effect.gen({ self: this }, function* () {
+        const kind = yield* attempt((active) => this.stat(path, active));
+        if (kind !== "file")
+          return yield* Effect.fail(
+            new Error("Edit requires an existing regular file"),
+          );
+        const original = yield* attempt((active) => this.read(path, active));
+        yield* Effect.try({
+          try: () => {
+            checkHash(original, expectedHash);
+            // Preserve the decoder's invalid-input error without materializing valid text
+            if (!isUtf8(original))
+              new TextDecoder("utf-8", { fatal: true }).decode(original);
+            if (original.includes(0))
+              throw new Error("Edit requires text without NUL bytes");
+          },
+          catch: (error) => error,
+        });
+        const { result, bytes } = yield* attempt(() => edit(original), {
+          awaitOnInterrupt: true,
+        });
+        if (bytes === undefined) return { result };
+        if (bytes.length > MAX_FILE_BYTES)
+          return yield* Effect.fail(
+            new Error("Edited file exceeds the 16 MiB transfer limit"),
+          );
+        const current = yield* attempt((active) => this.read(path, active));
+        yield* Effect.try({
+          try: () => checkHash(current, hash(original)),
+          catch: (error) => error,
+        });
+        // Wait for an in-flight write to settle before reporting cancellation
+        yield* attempt((active) => this.write(path, bytes, active), {
+          awaitOnInterrupt: true,
+        });
+        return { result, sha256: hash(bytes) };
+      }),
+      signal,
+    );
   }
 
   async delete(path: string, signal?: AbortSignal): Promise<void> {

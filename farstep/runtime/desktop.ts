@@ -1,7 +1,7 @@
 import type { Socket } from "node:net";
 import { pipeline } from "node:stream";
-import { attempt, run } from "@ai/core/effect/effect";
-import { connectSocket, scopedSocket } from "@ai/core/effect/socket/socket";
+import { attempt, Lifetime, run } from "@ai/core/effect/effect";
+import { scopedSocket } from "@ai/core/effect/socket/socket";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import {
   ReadBuffer,
@@ -29,9 +29,15 @@ class DesktopTransport implements Transport {
   onmessage?: (message: JSONRPCMessage) => void;
   #socket: Socket | undefined;
   #buffer = new ReadBuffer();
+  readonly #lifetime = new Lifetime();
 
   async start(): Promise<void> {
-    const socket = await run(connectSocket({ path: await desktopEndpoint() }));
+    const socket = await this.#lifetime.run(
+      Effect.gen(function* () {
+        const path = yield* attempt(desktopEndpoint);
+        return yield* scopedSocket({ path });
+      }),
+    );
     this.#socket = socket;
     const bounded = new BoundedFrames(
       MAX_DESKTOP_RESPONSE_BYTES,
@@ -70,7 +76,7 @@ class DesktopTransport implements Transport {
       throw new Error("Desktop request exceeded 1 MiB");
     const socket = this.#socket;
     if (!socket || socket.destroyed) throw new Error("Desktop channel is closed");
-    await run(
+    await this.#lifetime.run(
       Effect.callback<void, Error>((resume) => {
         socket.write(encoded, (error) =>
           resume(error ? Effect.fail(error) : Effect.void),
@@ -80,7 +86,7 @@ class DesktopTransport implements Transport {
   }
 
   async close(): Promise<void> {
-    this.#socket?.destroy();
+    await this.#lifetime.close();
     this.#buffer.clear();
   }
 }

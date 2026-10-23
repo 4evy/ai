@@ -2,7 +2,6 @@ import { Deferred, Effect, Fiber, Option, Stream } from "effect";
 import { boundedText } from "../../text/utf8";
 import { assertTimerDelay } from "../../time/time";
 import { attempt } from "../effect";
-import { decodeUtf8 } from "../stream/stream";
 
 type Output = "pipe" | "inherit" | "ignore" | number;
 export interface CommandOptions {
@@ -52,7 +51,7 @@ function capture(stream: ReadableStream<Uint8Array> | number | null | undefined)
     ? Stream.fromReadableStream({
         evaluate: () => stream,
         onError: (error) => error,
-      }).pipe(decodeUtf8, Stream.mkString)
+      }).pipe(Stream.decodeText, Stream.mkString)
     : Effect.succeed("");
 }
 

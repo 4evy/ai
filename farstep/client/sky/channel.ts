@@ -3,6 +3,7 @@ import { McpSession } from "@ai/core/mcp/session/session";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { Effect, Exit } from "effect";
 import { PROVISION_TIMEOUT_MS } from "farstep/protocol/sky/limits";
 import * as v from "valibot";
 
@@ -58,29 +59,35 @@ export class ChannelSession {
     this.prepared = true;
   };
 
-  async open(signal?: AbortSignal): Promise<SkyChannel> {
+  open(signal?: AbortSignal): Promise<SkyChannel> {
     const active = signal
       ? AbortSignal.any([signal, this.closedFleet])
       : this.closedFleet;
-    try {
-      await run(this.session.openEffect(this.transport), active);
-      const identity = v.parse(
-        identitySchema,
-        structured(await this.call("helper.handshake", {}, signal)),
-      );
-      if (!identity.capabilities.includes("sky-mcp-v1"))
-        throw new Error("Upgrade Farstep on this target: it lacks sky-mcp-v1");
-
-      return {
-        identity,
-        call: this.call,
-        prepare: this.prepare,
-        close: this.close,
-        isClosed: this.session.isClosed,
-      };
-    } catch (error) {
-      await this.close();
-      throw error;
-    }
+    return run(
+      Effect.gen({ self: this }, function* () {
+        yield* this.session.openEffect(this.transport);
+        const handshake = yield* this.session.callEffect("helper.handshake", {});
+        const identity = yield* Effect.try({
+          try: () => v.parse(identitySchema, structured(handshake)),
+          catch: (error) => error,
+        });
+        if (!identity.capabilities.includes("sky-mcp-v1"))
+          return yield* Effect.fail(
+            new Error("Upgrade Farstep on this target: it lacks sky-mcp-v1"),
+          );
+        return {
+          identity,
+          call: this.call,
+          prepare: this.prepare,
+          close: this.close,
+          isClosed: this.session.isClosed,
+        };
+      }).pipe(
+        Effect.onExit((exit) =>
+          Exit.isFailure(exit) ? this.session.closeEffect : Effect.void,
+        ),
+      ),
+      active,
+    );
   }
 }

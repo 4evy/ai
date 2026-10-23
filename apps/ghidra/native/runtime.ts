@@ -3,7 +3,10 @@ import { createHash } from "node:crypto";
 import { closeSync, openSync } from "node:fs";
 import { mkdir, readdir } from "node:fs/promises";
 import { delimiter, dirname, join } from "node:path";
+import { attempt, run } from "@ai/core/effect/effect";
+import { executeCommand, terminateProcess } from "@ai/core/effect/process/process";
 import { writeFile as atomicWrite } from "atomically";
+import { Effect, Schedule } from "effect";
 import {
   type Installation,
   installed,
@@ -47,7 +50,7 @@ async function environment(receipt: Installation): Promise<NodeJS.ProcessEnv> {
   };
 }
 
-async function server(
+const server = Effect.fnUntraced(function* (
   receipt: Installation,
   args: string[],
   env: NodeJS.ProcessEnv,
@@ -69,82 +72,100 @@ async function server(
   ])
     if (name && flag && env[name]) defaults.push(flag, env[name]);
   if (env.GHIDRA_USER) options.push(`-Duser.name=${env.GHIDRA_USER}`);
-  const classpath = (await jars(join(ghidra, "Ghidra"))).join(delimiter);
+  const classpath = (yield* attempt(() => jars(join(ghidra, "Ghidra")))).join(
+    delimiter,
+  );
   let classpathArgs = ["-cp", classpath];
   if (platform().name === "win32") {
     // Ghidra's full classpath can exceed Windows' command-line length limit
     const digest = createHash("sha256").update(classpath).digest("hex");
     const file = join(stateHome(), "runtime", `classpath-${digest}.args`);
-    await atomicWrite(
-      file,
-      `-cp\n"${classpath.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"\n`,
+    yield* attempt(
+      () =>
+        atomicWrite(
+          file,
+          `-cp\n"${classpath.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"\n`,
+        ),
+      { awaitOnInterrupt: true },
     );
     classpathArgs = [`@${file}`];
   }
-  return Bun.spawn(
-    [
-      java(receipt),
-      ...options,
-      `-Duser.home=${join(stateHome(), "home")}`,
-      `-Djava.io.tmpdir=${env.TMPDIR}`,
-      `-Dghidra.home=${ghidra}`,
-      "-Djava.awt.headless=true",
-      "-Dapplication.name=GhidraMCP",
-      ...classpathArgs,
-      "com.xebyte.headless.GhidraMCPHeadlessServer",
-      ...defaults,
-      ...extra,
-      ...args,
-    ],
-    { env, stdin: "ignore", stdout: log ?? "inherit", stderr: log ?? "inherit" },
+  return yield* own(() =>
+    Bun.spawn(
+      [
+        java(receipt),
+        ...options,
+        `-Duser.home=${join(stateHome(), "home")}`,
+        `-Djava.io.tmpdir=${env.TMPDIR}`,
+        `-Dghidra.home=${ghidra}`,
+        "-Djava.awt.headless=true",
+        "-Dapplication.name=GhidraMCP",
+        ...classpathArgs,
+        "com.xebyte.headless.GhidraMCPHeadlessServer",
+        ...defaults,
+        ...extra,
+        ...args,
+      ],
+      { env, stdin: "ignore", stdout: log ?? "inherit", stderr: log ?? "inherit" },
+    ),
+  );
+});
+
+function own<A extends Bun.Subprocess>(spawn: () => A) {
+  return Effect.acquireRelease(
+    Effect.try({ try: spawn, catch: (error) => error }),
+    (child) => terminateProcess(child).pipe(Effect.orDie),
   );
 }
 
 function bridge(receipt: Installation, args: string[], env: NodeJS.ProcessEnv) {
-  return Bun.spawn(
-    [
-      join(receipt.directory, platform().python),
-      "-m",
-      "bridge_mcp_ghidra",
-      "--transport",
-      env.GHIDRA_MCP_BRIDGE_TRANSPORT ?? "stdio",
-      "--mcp-host",
-      env.GHIDRA_MCP_BRIDGE_HOST ?? "127.0.0.1",
-      "--mcp-port",
-      env.GHIDRA_MCP_BRIDGE_PORT ?? "8090",
-      "--no-lazy",
-      ...args,
-    ],
-    { env, stdin: "inherit", stdout: "inherit", stderr: "inherit" },
+  return own(() =>
+    Bun.spawn(
+      [
+        join(receipt.directory, platform().python),
+        "-m",
+        "bridge_mcp_ghidra",
+        "--transport",
+        env.GHIDRA_MCP_BRIDGE_TRANSPORT ?? "stdio",
+        "--mcp-host",
+        env.GHIDRA_MCP_BRIDGE_HOST ?? "127.0.0.1",
+        "--mcp-port",
+        env.GHIDRA_MCP_BRIDGE_PORT ?? "8090",
+        "--no-lazy",
+        ...args,
+      ],
+      { env, stdin: "inherit", stdout: "inherit", stderr: "inherit" },
+    ),
   );
 }
 
-async function ready(env: NodeJS.ProcessEnv): Promise<boolean> {
-  try {
-    const response = await fetch(
-      `${env.GHIDRA_MCP_URL?.replace(/\/+$/, "")}/check_connection`,
-      {
-        signal: AbortSignal.timeout(1000),
-        headers: env.GHIDRA_MCP_AUTH_TOKEN
-          ? { Authorization: `Bearer ${env.GHIDRA_MCP_AUTH_TOKEN}` }
-          : {},
-      },
-    );
-    await response.body?.cancel();
-    return response.ok;
-  } catch {
-    return false;
-  }
+function ready(env: NodeJS.ProcessEnv) {
+  return attempt(
+    async (signal) => {
+      const response = await fetch(
+        `${env.GHIDRA_MCP_URL?.replace(/\/+$/, "")}/check_connection`,
+        {
+          signal: AbortSignal.any([signal, AbortSignal.timeout(1000)]),
+          headers: env.GHIDRA_MCP_AUTH_TOKEN
+            ? { Authorization: `Bearer ${env.GHIDRA_MCP_AUTH_TOKEN}` }
+            : {},
+        },
+      );
+      await response.body?.cancel();
+      return response.ok;
+    },
+    { awaitOnInterrupt: true },
+  ).pipe(Effect.catch(() => Effect.succeed(false)));
 }
 
-async function ghidra(
+const ghidra = Effect.fnUntraced(function* (
   receipt: Installation,
   action: string,
   args: string[],
   env: NodeJS.ProcessEnv,
 ) {
   const directory = join(receipt.directory, "ghidra");
-  const launcher = Bun.spawn(
+  const launcher = yield* executeCommand(
     [
       java(receipt),
       "-cp",
@@ -155,106 +176,136 @@ async function ghidra(
     ],
     { env, stdout: "pipe", stderr: "inherit" },
   );
-  const options = (await new Response(launcher.stdout).text())
-    .split(/\r?\n/)
-    .filter(Boolean);
-  if ((await launcher.exited) !== 0)
-    throw new Error("Ghidra launch settings could not be read");
+  const options = launcher.stdout.split(/\r?\n/).filter(Boolean);
+  if (launcher.code !== 0)
+    return yield* Effect.fail(new Error("Ghidra launch settings could not be read"));
   if (action === "analyzeHeadless") options.push("-Djava.awt.headless=true");
   options.push(...(env.JAVA_OPTS ?? "").trim().split(/\s+/).filter(Boolean));
-  return Bun.spawn(
-    [
-      java(receipt),
-      ...options,
-      "-cp",
-      join(directory, "Ghidra/Framework/Utility/lib/Utility.jar"),
-      "ghidra.Ghidra",
-      action === "gui"
-        ? "ghidra.GhidraRun"
-        : "ghidra.app.util.headless.AnalyzeHeadless",
-      ...args,
-    ],
-    { env, stdin: "inherit", stdout: "inherit", stderr: "inherit" },
+  return yield* own(() =>
+    Bun.spawn(
+      [
+        java(receipt),
+        ...options,
+        "-cp",
+        join(directory, "Ghidra/Framework/Utility/lib/Utility.jar"),
+        "ghidra.Ghidra",
+        action === "gui"
+          ? "ghidra.GhidraRun"
+          : "ghidra.app.util.headless.AnalyzeHeadless",
+        ...args,
+      ],
+      { env, stdin: "inherit", stdout: "inherit", stderr: "inherit" },
+    ),
   );
-}
+});
 
 export async function launch(action: string, args: string[]): Promise<number> {
   const receipt = await installed();
   if (!receipt)
     throw new Error("Install the native runtime with ai ghidra install first");
   const env = await environment(receipt);
-  const owned: Bun.Subprocess[] = [];
+  const controller = new AbortController();
   let interrupted = 0;
   const stop = (signal: NodeJS.Signals) => {
     interrupted = signal === "SIGINT" ? 130 : 143;
-    for (const child of owned) child.kill();
+    controller.abort(new Error("Ghidra launch interrupted"));
   };
   process.on("SIGINT", stop);
   process.on("SIGTERM", stop);
   try {
-    let child: Bun.Subprocess;
-    const direct = ["gui", "analyzeHeadless", "httpd", "bridge"].includes(action);
-    const help = args.includes("--help") || args.includes("-h");
-    switch (!direct && help ? "bridge" : action) {
-      case "gui":
-      case "analyzeHeadless":
-        child = await ghidra(receipt, action, args, env);
-        break;
-      case "httpd":
-        child = await server(receipt, args, env);
-        break;
-      case "bridge":
-        child = bridge(receipt, args, env);
-        break;
-      case "headless": {
-        const timeout = env.GHIDRA_MCP_STARTUP_TIMEOUT ?? "120";
-        if (!/^[1-9]\d*$/.test(timeout))
-          throw new Error("GHIDRA_MCP_STARTUP_TIMEOUT must be a positive integer");
-        const log = env.GHIDRA_MCP_HTTPD_LOG ?? join(stateHome(), "httpd.log");
-        let backend: Bun.Subprocess | undefined;
-        if (env.GHIDRA_MCP_START_HTTPD !== "0" && !(await ready(env))) {
-          const url = new URL(env.GHIDRA_MCP_URL ?? "");
-          if (!["127.0.0.1", "localhost", "[::1]"].includes(url.hostname))
-            throw new Error(
-              "A remote Ghidra backend is unavailable; start it on its host",
-            );
-          await mkdir(dirname(log), { recursive: true, mode: 0o700 });
-          const descriptor = openSync(log, "a", 0o600);
-          try {
-            backend = await server(receipt, [], env, descriptor);
-            owned.push(backend);
-          } finally {
-            closeSync(descriptor);
-          }
-        }
-        if (env.GHIDRA_MCP_SKIP_WAIT !== "1") {
-          const deadline = Date.now() + Number(timeout) * 1000;
-          while (!(await ready(env))) {
-            if (interrupted) return interrupted;
-            if (backend?.exitCode !== null && backend?.exitCode !== undefined)
-              throw new Error(
-                `Ghidra MCP backend exited with ${backend.exitCode}; see ${log}`,
+    return await run(
+      Effect.scoped(
+        Effect.gen(function* () {
+          let child: Bun.Subprocess;
+          const direct = ["gui", "analyzeHeadless", "httpd", "bridge"].includes(action);
+          const help = args.includes("--help") || args.includes("-h");
+          switch (!direct && help ? "bridge" : action) {
+            case "gui":
+            case "analyzeHeadless":
+              child = yield* ghidra(receipt, action, args, env);
+              break;
+            case "httpd":
+              child = yield* server(receipt, args, env);
+              break;
+            case "bridge":
+              child = yield* bridge(receipt, args, env);
+              break;
+            case "headless": {
+              const timeout = env.GHIDRA_MCP_STARTUP_TIMEOUT ?? "120";
+              if (!/^[1-9]\d*$/.test(timeout))
+                return yield* Effect.fail(
+                  new Error("GHIDRA_MCP_STARTUP_TIMEOUT must be a positive integer"),
+                );
+              const log = env.GHIDRA_MCP_HTTPD_LOG ?? join(stateHome(), "httpd.log");
+              let backend: Bun.Subprocess | undefined;
+              if (env.GHIDRA_MCP_START_HTTPD !== "0" && !(yield* ready(env))) {
+                const url = new URL(env.GHIDRA_MCP_URL ?? "");
+                if (!["127.0.0.1", "localhost", "[::1]"].includes(url.hostname))
+                  return yield* Effect.fail(
+                    new Error(
+                      "A remote Ghidra backend is unavailable; start it on its host",
+                    ),
+                  );
+                yield* attempt(
+                  () => mkdir(dirname(log), { recursive: true, mode: 0o700 }),
+                  { awaitOnInterrupt: true },
+                );
+                backend = yield* Effect.acquireUseRelease(
+                  Effect.try({
+                    try: () => openSync(log, "a", 0o600),
+                    catch: (error) => error,
+                  }),
+                  (descriptor) => server(receipt, [], env, descriptor),
+                  (descriptor) => Effect.sync(() => closeSync(descriptor)),
+                );
+              }
+              if (env.GHIDRA_MCP_SKIP_WAIT !== "1") {
+                yield* Effect.gen(function* () {
+                  const connected = yield* ready(env);
+                  if (
+                    !connected &&
+                    backend?.exitCode !== null &&
+                    backend?.exitCode !== undefined
+                  )
+                    return yield* Effect.fail(
+                      new Error(
+                        `Ghidra MCP backend exited with ${backend.exitCode}; see ${log}`,
+                      ),
+                    );
+                  return connected;
+                }).pipe(
+                  Effect.repeat({
+                    schedule: Schedule.spaced(250),
+                    while: (connected) => !connected,
+                  }),
+                  Effect.timeoutOrElse({
+                    duration: Number(timeout) * 1000,
+                    orElse: () =>
+                      Effect.fail(
+                        new Error(
+                          `Timed out waiting for ${env.GHIDRA_MCP_URL}; see ${log}`,
+                        ),
+                      ),
+                  }),
+                );
+              }
+              child = yield* bridge(receipt, args, env);
+              break;
+            }
+            default:
+              return yield* Effect.fail(
+                new Error(`Unknown native Ghidra command: ${action}`),
               );
-            if (Date.now() >= deadline)
-              throw new Error(
-                `Timed out waiting for ${env.GHIDRA_MCP_URL}; see ${log}`,
-              );
-            await Bun.sleep(250);
           }
-        }
-        child = bridge(receipt, args, env);
-        break;
-      }
-      default:
-        throw new Error(`Unknown native Ghidra command: ${action}`);
-    }
-    owned.push(child);
-    if (interrupted) child.kill();
-    const code = await child.exited;
-    return interrupted || code;
+          return yield* attempt(() => child.exited);
+        }),
+      ),
+      controller.signal,
+    );
+  } catch (error) {
+    if (controller.signal.aborted) return interrupted;
+    throw error;
   } finally {
-    for (const child of owned) if (child.exitCode === null) child.kill();
-    await Promise.all(owned.map((child) => child.exited));
     process.off("SIGINT", stop);
     process.off("SIGTERM", stop);
   }
