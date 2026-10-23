@@ -2,8 +2,8 @@ use std::os::unix::process::CommandExt;
 
 use backon::Retryable;
 use procfs::process::Process;
+use zbus::Variant;
 use zbus_systemd::systemd1::ManagerProxy;
-use zbus_systemd::zvariant::Value;
 
 use super::super::protocol::{Failure, Result};
 use super::bus::adapter;
@@ -71,20 +71,20 @@ pub async fn child(id: &str, arguments: &[String]) -> Result<()> {
     let bus = zbus::Connection::session().await.map_err(prerequisite)?;
     let unit = scope(id);
     let mut properties = vec![
-        ("PIDs", Value::new(vec![std::process::id()])),
-        ("Description", Value::from("Farstep isolated GUI launch")),
-        ("CollectMode", Value::from("inactive-or-failed")),
+        ("PIDs", Variant::new(vec![std::process::id()])),
+        ("Description", Variant::from("Farstep isolated GUI launch")),
+        ("CollectMode", Variant::from("inactive-or-failed")),
     ];
     if let Ok(parent) = std::env::var("FARSTEP_WORKSPACE_SCOPE_PARENT")
         && !parent.is_empty()
     {
-        properties.push(("BindsTo", Value::new(vec![parent.clone()])));
-        properties.push(("After", Value::new(vec![parent])));
+        properties.push(("BindsTo", Variant::new(vec![parent.clone()])));
+        properties.push(("After", Variant::new(vec![parent])));
     }
     let properties = properties
         .into_iter()
         .map(|(name, value)| Ok((name.to_owned(), value.try_to_owned()?)))
-        .collect::<zbus_systemd::zvariant::Result<Vec<_>>>()
+        .collect::<zbus::Result<Vec<_>>>()
         .map_err(prerequisite)?;
     let manager = manager_bus().await?;
     ManagerProxy::new(&manager)

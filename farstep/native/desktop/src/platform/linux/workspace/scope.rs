@@ -50,7 +50,6 @@ pub(super) async fn manager_bus() -> Result<zbus::Connection> {
         runtime.join("bus"),
     ))));
     zbus::connection::Builder::address(address)
-        .map_err(prerequisite)?
         .build()
         .await
         .map_err(prerequisite)

@@ -120,10 +120,7 @@ impl Command {
             }
             Action::Is(Is::Active { unit }) => {
                 let path = manager.get_unit(unit.clone()).await?;
-                let unit = systemd1::UnitProxy::builder(bus)
-                    .path(path)?
-                    .build()
-                    .await?;
+                let unit = systemd1::UnitProxy::builder(bus).path(path).build().await?;
                 if ACTIVE_STATES.contains(&unit.active_state().await?.as_str()) {
                     0
                 } else {
@@ -171,7 +168,7 @@ async fn sessions(bus: &zbus::Connection) -> zbus::Result<i32> {
     let sessions: Vec<_> = stream::iter(manager.list_sessions().await?)
         .then(|(id, _, _, _, path)| async move {
             let session = login1::SessionProxy::builder(bus)
-                .path(path)?
+                .path(path)
                 .build()
                 .await?;
             Ok::<_, zbus::Error>(json!({
