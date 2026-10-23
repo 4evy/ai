@@ -1,11 +1,11 @@
-import { createHash, randomUUID } from "node:crypto";
+import { hash, randomUUID } from "node:crypto";
 import { link, open, realpath, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { atomicWrite, privateDirectory } from "../../state";
 import { withFileLock } from "../lock/lock";
 
 export function workflowHash(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
+  return hash("sha256", value);
 }
 
 export async function workflowDirectory(scope: string, name: string): Promise<string> {

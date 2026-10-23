@@ -39,7 +39,6 @@ const PRIVATE_OUTPUT: &str = "HEADLESS-1";
 pub(super) fn maintenance_gate(
     state: &Path,
 ) -> Result<scopeguard::ScopeGuard<PathBuf, impl FnOnce(PathBuf) + use<>>> {
-    use std::io::Write;
     let path = state.join("maintenance.lock");
     std::fs::DirBuilder::new()
         .mode(0o700)
@@ -58,14 +57,13 @@ pub(super) fn maintenance_gate(
         let _ = std::fs::remove_file(path.join("owner.json"));
         let _ = std::fs::remove_dir(path);
     });
-    let mut owner = std::fs::OpenOptions::new()
+    let owner = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .mode(0o600)
         .open(gate.join("owner.json"))
         .map_err(|e| Failure::new("prerequisite", e))?;
-    owner
-        .write_all(json!({"pid": std::process::id()}).to_string().as_bytes())
+    serde_json::to_writer(owner, &json!({"pid": std::process::id()}))
         .map_err(|e| Failure::new("prerequisite", e))?;
     Ok(gate)
 }

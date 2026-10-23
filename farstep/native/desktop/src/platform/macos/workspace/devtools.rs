@@ -47,14 +47,15 @@ impl DevTools {
                         "Browser DevTools pipe closed or exceeded its limit",
                     ));
                 }
-                let response: Value = serde_json::from_slice(&response).map_err(failure)?;
+                let mut response: Value = serde_json::from_slice(&response).map_err(failure)?;
                 if response["id"] != id {
                     continue;
                 }
                 if let Some(error) = response.get("error") {
                     return Err(prerequisite(error));
                 }
-                return Ok(response["result"].clone());
+                // Move nested JSON while retaining null for absent results
+                return Ok(response.get_mut("result").map_or(Value::Null, Value::take));
             }
         })
         .await

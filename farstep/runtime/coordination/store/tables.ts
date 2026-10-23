@@ -63,7 +63,7 @@ export const jobs = sqliteTable(
     name: text().notNull(),
     project: text().notNull(),
     actor: text().notNull(),
-    payload: text().notNull(),
+    payload: text({ mode: "json" }).notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.scope, table.name] }),

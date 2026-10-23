@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { hash } from "node:crypto";
 import { open } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
@@ -10,8 +10,7 @@ import {
 import { atomicWrite, privateDirectory, privateRead } from "../../state";
 import { withFileLock } from "../lock/lock";
 
-export const actionHash = (value: string) =>
-  createHash("sha256").update(value).digest("hex");
+export const actionHash = (value: string) => hash("sha256", value);
 const recordSchema = v.strictObject({
   scopeId: v.string(),
   owner: v.string(),

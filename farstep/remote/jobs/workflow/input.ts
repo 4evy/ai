@@ -18,31 +18,27 @@ const polling = {
     v.description("Polling interval in seconds; default 0.1"),
   ),
 };
+// Reuse protocol fields, but keep polling in seconds and defaults unset here
 export const readinessInputSchema = v.union([
   v.pipe(textSchema, v.minLength(1), v.description("Readiness regex in output")),
   v.variant("kind", [
     v.strictObject({
       ...polling,
-      kind: v.literal("log"),
-      pattern: logReady.entries.pattern,
+      ...v.omit(logReady, ["timeoutMs", "pollMs"]).entries,
     }),
     v.strictObject({
       ...polling,
-      kind: v.literal("tcp"),
+      ...v.omit(tcpReady, ["timeoutMs", "pollMs"]).entries,
       host: v.optional(v.unwrap(tcpReady.entries.host)),
-      port: tcpReady.entries.port,
     }),
     v.strictObject({
       ...polling,
-      kind: v.literal("http"),
-      url: httpReady.entries.url,
+      ...v.omit(httpReady, ["timeoutMs", "pollMs"]).entries,
       status: v.optional(v.unwrap(httpReady.entries.status)),
-      bodyContains: httpReady.entries.bodyContains,
     }),
     v.strictObject({
       ...polling,
-      kind: v.literal("file"),
-      path: fileReady.entries.path,
+      ...v.omit(fileReady, ["timeoutMs", "pollMs"]).entries,
       state: v.optional(v.unwrap(fileReady.entries.state)),
     }),
     v.strictObject({

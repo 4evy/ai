@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { hash } from "node:crypto";
 import { attempt, Lifetime, run } from "@ai/core/effect/effect";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { and, eq } from "drizzle-orm";
@@ -179,17 +179,17 @@ export class CoordinationRegistry {
       const session = this.presence.requireSession();
       const project = session.project;
       const requestId = "requestId" in input ? input.requestId : undefined;
-      const fingerprint = createHash("sha256")
-        .update(
-          JSON.stringify(
-            Object.fromEntries(
-              Object.entries(input)
-                .filter(([key]) => key !== "requestId")
-                .sort(([a], [b]) => a.localeCompare(b)),
-            ),
-          ),
-        )
-        .digest("hex");
+      // Requests contain only scalar values and string arrays, so a property
+      // list preserves the persisted key order without rebuilding the object
+      const fingerprint = hash(
+        "sha256",
+        JSON.stringify(
+          input,
+          Object.keys(input)
+            .filter((key) => key !== "requestId")
+            .sort((a, b) => a.localeCompare(b)),
+        ),
+      );
       if (requestId) {
         const original = this.store.queries
           .select({

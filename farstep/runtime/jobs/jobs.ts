@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { hash, randomUUID } from "node:crypto";
 import type { Dirent } from "node:fs";
 import { link, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -39,7 +39,7 @@ const scopeSchema = v.strictObject({
 export async function brokerDirectory(directory: string): Promise<string> {
   const root = brokerRoot();
   await privateDirectory(root);
-  const runtime = join(root, createHash("sha256").update(directory).digest("hex"));
+  const runtime = join(root, hash("sha256", directory));
   await privateDirectory(runtime);
   return runtime;
 }

@@ -98,7 +98,8 @@ export class CoordinationViews {
       .offset(offset)
       .all();
     const jobs = this.context.store.queries
-      .select({ payload: tables.jobs.payload })
+      // Budget raw stored bytes before decoding only the selected prefix
+      .select({ payload: sql<string>`${tables.jobs.payload}` })
       .from(tables.jobs)
       .where(allProjects ? undefined : eq(tables.jobs.project, project))
       .orderBy(tables.jobs.project, tables.jobs.scope, tables.jobs.name)

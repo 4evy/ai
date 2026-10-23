@@ -49,7 +49,7 @@ export class CoordinationJobs {
       .get();
     if (!row) throw new Error("Only caller-owned jobs in this project may be linked");
     const job = {
-      ...v.parse(coordinationJobSchema, JSON.parse(row.payload)),
+      ...v.parse(coordinationJobSchema, row.payload),
       work: work.id,
       updatedAt: Date.now(),
     };
@@ -67,12 +67,12 @@ export class CoordinationJobs {
         name: parsed.name,
         project: parsed.project,
         actor: parsed.actor,
-        payload: JSON.stringify(parsed),
+        payload: parsed,
       })
       .onConflictDoUpdate({
         target: [tables.jobs.scope, tables.jobs.name],
         set: {
-          payload: JSON.stringify(parsed),
+          payload: parsed,
           project: parsed.project,
           actor: parsed.actor,
         },
@@ -101,7 +101,7 @@ export class CoordinationJobs {
         )
         .get();
       if (existing) {
-        const job = v.parse(coordinationJobSchema, JSON.parse(existing.payload));
+        const job = v.parse(coordinationJobSchema, existing.payload);
         // Lifetime follows native mode changes, not reservation identity
         if (
           job.owner !== this.context.owner ||
@@ -159,7 +159,7 @@ export class CoordinationJobs {
       .where(project === undefined ? undefined : eq(tables.jobs.project, project))
       .orderBy(tables.jobs.scope, tables.jobs.name)
       .all();
-    return rows.map((row) => v.parse(coordinationJobSchema, JSON.parse(row.payload)));
+    return rows.map((row) => v.parse(coordinationJobSchema, row.payload));
   }
 
   private assertObservedJob(
@@ -226,7 +226,7 @@ export class CoordinationJobs {
         if (reference) throw new Error("Coordination refresh job no longer exists");
         return;
       }
-      const old = v.parse(coordinationJobSchema, JSON.parse(row.payload));
+      const old = v.parse(coordinationJobSchema, row.payload);
       this.assertObservedJob(snapshot, old, reference);
       const job = this.observedJob(snapshot, old);
       if (isDeepStrictEqual({ ...job, updatedAt: old.updatedAt }, old)) return;
@@ -253,7 +253,7 @@ export class CoordinationJobs {
         )
         .get();
       if (!row) throw new Error("Coordination refresh job no longer exists");
-      const old = v.parse(coordinationJobSchema, JSON.parse(row.payload));
+      const old = v.parse(coordinationJobSchema, row.payload);
       if (
         reference.owner !== old.owner ||
         reference.project !== old.project ||

@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { hash, randomUUID } from "node:crypto";
 import { open } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { attempt, Lifetime, run } from "@ai/core/effect/effect";
@@ -106,9 +106,7 @@ export async function bindDeadline(
     record.name !== spec.name
   )
     throw new Error("Deadline evidence identity mismatch");
-  const index = createHash("sha256")
-    .update(JSON.stringify([spec.name, nativeId]))
-    .digest("hex");
+  const index = hash("sha256", JSON.stringify([spec.name, nativeId]));
   await atomicWrite(
     join(directory, "deadlines", `${index}.index`),
     JSON.stringify({ record: path, nativeId }),
@@ -124,9 +122,7 @@ export async function deadlineEvidence(
   owner: string,
 ) {
   const root = join(directory, "deadlines");
-  const index = createHash("sha256")
-    .update(JSON.stringify([name, nativeId]))
-    .digest("hex");
+  const index = hash("sha256", JSON.stringify([name, nativeId]));
   try {
     const { record: path, nativeId: boundId } = v.parse(
       deadlineIndexSchema,
