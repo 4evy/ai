@@ -31,7 +31,10 @@ async function run(command: string[], cwd = root): Promise<string> {
 }
 
 async function verifyInstalledPatches(): Promise<void> {
-  for (const [name, patch] of [["pi-coding-agent", "agent/agent.patch"]] as const) {
+  for (const [name, patch] of [
+    ["pi-coding-agent", "agent/agent.patch"],
+    ["pi-tui", "tui/tui.patch"],
+  ] as const) {
     await using workspace = await mkdtempDisposable(
       join(tmpdir(), "omp-published-check-"),
     );

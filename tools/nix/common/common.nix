@@ -95,6 +95,7 @@ in
         type = lib.types.attrsOf lib.types.path;
         default = {
           mcp = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/mcp";
+          compact = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/compact";
           remote = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/remote";
           skylight = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/skylight";
           thinking = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/thinking";

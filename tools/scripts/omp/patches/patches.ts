@@ -23,6 +23,7 @@ import {
 const repo = join(import.meta.dir, "../../../..");
 const targets = [
   { name: "pi-coding-agent", directory: "coding-agent", patch: "agent/agent.patch" },
+  { name: "pi-tui", directory: "tui", patch: "tui/tui.patch" },
 ];
 
 const files = Effect.fnUntraced(function* (root: string) {
@@ -262,11 +263,7 @@ const syncPatchesEffect = Effect.fnUntraced(function* (options: {
   yield* applyProfile(pristine, "runtime");
   // Generate every artifact before changing the checked-in patches
   for (const { path, content } of generated) {
-    if (
-      (yield* attempt((signal) => readFile(path, { encoding: "utf8", signal }))) ===
-      content
-    )
-      continue;
+    if ((yield* bytes(path))?.toString("utf8") === content) continue;
     if (options.check)
       return yield* Effect.fail(
         new Error(`${path} is stale; run just omp patches sync`),

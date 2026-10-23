@@ -129,6 +129,7 @@
   },
   "patchedDependencies": {
     "@oh-my-pi/pi-coding-agent@18.12.6": "apps/omp/runtime/npm/agent/agent.patch",
+    "@oh-my-pi/pi-tui@18.12.6": "apps/omp/runtime/npm/tui/tui.patch",
   },
   "catalog": {
     "@types/bun": "1.4.4",

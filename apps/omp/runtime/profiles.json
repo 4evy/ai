@@ -5,10 +5,17 @@
       "workspace/workspace.patch",
       "compression/compression.patch",
       "mcp/mcp.patch",
+      "ui/todo.patch",
       "quota/quota.patch",
-      "schema/schema.patch"
+      "schema/schema.patch",
+      "ui/compact.patch"
     ],
-    "sdk": ["ssh/ssh.patch", "compression/compression.patch", "mcp/mcp.patch"]
+    "sdk": [
+      "ssh/ssh.patch",
+      "compression/compression.patch",
+      "mcp/mcp.patch",
+      "ui/todo.patch"
+    ]
   },
   "dependencies": {},
   "overlays": [
@@ -21,6 +28,16 @@
       "source": "overlays/compression/compression.ts",
       "target": "packages/coding-agent/src/ssh/transfer-compression.ts",
       "profiles": ["runtime", "sdk"]
+    },
+    {
+      "source": "../lib/todo/summary.ts",
+      "target": "packages/tui/src/tools/todo-summary.ts",
+      "profiles": ["runtime"]
+    },
+    {
+      "source": "../lib/compact/hud.ts",
+      "target": "packages/tui/src/tools/compact-hud.ts",
+      "profiles": ["runtime"]
     }
   ]
 }

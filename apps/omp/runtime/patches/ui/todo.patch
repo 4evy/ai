@@ -1,0 +1,28 @@
+diff --git a/packages/tui/src/tools/todo.ts b/packages/tui/src/tools/todo.ts
+--- a/packages/tui/src/tools/todo.ts
++++ b/packages/tui/src/tools/todo.ts
+@@ -464,6 +464,11 @@
+ 	activeTodoDescriptionsProvider = provider;
+ }
+ 
++/** Read the host-owned live descriptions without replacing their provider */
++export function getActiveTodoDescriptions(): readonly string[] {
++	return activeTodoDescriptionsProvider();
++}
++
+ /** omp todo status → checklist item status (§7.5). */
+ const CHECKLIST_STATUS: Record<TodoStatus, TspChecklistItem["status"]> = {
+ 	pending: "pending",
+@@ -476,10 +481,10 @@
+ /** Checklist item for one todo; a pending todo an in-flight subagent executes reads as active. */
+ function checklistItem(task: TodoItem, id: string, matched = false): TspChecklistItem {
+ 	const status = task.status === "pending" && matched ? "active" : CHECKLIST_STATUS[task.status];
+-	const note = task.status === "blocked" && task.blocker ? forDisplay(task.blocker) : undefined;
++	const note = task.blocker ?? task.notes?.at(-1);
+ 	return note === undefined
+ 		? { id, text: forDisplay(task.content), status }
+-		: { id, text: forDisplay(task.content), status, note };
++		: { id, text: forDisplay(task.content), status, note: forDisplay(note) };
+ }
+ 
+ /**
