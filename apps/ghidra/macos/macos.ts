@@ -273,19 +273,24 @@ async function load(binary: string): Promise<void> {
 }
 
 if (import.meta.main) {
+  const actions = ["find", "extract", "load"] as const;
   try {
     if (
       process.argv
         .slice(2)
         .some((argument) => argument === "--help" || argument === "-h")
     )
-      console.log(readText(new URL("./macos.md", import.meta.url), "usage"));
+      console.log(
+        readText(new URL("./macos.md", import.meta.url), "usage", {
+          ACTIONS: actions.join("|"),
+        }),
+      );
     else {
       if (process.platform !== "darwin")
         throw new UsageError("macOS shared caches require macOS");
       const parsed = parseSync(
         or(
-          ...(["find", "extract", "load"] as const).map((action) =>
+          ...actions.map((action) =>
             command(
               action,
               object({ action: constant(action), query: argument(string()) }),

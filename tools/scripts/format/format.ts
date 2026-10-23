@@ -239,7 +239,11 @@ if (
   !filenames.length ||
   (kindArgument === "text" ? executable !== "-" : executable === "-")
 ) {
-  console.error(readText(new URL("./format.md", import.meta.url), "usage"));
+  console.error(
+    readText(new URL("./format.md", import.meta.url), "usage", {
+      KINDS: kindSchema.options.join(", "),
+    }),
+  );
   process.exit(2);
 }
 
