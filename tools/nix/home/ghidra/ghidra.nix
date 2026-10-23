@@ -59,7 +59,6 @@ in
             Restart = "on-failure";
             RestartSec = 5;
           };
-          Install.WantedBy = [ "default.target" ];
         };
     launchd.agents.ghidra-mcp =
       lib.modules.mkIf (cfg.server.enable && pkgs.stdenv.hostPlatform.isDarwin)
@@ -74,8 +73,8 @@ in
             ]
             ++ cfg.server.extraArgs;
             EnvironmentVariables = environment;
-            RunAtLoad = true;
-            KeepAlive = true;
+            RunAtLoad = false;
+            KeepAlive = false;
             ThrottleInterval = 5;
             Umask = 63;
           };

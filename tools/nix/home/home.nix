@@ -35,6 +35,20 @@ let
         "mcp"
         "bridge"
       ];
+      ghidraOmpArgs =
+        cfg.host.ghidraArgs or (
+          if cfg.host ? ghidraBridge then
+            [ ]
+          else
+            [
+              "ghidra"
+              "mcp"
+              "headless"
+            ]
+        );
+      ghidraOmpEnvironment = cfg.ghidra.server.environment // {
+        GHIDRA_MCP_PORT = toString cfg.ghidra.server.port;
+      };
       ghidraUrl = cfg.ghidra.url;
       ghidraEnabled = cfg.ghidra.enable;
       ghidraEnvironment = cfg.ghidra.bridge.environment // {
