@@ -46,7 +46,7 @@ jobs:
           bun-version-file: package.json
           no-cache: true
       - name: Install Nix
-        uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
+        uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # 31.11.3
         with:
           github_access_token: ${{ github.token }}
           extra_nix_config: |
