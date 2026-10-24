@@ -226,3 +226,9 @@ Review pin, hash, lockfile, and generated-file changes together. Renovate's
 [artifact workflow](../tools/scripts/renovate/artifacts.ts) synchronizes derived
 inputs. Read the [runner](../.github/scripts/renovate/renovate.ts) before
 changing automation.
+
+The scheduled Renovate workflow requires the repository Actions secret
+`RENOVATE_TOKEN`, containing a separate token with contents, pull requests,
+issues, and workflows write access. Restrict fine-grained tokens to this
+repository and renew them before expiry. The default `GITHUB_TOKEN` cannot
+replace it because updates must trigger CI and may change workflow files.
