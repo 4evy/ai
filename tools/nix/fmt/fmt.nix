@@ -29,7 +29,16 @@ in
     nixfmt.enable = true;
     deadnix.enable = true;
     just.enable = true;
-    biome.enable = true;
+    biome = {
+      enable = true;
+      package = pkgs.writeShellApplication {
+        name = "biome";
+        text = ''
+          exec ${lib.getExe bun} \
+            ${ai-javascript.biome}/node_modules/@biomejs/biome/bin/biome "$@"
+        '';
+      };
+    };
     rustfmt = {
       enable = true;
       package = pkgs.rustfmt.override { asNightly = true; };

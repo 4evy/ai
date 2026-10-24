@@ -33,6 +33,10 @@ assert lib.asserts.assertMsg (manifest.packageManager == "bun@${bun.version}")
 stdenv.mkDerivation {
   pname = "ai-javascript";
   inherit (lib.trivial.importJSON ../../../packages/core/package.json) version;
+  outputs = [
+    "out"
+    "biome"
+  ];
   src = source (
     [
       ../../../package.json
@@ -88,6 +92,10 @@ stdenv.mkDerivation {
   '';
   installPhase = ''
     runHook preInstall
+    # Preserve the pinned formatter and host binary before pruning dev tools
+    mkdir -p "$biome/node_modules/@biomejs"
+    cp -R node_modules/@biomejs/biome \
+      node_modules/@biomejs/cli-${platform}-${arch} "$biome/node_modules/@biomejs/"
     # Bun does not prune an existing install when switching to production
     rm -rf node_modules ${
       lib.strings.escapeShellArgs (map (path: "${path}/node_modules") manifest.workspaces.packages)
