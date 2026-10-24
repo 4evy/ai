@@ -118,7 +118,14 @@ test("aborting waits for child cleanup and preserves the cancellation reason", a
     executeCommand([
       process.execPath,
       "-e",
-      "await Bun.write(process.argv[1], String(process.pid)); setInterval(() => {}, 1000)",
+      // File existence must publish a complete PID, not an unfinished Bun.write
+      `
+        import { rename } from "node:fs/promises";
+        const ready = process.argv[1];
+        await Bun.write(ready + ".tmp", String(process.pid));
+        await rename(ready + ".tmp", ready);
+        setInterval(() => {}, 1000);
+      `,
       ready,
     ]),
     controller.signal,
