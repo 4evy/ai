@@ -55,6 +55,8 @@ in
         ) files
         // {
           ".omp/agent/lib".source = "${packages.ai-tools}/lib/ai-tools/apps/omp/lib";
+          ".omp/agent/commands/commit.md".source =
+            "${packages.ai-tools}/lib/ai-tools/apps/omp/commands/commit.md";
         }
         // lib.attrsets.mapAttrs' (
           name: source:

@@ -245,6 +245,25 @@ issues, and workflows write access. Restrict fine-grained tokens to this
 repository and renew them before expiry. The default `GITHUB_TOKEN` cannot
 replace it because updates must trigger CI and may change workflow files.
 
+## Commit changes by domain in OMP
+
+Use `/commit` to have the current AI review `jj diff` and `jj st`, group the
+working-copy changes by purpose, and create a separate `jj commit` for each
+domain. Add scope with `/commit <instructions>`, such as
+`/commit only the remote execution changes`.
+
+The [file-based command](../apps/omp/commands/commit.md) keeps related code,
+tests, documentation, and generated files together. It requires selective
+commits when files span domains, stops rather than creating empty commits or
+committing conflicts or suspected secrets, and reports commit IDs and remaining
+changes. It does not push or move bookmarks.
+
+This is a prompt workflow, not a plugin or a deterministic commit engine. The
+AI uses the current session's tools and repository instructions. The shared
+OMP settings module installs it at `~/.omp/agent/commands/commit.md`. For a
+checkout-only setup, copy the command into the target repository's
+`.omp/commands/commit.md`, then reload OMP.
+
 ## Improve a prompt before sending
 
 In OMP's interactive editor, write a draft and press **Alt+I**. The
