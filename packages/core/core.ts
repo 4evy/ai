@@ -4,6 +4,7 @@ export type {
   CompiledTool,
   EffectToolExecution,
   Invocation,
+  SchemaToolCompiler,
   ToolContext,
   ToolExecution,
   ToolMetadata,

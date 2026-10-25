@@ -29,35 +29,48 @@ export interface ToolMetadata<S extends v.GenericSchema> {
   mcpToolName?: string;
   beforeParse?: (input: unknown) => void;
 }
-export interface Invocation<C extends ToolContext, D = unknown> {
+export interface Invocation<C extends ToolContext, R extends ToolResult = ToolResult> {
   id: string;
   context: C;
   signal?: AbortSignal | undefined;
-  update?: ((result: ToolResult<D>) => void) | undefined;
+  update?: ((result: R) => void) | undefined;
 }
-export type ToolExecution<T, C extends ToolContext, D = unknown> = (
-  input: T,
-  invocation: Invocation<C, D>,
-) => Promise<ToolResult<D>>;
-export type EffectToolExecution<T, C extends ToolContext, D = unknown> = (
-  input: T,
-  invocation: Invocation<C, D>,
-) => Effect.Effect<ToolResult<D>, unknown>;
-export interface CompiledTool<C extends ToolContext = ToolContext, D = unknown>
-  extends Omit<ToolMetadata<v.GenericSchema>, "parameters" | "beforeParse"> {
+export type ToolExecution<
+  T,
+  C extends ToolContext,
+  R extends ToolResult = ToolResult,
+> = (input: T, invocation: Invocation<C, NoInfer<R>>) => Promise<R>;
+export type EffectToolExecution<
+  T,
+  C extends ToolContext,
+  R extends ToolResult = ToolResult,
+> = (input: T, invocation: Invocation<C, NoInfer<R>>) => Effect.Effect<R, unknown>;
+export interface CompiledTool<
+  C extends ToolContext = ToolContext,
+  R extends ToolResult = ToolResult,
+> extends Omit<ToolMetadata<v.GenericSchema>, "parameters" | "beforeParse"> {
   parameters: JsonSchema;
-  execute: ToolExecution<unknown, C, D>;
-  executeEffect: EffectToolExecution<unknown, C, D>;
+  execute: ToolExecution<unknown, C, R>;
+  executeEffect: EffectToolExecution<unknown, C, R>;
 }
+
+// Bind a host context without erasing schema output or result inference
+// Annotate handler results when progress callbacks would make inference circular
+export type SchemaToolCompiler<C extends ToolContext> = <
+  S extends v.GenericSchema,
+  R extends ToolResult,
+>(
+  definition: ToolMetadata<S> & { execute: ToolExecution<v.InferOutput<S>, C, R> },
+) => CompiledTool<C, R>;
 
 // Validation and defaults run for every adapter, even when a host skips validation
 export function compileSchemaTool<
   S extends v.GenericSchema,
   C extends ToolContext,
-  D = unknown,
+  R extends ToolResult,
 >(
-  definition: ToolMetadata<S> & { execute: ToolExecution<v.InferOutput<S>, C, D> },
-): CompiledTool<C, D> {
+  definition: ToolMetadata<S> & { execute: ToolExecution<v.InferOutput<S>, C, R> },
+): CompiledTool<C, R> {
   const { execute, ...metadata } = definition;
   return compileEffectTool({
     ...metadata,
@@ -72,14 +85,14 @@ export function compileSchemaTool<
 export function compileEffectTool<
   S extends v.GenericSchema,
   C extends ToolContext,
-  D = unknown,
+  R extends ToolResult,
 >(
   definition: ToolMetadata<S> & {
-    execute: EffectToolExecution<v.InferOutput<S>, C, D>;
+    execute: EffectToolExecution<v.InferOutput<S>, C, R>;
   },
-): CompiledTool<C, D> {
+): CompiledTool<C, R> {
   const { parameters, execute, beforeParse, ...metadata } = definition;
-  const executeEffect: EffectToolExecution<unknown, C, D> = (input, invocation) =>
+  const executeEffect: EffectToolExecution<unknown, C, R> = (input, invocation) =>
     Effect.gen(function* () {
       const parsed = yield* Effect.try({
         try: () => parseSchemaInput(parameters, input, beforeParse),

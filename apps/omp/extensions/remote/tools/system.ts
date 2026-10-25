@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import type { AgentToolResult, ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { localHelper } from "farstep/client/execution/local";
 import { structuredResult } from "farstep/protocol/identity";
 import {
@@ -11,7 +11,7 @@ import {
 import { remoteDefinitions } from "farstep/remote/remote";
 import { connectHelper } from "farstep/transport/connection/bun";
 import * as v from "valibot";
-import { registerSchemaTool } from "#apps/omp/lib/schema/tool";
+import { compileTool, registerCompiledTool } from "#apps/omp/lib/schema/tool";
 import { helperCommand, remoteArgv } from "../connections/command";
 import type { Connections } from "../connections/state";
 import type { ExecutionTarget } from "../connections/types";
@@ -44,42 +44,48 @@ async function transport(target: ExecutionTarget) {
 }
 
 export function registerSystemTool(api: ExtensionAPI, { execution }: Connections) {
-  registerSchemaTool(api, {
-    ...remoteDefinitions.system,
-    async execute(_id, input, signal, _update, ctx) {
-      const target = await execution(input.target, ctx.cwd);
-      await using helper = await connectHelper(
-        "farstep-system",
-        await transport(target),
-        signal ? { signal } : {},
-      );
-      if (!helper.identity.capabilities.includes(SYSTEM_CAPABILITY))
-        throw new Error("Upgrade Farstep to a version with system access");
-      const platform = SYSTEM_PLATFORMS[target.info.os];
-      if (helper.identity.platform !== platform)
-        throw new Error("System helper platform mismatch");
-      const reply =
-        input.action === "inspect"
-          ? await helper.call("system.inspect", {}, signal)
-          : await helper.call(
-              "system.exec",
-              v.parse(systemExecSchema, {
-                command: input.command,
-                cwd: input.cwd,
-                timeout: input.timeout,
-              }),
-              signal,
-              (input.timeout + SYSTEM_EXEC_GRACE_SECONDS) * 1000,
-            );
-      const metadata =
-        input.action === "inspect"
-          ? v.parse(systemStatusSchema, structuredResult(reply))
-          : v.parse(systemExecResultSchema, structuredResult(reply));
-      return {
-        content: [{ type: "text", text: JSON.stringify(metadata, null, 2) }],
-        details: metadata,
-        ...(reply.isError ? { isError: true } : {}),
-      };
-    },
-  });
+  registerCompiledTool(
+    api,
+    compileTool({
+      ...remoteDefinitions.system,
+      async execute(
+        input,
+        { signal, context: ctx },
+      ): Promise<AgentToolResult<unknown>> {
+        const target = await execution(input.target, ctx.cwd);
+        await using helper = await connectHelper(
+          "farstep-system",
+          await transport(target),
+          signal ? { signal } : {},
+        );
+        if (!helper.identity.capabilities.includes(SYSTEM_CAPABILITY))
+          throw new Error("Upgrade Farstep to a version with system access");
+        const platform = SYSTEM_PLATFORMS[target.info.os];
+        if (helper.identity.platform !== platform)
+          throw new Error("System helper platform mismatch");
+        const reply =
+          input.action === "inspect"
+            ? await helper.call("system.inspect", {}, signal)
+            : await helper.call(
+                "system.exec",
+                v.parse(systemExecSchema, {
+                  command: input.command,
+                  cwd: input.cwd,
+                  timeout: input.timeout,
+                }),
+                signal,
+                (input.timeout + SYSTEM_EXEC_GRACE_SECONDS) * 1000,
+              );
+        const metadata =
+          input.action === "inspect"
+            ? v.parse(systemStatusSchema, structuredResult(reply))
+            : v.parse(systemExecResultSchema, structuredResult(reply));
+        return {
+          content: [{ type: "text", text: JSON.stringify(metadata, null, 2) }],
+          details: metadata,
+          ...(reply.isError ? { isError: true } : {}),
+        };
+      },
+    }),
+  );
 }

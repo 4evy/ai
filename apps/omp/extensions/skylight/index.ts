@@ -5,6 +5,7 @@ import { SKYLIGHT_TOOLS } from "farstep/skylight/names";
 import { createSkylightParameters } from "farstep/skylight/schemas";
 import { createSkylight } from "farstep/skylight/skylight";
 import * as v from "valibot";
+import { registerCompiledTool } from "#apps/omp/lib/schema/tool";
 import { skylightPresentation } from "./presentation";
 import { present } from "./runtime/result";
 
@@ -25,20 +26,12 @@ export default function skylight(api: ExtensionAPI) {
   };
   for (const tool of feature.tools) {
     const target = targets[tool.name];
-    api.registerTool({
-      ...(target ? skylightPresentation(tool.label, target) : {}),
-      ...tool,
-      parameters: { ...tool.parameters },
-      async execute(id, input, signal, update, context) {
-        const result = await tool.execute(input, {
-          id,
-          signal,
-          context,
-          update: update ? (result) => update(present(result, tool.name)) : undefined,
-        });
-        return present(result, tool.name);
-      },
-    });
+    registerCompiledTool(
+      api,
+      tool,
+      target ? skylightPresentation(tool.label, target) : {},
+      (result) => present(result, tool.name),
+    );
   }
   api.on("session_switch", feature.close);
   api.on("session_branch", feature.close);

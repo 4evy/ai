@@ -8,12 +8,19 @@ import type {
 } from "@oh-my-pi/pi-tui/tools/renderer";
 import { isRecord } from "@oh-my-pi/pi-utils";
 
-interface FileDetails {
+export interface FileDetails {
   connectionId?: string;
   path?: string;
   resolvedPath?: string;
   displayTarget?: string;
   meta?: OutputMeta;
+  sha256?: string | undefined;
+  bytes?: number;
+  fileSize?: number;
+  isDirectory?: boolean;
+  totalEntries?: number;
+  offset?: number;
+  truncated?: boolean;
 }
 
 function remoteArgs(input: unknown, details?: FileDetails) {

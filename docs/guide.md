@@ -105,6 +105,13 @@ Acquire MCP clients with
 The caller supplies protocol negotiation, while the acquisition scope owns
 startup, immediate rollback, and the negotiated session's lifetime.
 
+Compile tool definitions with
+[`compileSchemaTool` or `compileEffectTool`](../packages/core/tool/tool.ts).
+Host adapters register compiled tools instead of projecting and parsing schemas
+again. Name a handler's result type when its progress callback makes inference
+circular. Core carries that result type through progress and completion, so
+adapters must explicitly map content their host cannot represent.
+
 ## Check and format changes
 
 Run checks covering the changed behavior on its target platform. Create or

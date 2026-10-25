@@ -1,33 +1,75 @@
-import { schemaJsonSchema } from "@ai/core/schema/json";
-import { parseSchemaInput } from "@ai/core/tool/tool";
-import type { ExtensionAPI, ToolDefinition } from "@oh-my-pi/pi-coding-agent";
-import type * as v from "valibot";
+import {
+  type CompiledTool,
+  compileSchemaTool,
+  type SchemaToolCompiler,
+  type ToolResult,
+} from "@ai/core/tool/tool";
+import type {
+  AgentToolResult,
+  ExtensionAPI,
+  ExtensionContext,
+  ToolDefinition,
+} from "@oh-my-pi/pi-coding-agent";
 
-// OMP's static marker types handlers without constructing a runtime schema
-export type SchemaToolDefinition<S extends v.GenericSchema, D = unknown> = Omit<
-  ToolDefinition<{ static: v.InferOutput<S> }, D>,
-  "parameters"
-> & { parameters: S; beforeParse?: (input: unknown) => void };
+export const compileTool: SchemaToolCompiler<ExtensionContext> = compileSchemaTool;
 
-// OMP validates the wire schema. Valibot applies defaults and refinements before
-// execution, including calls that bypass OMP's validator
-export function registerSchemaTool<S extends v.GenericSchema, D = unknown>(
+type ToolPresentation<D> = Omit<
+  ToolDefinition<Record<string, unknown>, D>,
+  keyof CompiledTool | "execute"
+>;
+
+export function registerCompiledTool<R extends ToolResult, D>(
   api: ExtensionAPI,
-  definition: SchemaToolDefinition<S, D>,
+  ...registration:
+    | [
+        tool: CompiledTool<ExtensionContext, AgentToolResult<D>>,
+        presentation?: ToolPresentation<D>,
+      ]
+    | [
+        tool: CompiledTool<ExtensionContext, R>,
+        presentation: ToolPresentation<D>,
+        mapResult: (result: R) => AgentToolResult<D>,
+      ]
 ): void {
-  const { parameters, execute, beforeParse, ...presentation } = definition;
+  if (registration.length === 3) {
+    const [tool, presentation, mapResult] = registration;
+    registerInvocation(api, tool, presentation, mapResult, (result) =>
+      result.then(mapResult),
+    );
+  } else {
+    const [tool, presentation = {}] = registration;
+    registerInvocation(
+      api,
+      tool,
+      presentation,
+      (result) => result,
+      (result) => result,
+    );
+  }
+}
+
+// Keep the native Promise untouched. MCP mappings apply identically to progress
+// and completion, while the core executor owns parsing and cancellation
+function registerInvocation<R extends ToolResult, D>(
+  api: ExtensionAPI,
+  tool: CompiledTool<ExtensionContext, R>,
+  presentation: ToolPresentation<D>,
+  mapUpdate: (result: R) => AgentToolResult<D>,
+  mapCompletion: (result: Promise<R>) => Promise<AgentToolResult<D>>,
+): void {
+  const { execute, executeEffect: _executeEffect, ...metadata } = tool;
   api.registerTool({
-    // Keep optional fields optional in provider schemas. Valibot validates input
-    strict: false,
+    ...metadata,
     ...presentation,
-    parameters: { ...schemaJsonSchema(parameters) },
-    execute(id, input, signal, update, ctx) {
-      return execute(
-        id,
-        parseSchemaInput(parameters, input, beforeParse),
-        signal,
-        update,
-        ctx,
+    parameters: { ...tool.parameters },
+    execute(id, input, signal, update, context) {
+      return mapCompletion(
+        execute(input, {
+          id,
+          signal,
+          context,
+          update: update ? (result) => update(mapUpdate(result)) : undefined,
+        }),
       );
     },
   });

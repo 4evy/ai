@@ -1,6 +1,6 @@
-import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import type { AgentToolResult, ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { remoteDefinitions } from "farstep/remote/remote";
-import { registerSchemaTool } from "#apps/omp/lib/schema/tool";
+import { compileTool, registerCompiledTool } from "#apps/omp/lib/schema/tool";
 import { connect } from "../connections/connections";
 import type { Connections } from "../connections/state";
 import { connectionState } from "../connections/state";
@@ -12,26 +12,35 @@ export function registerConnectionTool(
   { save }: Connections,
   jobs: RemoteJobs,
 ) {
-  registerSchemaTool(api, {
-    ...remoteDefinitions.connect,
-    async execute(_id, input, signal, _update, ctx) {
-      const connection = await connect(input, ctx.cwd, signal);
-      save(connection);
-      const multiplexing = await connectionState(connection, signal);
-      await touchCoordination(
-        api,
-        connection,
-        jobs,
-        ctx,
-        (reason) =>
-          `SSH connection ${connection.id} is saved, but coordination registration is unavailable: ${reason}. No operations were replayed`,
-      );
-      return {
-        content: [
-          { type: "text", text: JSON.stringify({ connection, multiplexing }, null, 2) },
-        ],
-        details: { connection, multiplexing, verifiedAt: Date.now() },
-      };
-    },
-  });
+  registerCompiledTool(
+    api,
+    compileTool({
+      ...remoteDefinitions.connect,
+      async execute(
+        input,
+        { signal, context: ctx },
+      ): Promise<AgentToolResult<unknown>> {
+        const connection = await connect(input, ctx.cwd, signal);
+        save(connection);
+        const multiplexing = await connectionState(connection, signal);
+        await touchCoordination(
+          api,
+          connection,
+          jobs,
+          ctx,
+          (reason) =>
+            `SSH connection ${connection.id} is saved, but coordination registration is unavailable: ${reason}. No operations were replayed`,
+        );
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ connection, multiplexing }, null, 2),
+            },
+          ],
+          details: { connection, multiplexing, verifiedAt: Date.now() },
+        };
+      },
+    }),
+  );
 }

@@ -3,10 +3,11 @@ import { createShellRenderer } from "@oh-my-pi/pi-tui/tools/bash";
 import { isRecord } from "@oh-my-pi/pi-utils/type-guards";
 import { remoteDefinitions } from "farstep/remote/remote";
 import { scriptArguments } from "farstep/remote/tools/shell";
-import { registerSchemaTool } from "#apps/omp/lib/schema/tool";
+import { compileTool, registerCompiledTool } from "#apps/omp/lib/schema/tool";
 import type { Connections } from "../connections/state";
 import type { RemoteJobs } from "../jobs/jobs";
 import { jobPresentation } from "../jobs/presentation";
+import type { Result } from "../jobs/types";
 
 const MAX_BATCH_PREVIEW_STEPS = 128;
 
@@ -44,35 +45,44 @@ export function registerJobTools(
   { execution }: Connections,
   jobs: RemoteJobs,
 ) {
-  registerSchemaTool(api, {
-    ...remoteDefinitions.run,
-    ...createShellRenderer<unknown>({
+  registerCompiledTool(
+    api,
+    compileTool({
+      ...remoteDefinitions.run,
+      async execute(args, { signal, update: onUpdate, context: ctx }): Promise<Result> {
+        const target = await execution(args.target ?? "local", ctx.cwd);
+        return jobs.run(target, args, ctx, signal, onUpdate);
+      },
+    }),
+    createShellRenderer<unknown>({
       ...scriptArguments,
       resolveTitle: (args) =>
         `${isRecord(args) && typeof args.target === "string" && args.target !== "local" ? `SSH · ${args.target}` : "Local"}`,
     }),
-    async execute(_id, args, signal, onUpdate, ctx) {
-      const target = await execution(args.target ?? "local", ctx.cwd);
-      return jobs.run(target, args, ctx, signal, onUpdate);
-    },
-  });
-  registerSchemaTool(api, {
-    ...remoteDefinitions.batch,
-    ...createShellRenderer<unknown>({
+  );
+  registerCompiledTool(
+    api,
+    compileTool({
+      ...remoteDefinitions.batch,
+      async execute(args, { signal, update: onUpdate, context: ctx }): Promise<Result> {
+        const target = await execution(args.target ?? "local", ctx.cwd);
+        return jobs.batch(target, args, ctx, signal, onUpdate);
+      },
+    }),
+    createShellRenderer<unknown>({
       ...scriptArguments,
       resolveCommand: batchPreview,
       resolveTitle: () => "Batch plan",
     }),
-    async execute(_id, args, signal, onUpdate, ctx) {
-      const target = await execution(args.target ?? "local", ctx.cwd);
-      return jobs.batch(target, args, ctx, signal, onUpdate);
-    },
-  });
-  registerSchemaTool(api, {
-    ...remoteDefinitions.job,
-    ...jobPresentation(),
-    async execute(_id, input, signal, _update, ctx) {
-      return jobs.control(input, ctx, signal);
-    },
-  });
+  );
+  registerCompiledTool(
+    api,
+    compileTool({
+      ...remoteDefinitions.job,
+      async execute(input, { signal, context: ctx }): Promise<Result> {
+        return jobs.control(input, ctx, signal);
+      },
+    }),
+    jobPresentation(),
+  );
 }
