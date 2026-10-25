@@ -138,7 +138,7 @@ if (!check) {
 }
 await run(["bun", "run", "--cwd", "apps/omp", "typecheck"]);
 await run([
-  "bun",
+  process.execPath,
   "x",
   "--no-install",
   "tsc",

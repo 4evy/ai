@@ -67,7 +67,9 @@ const declarations = Effect.fnUntraced(function* (
 ) {
   yield* run([
     process.execPath,
-    join(repo, "node_modules/typescript/bin/tsc"),
+    "x",
+    "--no-install",
+    "tsc",
     "-p",
     join(tree, "packages", directory, "tsconfig.publish.json"),
     "--outDir",

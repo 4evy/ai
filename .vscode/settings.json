@@ -1,9 +1,6 @@
 {
   "editor.formatOnSave": true,
   "editor.tabSize": 2,
-  "js/ts.experimental.useTsgo": true,
-  "js/ts.tsdk.path": "./node_modules/typescript",
-  "js/ts.tsdk.promptToUseWorkspaceVersion": true,
   "js/ts.updateImportsOnFileMove.enabled": "always",
   "rust-analyzer.linkedProjects": ["./Cargo.toml"],
   "rust-analyzer.check.command": "clippy",
