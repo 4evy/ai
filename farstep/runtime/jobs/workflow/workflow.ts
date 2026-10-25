@@ -26,7 +26,7 @@ import {
   workflowCancellationSchema,
   workflowJournalSchema,
 } from "./records";
-import { durableWorkflowWrite, withWorkflowLock, workflowDirectory } from "./storage";
+import { withWorkflowLock, workflowDirectory, writeWorkflowRecord } from "./storage";
 
 export { readWorkflowManifest } from "./manifest";
 export {
@@ -38,7 +38,6 @@ export {
   workflowJournalSchema,
 } from "./records";
 export {
-  durableWorkflowWrite,
   immutableWorkflowWrite,
   withWorkflowLock,
 } from "./storage";
@@ -129,7 +128,7 @@ export class WorkflowService {
           throw new Error(
             "Workflow native generation changed; launch cannot be replayed",
           );
-        await durableWorkflowWrite(path, {
+        await writeWorkflowRecord(path, {
           attemptedAt: reservation?.attemptedAt ?? Date.now(),
           nativeId: existing.id,
         });
@@ -149,13 +148,13 @@ export class WorkflowService {
           throw new Error("Helper is not activated; workflow launches are disabled");
         // This fence precedes the irreversible native request, including its reply
         const attemptedAt = Date.now();
-        await durableWorkflowWrite(path, { attemptedAt });
+        await writeWorkflowRecord(path, { attemptedAt });
         const response = await this.broker.request({
           op: "start",
           spec: manifest.prepared.spec,
           owner: this.owner,
         });
-        await durableWorkflowWrite(path, {
+        await writeWorkflowRecord(path, {
           attemptedAt,
           nativeId: response.snapshot.id,
         });
@@ -186,7 +185,7 @@ export class WorkflowService {
           journal,
           "Workflow worker exited without a durable completion; child outcomes are unknown",
         );
-        await durableWorkflowWrite(path, journal);
+        await writeWorkflowRecord(path, journal);
       } else if (native && journal.phase === "prepared") {
         // A started native root is not evidence that any child completed
         return presentResult({ ...journal.result, state: "running" }, selectedStep);
@@ -205,7 +204,7 @@ export class WorkflowService {
       const previous = (await exists(path))
         ? v.parse(workflowCancellationSchema, JSON.parse(await privateRead(path)))
         : undefined;
-      await durableWorkflowWrite(path, cancellationRequest(previous, request.step));
+      await writeWorkflowRecord(path, cancellationRequest(previous, request.step));
       if (
         !(await exists(join(directory, "start.json"))) &&
         !(await exists(join(directory, "execution.json")))
@@ -227,7 +226,7 @@ export class WorkflowService {
           journal.result.state = "cancelled";
           journal.result.finishedAt = Date.now();
         }
-        await durableWorkflowWrite(journalPath, journal);
+        await writeWorkflowRecord(journalPath, journal);
       }
     });
     return this.inspect({ name: request.name });

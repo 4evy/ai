@@ -1,5 +1,4 @@
 import { hash, randomUUID } from "node:crypto";
-import { open } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { attempt, Lifetime, run } from "@ai/core/effect/effect";
 import { Process } from "@oh-my-pi/pi-natives";
@@ -9,7 +8,12 @@ import { uuidSchema } from "farstep/protocol/identity";
 import type { JobSpec } from "farstep/protocol/jobs/protocol";
 import * as v from "valibot";
 import { deadlineEvidenceSchema } from "#farstep/protocol/jobs/gateway";
-import { atomicWrite, privateDirectory, privateRead } from "../state";
+import {
+  atomicWrite,
+  durableJsonWriter,
+  privateDirectory,
+  privateRead,
+} from "../state";
 
 const deadlineIndexSchema = v.strictObject({
   record: v.string(),
@@ -24,22 +28,7 @@ const recordSchema = v.strictObject({
   evidence: deadlineEvidenceSchema,
 });
 
-async function persist(
-  path: string,
-  record: v.InferOutput<typeof recordSchema>,
-): Promise<void> {
-  await atomicWrite(path, JSON.stringify(record));
-  const root = dirname(path);
-  for (const parent of [
-    root,
-    dirname(root),
-    dirname(dirname(root)),
-    dirname(dirname(dirname(root))),
-  ]) {
-    await using directory = await open(parent, "r");
-    await directory.sync();
-  }
-}
+const persist = durableJsonWriter<v.InferOutput<typeof recordSchema>>(4);
 
 export async function prepareDeadline(
   directory: string,

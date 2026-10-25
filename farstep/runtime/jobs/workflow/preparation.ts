@@ -13,11 +13,11 @@ import {
   type WorkflowManifest,
 } from "./records";
 import {
-  durableWorkflowWrite,
   immutableWorkflowWrite,
   withWorkflowLock,
   workflowDirectory,
   workflowHash,
+  writeWorkflowRecord,
 } from "./storage";
 
 export class WorkflowPreparation {
@@ -81,7 +81,7 @@ export class WorkflowPreparation {
             !(await exists(join(directory, "journal.json"))) &&
             !(await exists(join(directory, "start.json")))
           )
-            await durableWorkflowWrite(join(directory, "journal.json"), {
+            await writeWorkflowRecord(join(directory, "journal.json"), {
               phase: "prepared",
               result: initialWorkflowResult(manifest),
             });
@@ -111,7 +111,7 @@ export class WorkflowPreparation {
           },
         };
         await immutableWorkflowWrite(record, manifest);
-        await durableWorkflowWrite(join(directory, "journal.json"), {
+        await writeWorkflowRecord(join(directory, "journal.json"), {
           phase: "prepared",
           result: initialWorkflowResult(manifest),
         });

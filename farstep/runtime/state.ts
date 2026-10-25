@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { lstat, mkdir, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { attempt, run } from "@ai/core/effect/effect";
-import { openFile } from "@ai/core/effect/fs/fs";
+import { openFile, syncDirectoryAncestors } from "@ai/core/effect/fs/fs";
 import { isEexist, isEnoent } from "@oh-my-pi/pi-utils/fs-error";
 import { Effect } from "effect";
 import { uuidSchema } from "farstep/protocol/identity";
@@ -24,6 +24,14 @@ export {
   privateRead,
   privateReadEffect,
 } from "./platform/state";
+
+// Preserve the platform's private publication before flushing directory entries
+export function durableJsonWriter<T = unknown>(ancestors: number) {
+  return async (path: string, value: T): Promise<void> => {
+    await run(atomicWriteEffect(path, JSON.stringify(value)));
+    await syncDirectoryAncestors(dirname(path), ancestors);
+  };
+}
 
 export const PROTOCOL_MAJOR = 1;
 export const VERSION = "1.0.0";

@@ -1,8 +1,11 @@
 import { hash, randomUUID } from "node:crypto";
 import { link, open, realpath, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { atomicWrite, privateDirectory } from "../../state";
+import { syncDirectoryAncestors } from "@ai/core/effect/fs/fs";
+import { durableJsonWriter, privateDirectory } from "../../state";
 import { withFileLock } from "../lock/lock";
+
+export const writeWorkflowRecord = durableJsonWriter(5);
 
 export function workflowHash(value: string): string {
   return hash("sha256", value);
@@ -20,24 +23,6 @@ export async function workflowDirectory(scope: string, name: string): Promise<st
   return directory;
 }
 
-export async function durableWorkflowWrite(
-  path: string,
-  value: unknown,
-): Promise<void> {
-  await atomicWrite(path, JSON.stringify(value));
-  await syncParents(dirname(path));
-}
-
-async function syncParents(directory: string): Promise<void> {
-  for (let index = 0; index < 5; index++) {
-    await using file = await open(directory, "r");
-    await file.sync();
-    const parent = dirname(directory);
-    if (parent === directory) break;
-    directory = parent;
-  }
-}
-
 export async function immutableWorkflowWrite(
   path: string,
   value: unknown,
@@ -50,7 +35,7 @@ export async function immutableWorkflowWrite(
       await file.sync();
     }
     await link(temporary, path);
-    await syncParents(dirname(path));
+    await syncDirectoryAncestors(dirname(path), 5);
   } finally {
     await rm(temporary, { force: true });
   }

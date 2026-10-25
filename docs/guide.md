@@ -105,6 +105,11 @@ Choose concurrency explicitly with `Effect.all` or `Effect.forEach`. Do not
 add retries around commands, file writes, or desktop input whose outcome may
 already have taken effect.
 
+Bind each job record domain's directory-flush depth once with
+[`durableJsonWriter`](../farstep/runtime/state.ts). The shared writer retains
+private atomic publication and then flushes directory entries nearest-first.
+Immutable workflow reservations still use exclusive hard-link publication.
+
 Acquire MCP clients with
 [`McpSession.acquireEffect`](../packages/core/mcp/session/session.ts).
 The caller supplies protocol negotiation, while the acquisition scope owns

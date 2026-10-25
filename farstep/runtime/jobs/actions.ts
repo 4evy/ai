@@ -36,7 +36,7 @@ function processTree(root: Process): Process[] {
 }
 
 import { JobObserver, screenChanged } from "./actions/observation";
-import { ActionRecords, durableWrite, withJobLock } from "./actions/records";
+import { ActionRecords, withJobLock, writeActionRecord } from "./actions/records";
 
 export class JobActions {
   private readonly records: ActionRecords;
@@ -141,20 +141,18 @@ export class JobActions {
         receipt,
         termination,
       };
-      await durableWrite(path, record, directory);
+      await writeActionRecord(path, record);
       if (termination)
-        await durableWrite(
-          join(directory, "termination.json"),
-          { actionId: request.actionId },
-          directory,
-        );
+        await writeActionRecord(join(directory, "termination.json"), {
+          actionId: request.actionId,
+        });
       const before = await this.beforeAction(request);
       if (request.expectedScreenVersion !== undefined) {
         if (before?.screenVersion !== request.expectedScreenVersion) {
           Object.assign(receipt, before, {
             error: "Screen changed; action was not sent",
           });
-          await durableWrite(path, record, directory);
+          await writeActionRecord(path, record);
           return receipt;
         }
       }
@@ -192,9 +190,9 @@ export class JobActions {
       // This write commits the no-replay fence before touching broker transport
       receipt.state = "sent-outcome-unknown";
       receipt.sentAt = Date.now();
-      await durableWrite(path, record, directory);
+      await writeActionRecord(path, record);
       await processAction();
-      await durableWrite(path, record, directory);
+      await writeActionRecord(path, record);
       return receipt;
     });
   }

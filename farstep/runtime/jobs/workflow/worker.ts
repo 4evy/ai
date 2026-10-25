@@ -28,8 +28,8 @@ import { exists, privateDirectory, privateRead } from "../../state";
 import type { RunningChild, StopKind } from "./child";
 import { STEP_POLICY } from "./states";
 import { type StepContext, type WorkflowState, WorkflowStep } from "./step";
+import { writeWorkflowRecord } from "./storage";
 import {
-  durableWorkflowWrite,
   immutableWorkflowWrite,
   initialWorkflowResult,
   markWorkflowUnknown,
@@ -120,7 +120,7 @@ class WorkflowWorker implements StepContext {
         "Workflow controller failed without a durable step completion",
       );
       try {
-        await durableWorkflowWrite(this.journalPath, this.journal);
+        await writeWorkflowRecord(this.journalPath, this.journal);
       } catch {
         /* Inspection reconciles an interrupted ledger as unknown */
       }
@@ -135,7 +135,7 @@ class WorkflowWorker implements StepContext {
           { component: "workflow", phase: this.ledger.phase },
           this.writes.withPermits(1)(
             attempt(() =>
-              durableWorkflowWrite(join(this.directory, "journal.json"), this.ledger),
+              writeWorkflowRecord(join(this.directory, "journal.json"), this.ledger),
             ),
           ),
         ),
@@ -348,7 +348,7 @@ class WorkflowWorker implements StepContext {
         result: previous.result,
       };
       claimed.result.state = "running";
-      await durableWorkflowWrite(join(this.directory, "journal.json"), claimed);
+      await writeWorkflowRecord(join(this.directory, "journal.json"), claimed);
       return claimed;
     });
   }

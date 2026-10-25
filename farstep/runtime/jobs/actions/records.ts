@@ -1,13 +1,13 @@
 import { hash } from "node:crypto";
-import { open } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
+import { syncDirectoryAncestors } from "@ai/core/effect/fs/fs";
 import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
 import * as v from "valibot";
 import {
   actionReceiptSchema,
   terminationMetadataSchema,
 } from "#farstep/protocol/jobs/gateway";
-import { atomicWrite, privateDirectory, privateRead } from "../../state";
+import { durableJsonWriter, privateDirectory, privateRead } from "../../state";
 import { withFileLock } from "../lock/lock";
 
 export const actionHash = (value: string) => hash("sha256", value);
@@ -19,15 +19,7 @@ const recordSchema = v.strictObject({
   termination: v.optional(terminationMetadataSchema),
 });
 
-export async function durableWrite(
-  path: string,
-  value: unknown,
-  directory: string,
-): Promise<void> {
-  await atomicWrite(path, JSON.stringify(value));
-  await using handle = await open(directory, "r");
-  await handle.sync();
-}
+export const writeActionRecord = durableJsonWriter(1);
 
 export async function withJobLock<T>(
   directory: string,
@@ -53,15 +45,7 @@ export class ActionRecords {
     const directory = join(root, actionHash(JSON.stringify([name, nativeId])));
     await privateDirectory(directory);
     // Sync directory entries too, so a power loss cannot forget the no-replay fence
-    for (const parent of [
-      root,
-      this.root,
-      dirname(this.root),
-      dirname(dirname(this.root)),
-    ]) {
-      await using handle = await open(parent, "r");
-      await handle.sync();
-    }
+    await syncDirectoryAncestors(root, 4);
     return directory;
   }
 
