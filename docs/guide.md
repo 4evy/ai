@@ -287,6 +287,36 @@ OMP settings module installs it at `~/.omp/agent/commands/commit.md`. For a
 checkout-only setup, copy the command into the target repository's
 `.omp/commands/commit.md`, then reload OMP.
 
+## Rebase onto the updated remote base in OMP
+
+Use `/rebase` to update the remote base and rebase the current local stack,
+including working-copy changes, onto it. Add context with
+`/rebase <instructions>`, such as `/rebase use the work remote`.
+
+The [file-based command](../apps/omp/commands/rebase.md) uses `gh api` to
+discover whether the selected GitHub remote is a fork and which `main` or
+`master` branch it uses. For a fork, it first merges the latest corresponding
+upstream branch into the fork's base branch on GitHub, preserving fork-only
+commits. This also handles forks whose base branch has a different name from
+upstream. It verifies the sync before running `jj git fetch`, then rebases onto
+the freshly fetched remote bookmark.
+
+Invoking `/rebase` authorizes that fork-base sync. It does not authorize
+force-resetting the fork, pushing local work, or changing pull requests. GitHub
+authentication and permission to update the fork are required. Ambiguous
+branches, failed syncs, and destructive choices must be resolved before the
+command fetches or rebases.
+
+The AI resolves conflicts throughout the rebased stack, restores the original
+working-copy change, and verifies that no affected revision remains conflicted.
+This is a prompt workflow, like `/commit`, not an automatic merge algorithm.
+If a conflict needs a decision the AI cannot safely infer, it asks rather than
+discarding either side or claiming completion.
+
+The shared OMP settings module installs it at
+`~/.omp/agent/commands/rebase.md`. For a checkout-only setup, copy the command
+into `.omp/commands/rebase.md` in the target repository, then reload OMP.
+
 ## Start a quick chat in OMP
 
 Use `/quick` to start a new, empty chat with `openai-codex/gpt-6-luna`.
