@@ -36,7 +36,6 @@ export async function isSameMachineSSH(
   const signal = ptree.combineSignals(opts.signal, opts.timeoutMs ?? 30_000);
   using child = ptree.spawn(["ssh", ...args], signal ? { signal } : {});
   const connection = (await child.text()).trim().split(/\s+/);
-  await child.exitedCleanly;
   const serverAddress = connection[2];
   if (
     connection.length !== 4 ||
