@@ -198,7 +198,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  
  			// Skip if already connected
  			if (this.#connections.has(name)) {
-@@ -838,13 +845,13 @@
+@@ -838,13 +845,12 @@
  				continue;
  			}
  
@@ -208,29 +208,25 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
 +			// A new config supersedes any retry schedule for the old one
  			this.#forgetLostServer(name);
 -			this.#serverConfigs.set(name, config);
-+			this.#serverAbort.get(name)?.abort();
- 			const connectionEpoch = this.#epoch;
+-			const connectionEpoch = this.#epoch;
 -			const connectSignal = this.#connectAbort.signal;
++			this.#serverAbort.get(name)?.abort();
 +			const controller = new AbortController();
 +			this.#serverAbort.set(name, controller);
 +			const connectSignal = AbortSignal.any([this.#connectAbort.signal, controller.signal]);
  
  			// Resolve auth config before connecting, but do so per-server in parallel.
  			const connectionPromise = (async () => {
-@@ -867,7 +874,11 @@
+@@ -867,7 +873,7 @@
  						connection._source = sources[name];
  					}
  
 -					if (this.#epoch !== connectionEpoch || this.#pendingConnections.get(name) !== connectionPromise) {
-+					if (
-+						connectSignal.aborted ||
-+						this.#epoch !== connectionEpoch ||
-+						this.#pendingConnections.get(name) !== connectionPromise
-+					) {
++					if (connectSignal.aborted || this.#pendingConnections.get(name) !== connectionPromise) {
  						this.#detachConnection(name, connection);
  						void disconnectServer(connection).catch(() => {});
  						throw new Error(`Server "${name}" was disconnected during initial connection`);
-@@ -915,7 +926,8 @@
+@@ -915,7 +921,8 @@
  
  			const toolsPromise = connectionPromise.then(async connection => {
  				try {
@@ -240,7 +236,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  					return { connection, serverTools };
  				} catch (error) {
  					// Detach and delete synchronously, then close in the background:
-@@ -935,13 +947,14 @@
+@@ -935,13 +942,14 @@
  
  			const startupUpdate = toolsPromise
  				.then(async ({ connection, serverTools }) => {
@@ -256,7 +252,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  					void this.toolCache?.set(name, config, serverTools);
  
  					notify({ type: "connected", serverName: name });
-@@ -1016,6 +1029,7 @@
+@@ -1016,6 +1024,7 @@
  			for (const task of connectionTasks) {
  				const { name } = task;
  				if (task.tracked.status === "fulfilled") {
@@ -264,7 +260,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  					const value = task.tracked.value;
  					if (!value) continue;
  					const { connection, serverTools } = value;
-@@ -1030,6 +1044,7 @@
+@@ -1030,6 +1039,7 @@
  					errors.set(name, message);
  					reportedErrors.add(name);
  				} else {
@@ -272,7 +268,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  					const cached = cachedTools.get(name);
  					if (cached) {
  						const source = this.#sources.get(name);
-@@ -1285,6 +1300,60 @@
+@@ -1285,6 +1295,60 @@
  		return this.#pendingReconnections.get(name);
  	}
  
@@ -333,21 +329,18 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  	/**
  	 * Wait for a connection to complete (or fail).
  	 */
-@@ -1325,7 +1394,12 @@
+@@ -1348,9 +1412,7 @@
+ 	 * Get all known server names (connected, connecting, or discovered).
  	 */
  	getAllServerNames(): string[] {
- 		return Array.from(
+-		return Array.from(
 -			new Set([...this.#sources.keys(), ...this.#connections.keys(), ...this.#pendingConnections.keys()]),
-+			new Set([
-+				...this.#serverConfigs.keys(),
-+				...this.#sources.keys(),
-+				...this.#connections.keys(),
-+				...this.#pendingConnections.keys(),
-+			]),
- 		);
+-		);
++		return Array.from(this.#serverConfigs.keys());
  	}
  
-@@ -1358,17 +1432,21 @@
+ 	/**
+@@ -1382,17 +1444,21 @@
  	}
  
  	/**
@@ -373,7 +366,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  		this.#pendingResourceRefresh.delete(name);
  		this.#reconnectHistory.delete(name);
  		this.#forgetLostServer(name);
-@@ -1381,9 +1459,7 @@
+@@ -1405,9 +1471,7 @@
  		}
  		this.#subscribedResources.delete(name);
  
@@ -384,7 +377,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  
  		// Remove tools from this server and notify consumers
  		const hadTools = this.#tools.some(t => t.mcpServerName === name);
-@@ -1395,6 +1471,7 @@
+@@ -1419,6 +1483,7 @@
  
  		// Notify prompt consumers so stale commands are cleared
  		if (connection?.prompts?.length) this.#onPromptsChanged?.(name);
@@ -392,7 +385,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  	}
  
  	/**
-@@ -1410,6 +1487,9 @@
+@@ -1434,6 +1499,9 @@
  		this.#epoch++;
  		this.#connectAbort.abort();
  		this.#connectAbort = new AbortController();
@@ -402,7 +395,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  		for (const name of this.#lostRemoteServers.keys()) this.#forgetLostServer(name);
  		const promises = Array.from(this.#connections, ([name, connection]) => this.#discardConnection(name, connection));
  		await Promise.allSettled(promises);
-@@ -1450,8 +1530,10 @@
+@@ -1474,8 +1542,10 @@
  		options?: { manual?: boolean; authChallenge?: MCPAuthChallenge },
  	): Promise<MCPServerConnection | null> {
  		if (options?.manual) {
@@ -413,7 +406,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  
  		const pending = this.#pendingReconnections.get(name);
  		if (pending) return pending;
-@@ -1570,7 +1652,12 @@
+@@ -1594,7 +1664,12 @@
  		const oldConnection = this.#connections.get(name);
  		let config = oldConnection?.config ?? this.#serverConfigs.get(name);
  		const source = this.#sources.get(name) ?? oldConnection?._source;
@@ -427,7 +420,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  
  		if (authChallenge) {
  			if (!this.#authHandler) {
-@@ -1581,7 +1668,7 @@
+@@ -1605,7 +1680,7 @@
  			}
  			try {
  				const refreshedConfig = await this.#authHandler(name, authChallenge);
@@ -436,7 +429,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  				config = refreshedConfig;
  				this.#serverConfigs.set(name, config);
  			} catch (error) {
-@@ -1597,7 +1684,6 @@
+@@ -1621,7 +1696,6 @@
  		// Fire-and-forget: don't await the close — HttpTransport.close() sends a
  		// DELETE with config.timeout (30s default), and blocking here delays the
  		// reconnect loop by that amount on every server restart.
@@ -444,7 +437,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  		if (oldConnection) {
  			// From here the live remote connection is gone: the server is lost
  			// until a reconnect succeeds, and the schedule outlives this attempt.
-@@ -1616,7 +1702,7 @@
+@@ -1640,7 +1714,7 @@
  		// attempt is a single quiet probe; its pacing is the schedule itself.
  		const delays = scheduled ? [] : this.reconnectPolicy.ladderMs;
  		for (let attempt = 0; attempt <= delays.length; attempt++) {
@@ -453,7 +446,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  				logger.debug("MCP reconnect aborted before attempt after configuration changed", {
  					path: `mcp:${name}`,
  					storedEpoch: reconnectEpoch,
-@@ -1625,12 +1711,13 @@
+@@ -1649,12 +1723,13 @@
  				return null;
  			}
  			try {
@@ -469,7 +462,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  					logger.debug("MCP reconnect aborted after configuration changed", {
  						path: `mcp:${name}`,
  						storedEpoch: reconnectEpoch,
-@@ -1668,10 +1755,8 @@
+@@ -1692,10 +1767,8 @@
  		name: string,
  		config: MCPServerConfig,
  		source: SourceMeta | undefined,
@@ -481,7 +474,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  		const resolvedConfig = await this.#resolveAuthConfig(config, { signal: connectSignal });
  		const connection = await connectToServer(name, resolvedConfig, {
  			signal: connectSignal,
-@@ -1688,7 +1773,7 @@
+@@ -1712,7 +1785,7 @@
  
  		// Bail out if the server was disconnected or the manager was reset
  		// while we were connecting (e.g. /mcp reload called disconnectAll).
@@ -490,7 +483,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  			this.#detachConnection(name, connection);
  			void disconnectServer(connection).catch(() => {});
  			throw new Error(`Server "${name}" was disconnected during reconnection`);
-@@ -1713,7 +1798,8 @@
+@@ -1737,7 +1810,8 @@
  			void this.reconnectServer(name);
  		};
  		try {
@@ -500,7 +493,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
  			const reconnect = (options?: { authChallenge?: MCPAuthChallenge }) => this.reconnectServer(name, options);
  			const customTools = MCPTool.fromTools(connection, serverTools, reconnect);
  			void this.toolCache?.set(name, config, serverTools);
-@@ -1802,6 +1888,7 @@
+@@ -1826,6 +1900,7 @@
  
  		// Reload tools
  		const serverTools = await listTools(connection);
@@ -511,7 +504,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
 diff --git a/packages/coding-agent/src/mcp/tool-bridge.ts b/packages/coding-agent/src/mcp/tool-bridge.ts
 --- a/packages/coding-agent/src/mcp/tool-bridge.ts
 +++ b/packages/coding-agent/src/mcp/tool-bridge.ts
-@@ -268,6 +268,9 @@
+@@ -274,6 +274,9 @@
  	return false;
  }
  
@@ -524,7 +517,7 @@ diff --git a/packages/coding-agent/src/mcp/tool-bridge.ts b/packages/coding-agen
 diff --git a/packages/coding-agent/src/mcp/transports/stdio.ts b/packages/coding-agent/src/mcp/transports/stdio.ts
 --- a/packages/coding-agent/src/mcp/transports/stdio.ts
 +++ b/packages/coding-agent/src/mcp/transports/stdio.ts
-@@ -409,7 +409,7 @@
+@@ -415,7 +415,7 @@
  }
  
  /** Grace window to observe a cooperative exit after SIGTERM before escalating to SIGKILL. */
@@ -536,7 +529,7 @@ diff --git a/packages/coding-agent/src/mcp/transports/stdio.ts b/packages/coding
 diff --git a/packages/coding-agent/src/mcp/types.ts b/packages/coding-agent/src/mcp/types.ts
 --- a/packages/coding-agent/src/mcp/types.ts
 +++ b/packages/coding-agent/src/mcp/types.ts
-@@ -67,6 +67,10 @@
+@@ -73,6 +73,10 @@
  interface MCPServerConfigBase {
  	/** Whether this server is enabled (default: true) */
  	enabled?: boolean;
@@ -570,7 +563,7 @@ diff --git a/packages/coding-agent/src/modes/components/extensions/mcp-runtime.t
 diff --git a/packages/coding-agent/src/modes/controllers/mcp-command-controller.ts b/packages/coding-agent/src/modes/controllers/mcp-command-controller.ts
 --- a/packages/coding-agent/src/modes/controllers/mcp-command-controller.ts
 +++ b/packages/coding-agent/src/modes/controllers/mcp-command-controller.ts
-@@ -1353,7 +1353,7 @@
+@@ -1008,7 +1008,7 @@
  	async #syncManagerConnection(name: string, config: MCPServerConfig): Promise<void> {
  		if (!this.ctx.mcpManager) return;
  		if (this.ctx.mcpManager.getConnectionStatus(name) !== "disconnected") return;
@@ -579,7 +572,7 @@ diff --git a/packages/coding-agent/src/modes/controllers/mcp-command-controller.
  		if (this.ctx.mcpManager.getConnectionStatus(name) === "connected") {
  			await this.ctx.session.refreshMCPTools(this.ctx.mcpManager.getTools());
  		}
-@@ -2217,7 +2217,7 @@
+@@ -1810,7 +1810,7 @@
  		}
  
  		const source = sources[name];
@@ -591,7 +584,7 @@ diff --git a/packages/coding-agent/src/modes/controllers/mcp-command-controller.
 diff --git a/packages/coding-agent/src/sdk.ts b/packages/coding-agent/src/sdk.ts
 --- a/packages/coding-agent/src/sdk.ts
 +++ b/packages/coding-agent/src/sdk.ts
-@@ -3428,6 +3428,7 @@
+@@ -3504,6 +3504,7 @@
  			}),
  			createAnnotationsAPI,
  		);
@@ -599,7 +592,7 @@ diff --git a/packages/coding-agent/src/sdk.ts b/packages/coding-agent/src/sdk.ts
  		// A dialog waits for the user, not the agent: the session lets the display sleep while one is open.
  		const trackUserWait: UserWaitTracker = dialog => (hasSession ? session.waitForUser(dialog) : dialog());
  		extensionRunner.setUserWaitTracker(trackUserWait);
-@@ -4783,6 +4784,7 @@
+@@ -4868,6 +4869,7 @@
  					}
  				: undefined,
  			disconnectOwnedMcpManager: ownedMcpManager ? () => ownedMcpManager.disconnectAll() : undefined,
@@ -610,7 +603,7 @@ diff --git a/packages/coding-agent/src/sdk.ts b/packages/coding-agent/src/sdk.ts
 diff --git a/packages/coding-agent/src/session/agent-session-types.ts b/packages/coding-agent/src/session/agent-session-types.ts
 --- a/packages/coding-agent/src/session/agent-session-types.ts
 +++ b/packages/coding-agent/src/session/agent-session-types.ts
-@@ -399,6 +399,8 @@
+@@ -402,6 +402,8 @@
  	advisorConfigWarnings?: string[];
  	/** Disconnect the MCP manager owned by this session during disposal. */
  	disconnectOwnedMcpManager?: () => Promise<void>;
@@ -622,7 +615,7 @@ diff --git a/packages/coding-agent/src/session/agent-session-types.ts b/packages
 diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
 --- a/packages/coding-agent/src/session/agent-session.ts
 +++ b/packages/coding-agent/src/session/agent-session.ts
-@@ -1098,6 +1098,7 @@
+@@ -1106,6 +1106,7 @@
  	#sideStreamFn: StreamFn;
  	#convertToLlm: (messages: AgentMessage[]) => Message[] | Promise<Message[]>;
  	#disconnectOwnedMcpManager: (() => Promise<void>) | undefined;
@@ -630,7 +623,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  
  	readonly #ttsr: TtsrCoordinator;
  	readonly #stats: SessionStatsTracker;
-@@ -2220,6 +2221,7 @@
+@@ -2271,6 +2272,7 @@
  			skillsReloadable: config.skillsReloadable,
  		});
  		this.#disconnectOwnedMcpManager = config.disconnectOwnedMcpManager;
@@ -638,7 +631,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  		const ttsrHost: TtsrCoordinatorHost = {
  			agent: this.agent,
  			sessionManager: this.sessionManager,
-@@ -5318,6 +5320,9 @@
+@@ -5429,6 +5431,9 @@
  		// `yielded` alone also covers queued steer/follow-up and IRC continuations,
  		// which `#flushPendingAgentEnd` re-tags non-terminal.
  		const awaitingAsyncWork = options?.willContinue === true && options.awaitingAsyncWork === true;
@@ -648,7 +641,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  		await this.#emitSessionEvent({
  			...event,
  			isTerminal: !options?.willContinue,
-@@ -5899,7 +5904,7 @@
+@@ -6021,7 +6026,7 @@
  		try {
  			await withTimeout(
  				this.#disconnectOwnedMcpManager(),
@@ -668,7 +661,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packa
  import type { CustomEditor } from "@oh-my-pi/pi-tui/prompt/custom-editor";
  import type { Theme } from "@oh-my-pi/pi-tui/theme";
  import type { NativeToolView } from "@oh-my-pi/pi-tui/tools/renderer";
-@@ -665,6 +666,8 @@
+@@ -687,6 +688,8 @@
  	sessionManager: ReadonlySessionManager;
  	/** Model registry for API key resolution */
  	modelRegistry: ModelRegistry;
@@ -688,7 +681,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/runner.ts b/pack
  	#uiContext: ExtensionUIContext;
  	#mode: ExtensionMode = "print";
  	#toolApprovalPreviewWaiter?: (toolCallId: string) => Promise<void>;
-@@ -1430,6 +1431,7 @@
+@@ -1487,6 +1488,7 @@
  			cwd: this.cwd,
  			sessionManager: this.sessionManager,
  			modelRegistry: this.modelRegistry,

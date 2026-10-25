@@ -401,7 +401,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  
  			// Skip if already connected
  			if (this.#connections.has(name)) {
-@@ -838,13 +845,13 @@
+@@ -838,13 +845,12 @@
  				continue;
  			}
  
@@ -411,29 +411,25 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
 +			// A new config supersedes any retry schedule for the old one
  			this.#forgetLostServer(name);
 -			this.#serverConfigs.set(name, config);
-+			this.#serverAbort.get(name)?.abort();
- 			const connectionEpoch = this.#epoch;
+-			const connectionEpoch = this.#epoch;
 -			const connectSignal = this.#connectAbort.signal;
++			this.#serverAbort.get(name)?.abort();
 +			const controller = new AbortController();
 +			this.#serverAbort.set(name, controller);
 +			const connectSignal = AbortSignal.any([this.#connectAbort.signal, controller.signal]);
  
  			// Resolve auth config before connecting, but do so per-server in parallel.
  			const connectionPromise = (async () => {
-@@ -867,7 +874,11 @@
+@@ -867,7 +873,7 @@
  						connection._source = sources[name];
  					}
  
 -					if (this.#epoch !== connectionEpoch || this.#pendingConnections.get(name) !== connectionPromise) {
-+					if (
-+						connectSignal.aborted ||
-+						this.#epoch !== connectionEpoch ||
-+						this.#pendingConnections.get(name) !== connectionPromise
-+					) {
++					if (connectSignal.aborted || this.#pendingConnections.get(name) !== connectionPromise) {
  						this.#detachConnection(name, connection);
  						void disconnectServer(connection).catch(() => {});
  						throw new Error(`Server "${name}" was disconnected during initial connection`);
-@@ -915,7 +926,8 @@
+@@ -915,7 +921,8 @@
  
  			const toolsPromise = connectionPromise.then(async connection => {
  				try {
@@ -443,7 +439,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  					return { connection, serverTools };
  				} catch (error) {
  					// Detach and delete synchronously, then close in the background:
-@@ -935,13 +947,14 @@
+@@ -935,13 +942,14 @@
  
  			const startupUpdate = toolsPromise
  				.then(async ({ connection, serverTools }) => {
@@ -459,7 +455,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  					void this.toolCache?.set(name, config, serverTools);
  
  					notify({ type: "connected", serverName: name });
-@@ -1016,6 +1029,7 @@
+@@ -1016,6 +1024,7 @@
  			for (const task of connectionTasks) {
  				const { name } = task;
  				if (task.tracked.status === "fulfilled") {
@@ -467,7 +463,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  					const value = task.tracked.value;
  					if (!value) continue;
  					const { connection, serverTools } = value;
-@@ -1030,6 +1044,7 @@
+@@ -1030,6 +1039,7 @@
  					errors.set(name, message);
  					reportedErrors.add(name);
  				} else {
@@ -475,7 +471,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  					const cached = cachedTools.get(name);
  					if (cached) {
  						const source = this.#sources.get(name);
-@@ -1285,6 +1300,60 @@
+@@ -1285,6 +1295,60 @@
  		return this.#pendingReconnections.get(name);
  	}
  
@@ -536,21 +532,18 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  	/**
  	 * Wait for a connection to complete (or fail).
  	 */
-@@ -1349,7 +1418,12 @@
+@@ -1348,9 +1412,7 @@
+ 	 * Get all known server names (connected, connecting, or discovered).
  	 */
  	getAllServerNames(): string[] {
- 		return Array.from(
+-		return Array.from(
 -			new Set([...this.#sources.keys(), ...this.#connections.keys(), ...this.#pendingConnections.keys()]),
-+			new Set([
-+				...this.#serverConfigs.keys(),
-+				...this.#sources.keys(),
-+				...this.#connections.keys(),
-+				...this.#pendingConnections.keys(),
-+			]),
- 		);
+-		);
++		return Array.from(this.#serverConfigs.keys());
  	}
  
-@@ -1382,17 +1456,21 @@
+ 	/**
+@@ -1382,17 +1444,21 @@
  	}
  
  	/**
@@ -576,7 +569,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  		this.#pendingResourceRefresh.delete(name);
  		this.#reconnectHistory.delete(name);
  		this.#forgetLostServer(name);
-@@ -1405,9 +1483,7 @@
+@@ -1405,9 +1471,7 @@
  		}
  		this.#subscribedResources.delete(name);
  
@@ -587,7 +580,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  
  		// Remove tools from this server and notify consumers
  		const hadTools = this.#tools.some(t => t.mcpServerName === name);
-@@ -1419,6 +1495,7 @@
+@@ -1419,6 +1483,7 @@
  
  		// Notify prompt consumers so stale commands are cleared
  		if (connection?.prompts?.length) this.#onPromptsChanged?.(name);
@@ -595,7 +588,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  	}
  
  	/**
-@@ -1434,6 +1511,9 @@
+@@ -1434,6 +1499,9 @@
  		this.#epoch++;
  		this.#connectAbort.abort();
  		this.#connectAbort = new AbortController();
@@ -605,7 +598,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  		for (const name of this.#lostRemoteServers.keys()) this.#forgetLostServer(name);
  		const promises = Array.from(this.#connections, ([name, connection]) => this.#discardConnection(name, connection));
  		await Promise.allSettled(promises);
-@@ -1474,8 +1554,10 @@
+@@ -1474,8 +1542,10 @@
  		options?: { manual?: boolean; authChallenge?: MCPAuthChallenge },
  	): Promise<MCPServerConnection | null> {
  		if (options?.manual) {
@@ -616,7 +609,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  
  		const pending = this.#pendingReconnections.get(name);
  		if (pending) return pending;
-@@ -1594,7 +1676,12 @@
+@@ -1594,7 +1664,12 @@
  		const oldConnection = this.#connections.get(name);
  		let config = oldConnection?.config ?? this.#serverConfigs.get(name);
  		const source = this.#sources.get(name) ?? oldConnection?._source;
@@ -630,7 +623,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  
  		if (authChallenge) {
  			if (!this.#authHandler) {
-@@ -1605,7 +1692,7 @@
+@@ -1605,7 +1680,7 @@
  			}
  			try {
  				const refreshedConfig = await this.#authHandler(name, authChallenge);
@@ -639,7 +632,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  				config = refreshedConfig;
  				this.#serverConfigs.set(name, config);
  			} catch (error) {
-@@ -1621,7 +1708,6 @@
+@@ -1621,7 +1696,6 @@
  		// Fire-and-forget: don't await the close — HttpTransport.close() sends a
  		// DELETE with config.timeout (30s default), and blocking here delays the
  		// reconnect loop by that amount on every server restart.
@@ -647,7 +640,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  		if (oldConnection) {
  			// From here the live remote connection is gone: the server is lost
  			// until a reconnect succeeds, and the schedule outlives this attempt.
-@@ -1640,7 +1726,7 @@
+@@ -1640,7 +1714,7 @@
  		// attempt is a single quiet probe; its pacing is the schedule itself.
  		const delays = scheduled ? [] : this.reconnectPolicy.ladderMs;
  		for (let attempt = 0; attempt <= delays.length; attempt++) {
@@ -656,7 +649,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  				logger.debug("MCP reconnect aborted before attempt after configuration changed", {
  					path: `mcp:${name}`,
  					storedEpoch: reconnectEpoch,
-@@ -1649,12 +1735,13 @@
+@@ -1649,12 +1723,13 @@
  				return null;
  			}
  			try {
@@ -672,7 +665,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  					logger.debug("MCP reconnect aborted after configuration changed", {
  						path: `mcp:${name}`,
  						storedEpoch: reconnectEpoch,
-@@ -1692,10 +1779,8 @@
+@@ -1692,10 +1767,8 @@
  		name: string,
  		config: MCPServerConfig,
  		source: SourceMeta | undefined,
@@ -684,7 +677,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  		const resolvedConfig = await this.#resolveAuthConfig(config, { signal: connectSignal });
  		const connection = await connectToServer(name, resolvedConfig, {
  			signal: connectSignal,
-@@ -1712,7 +1797,7 @@
+@@ -1712,7 +1785,7 @@
  
  		// Bail out if the server was disconnected or the manager was reset
  		// while we were connecting (e.g. /mcp reload called disconnectAll).
@@ -693,7 +686,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  			this.#detachConnection(name, connection);
  			void disconnectServer(connection).catch(() => {});
  			throw new Error(`Server "${name}" was disconnected during reconnection`);
-@@ -1737,7 +1822,8 @@
+@@ -1737,7 +1810,8 @@
  			void this.reconnectServer(name);
  		};
  		try {
@@ -703,7 +696,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  			const reconnect = (options?: { authChallenge?: MCPAuthChallenge }) => this.reconnectServer(name, options);
  			const customTools = MCPTool.fromTools(connection, serverTools, reconnect);
  			void this.toolCache?.set(name, config, serverTools);
-@@ -1826,6 +1912,7 @@
+@@ -1826,6 +1900,7 @@
  
  		// Reload tools
  		const serverTools = await listTools(connection);
