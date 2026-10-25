@@ -43,6 +43,32 @@ export async function syncNixDependencies(
       "--output-file",
       output,
     ]);
+    const { packages } = Bun.JSONC.parse(await Bun.file(join(root, lock)).text()) as {
+      packages: Record<
+        string,
+        [string, unknown, { os?: string | string[]; cpu?: string | string[] }?]
+      >;
+    };
+    const platforms: Record<string, { os?: string[]; cpu?: string[] }> = {};
+    for (const [name, , metadata] of Object.values(packages)) {
+      const { os, cpu } = metadata ?? {};
+      if (os === undefined && cpu === undefined) continue;
+      platforms[name] = {
+        ...(os === undefined ? {} : { os: typeof os === "string" ? [os] : os }),
+        ...(cpu === undefined ? {} : { cpu: typeof cpu === "string" ? [cpu] : cpu }),
+      };
+    }
+    const platformOutput = output.replace(/bun\.nix$/, "platforms.json");
+    await writeJson(join(root, platformOutput), platforms);
+    await runCommand([
+      "bun",
+      "x",
+      "--no-install",
+      "biome",
+      "format",
+      "--write",
+      platformOutput,
+    ]);
     await runCommand(["deadnix", "--edit", output]);
     await runCommand(["nixfmt", output]);
   }

@@ -28,6 +28,4 @@ fmt *args:
 
 # Regenerate Bun-to-Nix expressions from frozen lockfiles
 deps:
-    nix run .#bun2nix -- --lock-file bun.lock --copy-prefix ../../../ --output-file tools/nix/javascript/bun.nix
-    deadnix --edit tools/nix/javascript/bun.nix
-    nixfmt tools/nix/javascript/bun.nix
+    bun --eval 'import { run, syncNixDependencies } from "./tools/scripts/renovate/process.ts"; await syncNixDependencies(run);'

@@ -27,6 +27,20 @@ let
       ../../.. + "/${path}";
   platform = if stdenv.hostPlatform.isDarwin then "darwin" else "linux";
   arch = if stdenv.hostPlatform.isAarch64 then "arm64" else "x64";
+  platforms = lib.trivial.importJSON ./platforms.json;
+  matchesPlatform =
+    target: values:
+    let
+      allowed = builtins.filter (value: !lib.strings.hasPrefix "!" value) values;
+    in
+    !builtins.elem "!${target}" values
+    && (allowed == [ ] || builtins.elem target allowed || builtins.elem "any" allowed);
+  forHost =
+    name: _:
+    let
+      constraints = platforms.${name} or { };
+    in
+    matchesPlatform platform (constraints.os or [ ]) && matchesPlatform arch (constraints.cpu or [ ]);
 in
 assert lib.asserts.assertMsg (manifest.packageManager == "bun@${bun.version}")
   "The JavaScript workspace requires ${manifest.packageManager}, but Nix supplies bun@${bun.version}";
@@ -58,7 +72,10 @@ stdenv.mkDerivation {
   bunDeps = bun2nix.fetchBunDeps {
     # Workspaces and file dependencies are installed from src, not the cache
     # Keeping their contents out of the cache lets source-only changes reuse it
-    bunNix = args: callPackage ./bun.nix (args // { copyPathToStore = _: null; });
+    # Filter before extraction so foreign native binaries never enter the cache
+    bunNix =
+      args:
+      lib.attrsets.filterAttrs forHost (callPackage ./bun.nix (args // { copyPathToStore = _: null; }));
     overrides = bun2nix.patchedDependenciesToOverrides { patchedDependencies = patches; };
   };
   nativeBuildInputs = [
