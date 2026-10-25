@@ -1,0 +1,132 @@
+diff --git a/packages/coding-agent/src/modes/rpc/rpc-goal.ts b/packages/coding-agent/src/modes/rpc/rpc-goal.ts
+--- a/packages/coding-agent/src/modes/rpc/rpc-goal.ts
++++ b/packages/coding-agent/src/modes/rpc/rpc-goal.ts
+@@ -229,6 +229,82 @@
+ 		}
+ 	}
+ 
++	/** Text-host `/goal` operations share the structured RPC controller's lifecycle */
++	async handleSlashCommand(args: string): Promise<string> {
++		const help = "Usage: /goal [objective|set <objective>|show|pause|resume|drop|budget <N|off>]";
++		const trimmed = args.trim();
++		const match = /^(\S+)(?:\s+([\s\S]*))?$/.exec(trimmed);
++		const action = match?.[1].toLowerCase();
++		const rest = match?.[2]?.trim() ?? "";
++		await this.settled();
++		if (!action) return `${this.#describeGoal()}\n\n${help}`;
++		if (["show", "pause", "resume", "drop"].includes(action) && rest) {
++			throw new Error(`Usage: /goal ${action}`);
++		}
++		switch (action) {
++			case "show":
++				break;
++			case "pause":
++				if (!this.#session.getGoalModeState()?.enabled) throw new Error("No active goal to pause.");
++				await this.handle({ op: "pause" });
++				break;
++			case "resume":
++				await this.handle({ op: "resume" });
++				break;
++			case "drop":
++				if (!this.#session.getGoalModeState()?.goal) return "No goal set.";
++				await this.handle({ op: "drop" });
++				return "Goal dropped. No goal set.";
++			case "budget": {
++				this.#assertCanEnter();
++				const state = this.#session.getGoalModeState();
++				if (!state?.enabled || (state.goal.status !== "active" && state.goal.status !== "budget-limited")) {
++					throw new Error(
++						state?.goal.status === "paused" ? "Resume the goal before adjusting the budget." : "No active goal.",
++					);
++				}
++				let budget: number | undefined;
++				if (rest.toLowerCase() !== "off") {
++					budget = /^\d+$/.test(rest) ? Number(rest) : NaN;
++					if (!Number.isSafeInteger(budget) || budget <= 0) {
++						throw new Error("Usage: /goal budget <positive integer|off>");
++					}
++				}
++				await this.#session.goalRuntime.onBudgetMutated(budget);
++				this.#resetContinuation();
++				this.#scheduleContinuation();
++				break;
++			}
++			case "set":
++				if (!rest) throw new Error("Usage: /goal set <objective>");
++				this.#assertCanEnter();
++				if (this.#session.getGoalModeState()?.enabled) {
++					await this.#enter(() => this.#session.goalRuntime.replaceGoal({ objective: rest }));
++				} else {
++					await this.handle({ op: "create", objective: rest });
++				}
++				break;
++			default:
++				await this.handle({ op: "create", objective: trimmed });
++		}
++		return this.#describeGoal();
++	}
++
++	#describeGoal(): string {
++		const goal = this.#session.getGoalModeState()?.goal;
++		if (!goal) return "No goal set.";
++		const budget =
++			goal.tokenBudget === undefined
++				? `${goal.tokensUsed} used (no budget)`
++				: `${goal.tokensUsed} / ${goal.tokenBudget} (${Math.max(0, goal.tokenBudget - goal.tokensUsed)} left)`;
++		return [
++			`Objective: ${goal.objective}`,
++			`Status: ${goal.status}`,
++			`Tokens: ${budget}`,
++			`Time spent: ${goal.timeUsedSeconds} seconds`,
++		].join("\n");
++	}
++
+ 	#assertCanEnter(): void {
+ 		if (!cfgGoalEnabled.get(this.#session.settings)) {
+ 			throw new Error("Goal mode is disabled (goal.enabled).");
+diff --git a/packages/coding-agent/src/modes/rpc/rpc-mode.ts b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
+--- a/packages/coding-agent/src/modes/rpc/rpc-mode.ts
++++ b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
+@@ -1814,6 +1814,7 @@
+ 					settings: session.settings,
+ 					cwd: session.sessionManager.getCwd(),
+ 					output: commandOutput => output({ type: "command_output", text: commandOutput }),
++					runGoalCommand: args => goalController.handleSlashCommand(args),
+ 					refreshCommands: emitAvailableCommandsUpdate,
+ 					reloadPlugins: reloadPluginState,
+ 					mcpManager: options.mcpManager,
+diff --git a/packages/coding-agent/src/slash-commands/builtin-modes.ts b/packages/coding-agent/src/slash-commands/builtin-modes.ts
+--- a/packages/coding-agent/src/slash-commands/builtin-modes.ts
++++ b/packages/coding-agent/src/slash-commands/builtin-modes.ts
+@@ -378,6 +378,8 @@
+ 		name: "goal",
+ 		icon: "goal",
+ 		description: "Toggle goal mode (persistent autonomous objective for this session)",
++		acpDescription: "Manage the session goal: set, show, pause, resume, drop, or adjust its budget",
++		acpInputHint: "[objective|set <objective>|show|pause|resume|drop|budget <N|off>]",
+ 		subcommands: [
+ 			{ name: "set", description: "Set or replace the goal", usage: "<objective>" },
+ 			{ name: "show", description: "Show current goal details" },
+@@ -394,6 +396,10 @@
+ 			const state = runtime.ctx.session.getGoalModeState();
+ 			return state ? `Goal: ${state.goal.status} (${shortDetail(state.goal.objective)})` : "Goal: off";
+ 		},
++		handle: async (command, runtime) => {
++			if (!runtime.runGoalCommand) throw new Error("Goal management is unavailable in this host.");
++			await runtime.output(await runtime.runGoalCommand(command.args));
++		},
+ 		handleTui: async (command, runtime) => {
+ 			await runWithDetachedModeDraft(command, runtime, () =>
+ 				runtime.ctx.handleGoalModeCommand(command.args || undefined, runtime.input),
+diff --git a/packages/coding-agent/src/slash-commands/types.ts b/packages/coding-agent/src/slash-commands/types.ts
+--- a/packages/coding-agent/src/slash-commands/types.ts
++++ b/packages/coding-agent/src/slash-commands/types.ts
+@@ -77,6 +77,8 @@
+ 	signal?: AbortSignal;
+ 	/** Emit text to the operator. TUI maps to `ctx.showStatus`, ACP to `sessionUpdate`. */
+ 	output: (text: string) => Promise<void> | void;
++	/** Execute text-mode `/goal` through the host's existing goal controller */
++	runGoalCommand?: (args: string) => Promise<string>;
+ 	/** Re-advertise the available command list (no-op outside ACP). */
+ 	refreshCommands: () => Promise<void> | void;
+ 	/**

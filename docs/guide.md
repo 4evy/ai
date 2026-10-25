@@ -233,6 +233,12 @@ and moving children into the destination. Pass `false` only for flat payloads.
 ZIP extraction uses the installed archive library. Tar extraction stays native
 because the library materializes file symlinks instead of preserving them.
 
+The runtime profile exposes `/goal` to RPC hosts through the
+[goal patch](../apps/omp/runtime/patches/ui/goal.patch). For automatic goal
+continuation, add `rpc` to `goal.continuationModes` in a host-specific
+`--config` overlay. Keep `interactive` in the list to retain terminal
+continuation, and avoid enabling it globally for unrelated RPC clients.
+
 Build Farstep on its target platform. On Unix, build `.#farstep` with Nix and
 run the output's `bin/farstep install --package-path /nix/store/...`. Remote
 installs require a trusted store output on the target. Windows packaging

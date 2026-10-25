@@ -9,6 +9,7 @@
       "quota/quota.patch",
       "schema/schema.patch",
       "ui/compact.patch",
+      "ui/goal.patch",
       "ui/session-model.patch"
     ],
     "sdk": [
