@@ -151,39 +151,36 @@ export class Gateway {
     };
     const lifetime = new Lifetime("sequential");
     return yield* Effect.gen(function* () {
-      const helper = yield* Effect.acquireRelease(
-        Effect.interruptible(
-          connectHelperEffect(`jobs-${randomUUID()}`, transport, {
-            onNotification(method, params) {
-              if (method !== JOB_COMPLETION_METHOD) return;
-              const message = parseJobWireMessage(
-                v.parse(notificationSchema, params).notification,
-              );
-              if (!("event" in message))
-                throw new Error("Invalid job completion notification");
-              deliver(message);
-            },
-            onClose() {
-              transportClosed = true;
-              if (gateway) {
-                const unexpected = !gateway.#closed;
-                gateway.#closed = true;
-                gateway.#presence.stopHeartbeat();
-                const closed = gateway;
-                closed.#closing ??= closed.#lifetime.close();
-                void closed.#closing.catch((error) => closed.#presence.failure(error));
-                if (unexpected && gateway.#presence.registered)
-                  gateway.#presence.failure(
-                    new Error(
-                      "Helper connection closed; coordination presence is unavailable",
-                    ),
-                  );
-              }
-              onClose(gateway);
-            },
-          }),
-        ),
-        (helper) => helper.closeEffect,
+      const helper = yield* Effect.interruptible(
+        connectHelperEffect(`jobs-${randomUUID()}`, transport, {
+          onNotification(method, params) {
+            if (method !== JOB_COMPLETION_METHOD) return;
+            const message = parseJobWireMessage(
+              v.parse(notificationSchema, params).notification,
+            );
+            if (!("event" in message))
+              throw new Error("Invalid job completion notification");
+            deliver(message);
+          },
+          onClose() {
+            transportClosed = true;
+            if (gateway) {
+              const unexpected = !gateway.#closed;
+              gateway.#closed = true;
+              gateway.#presence.stopHeartbeat();
+              const closed = gateway;
+              closed.#closing ??= closed.#lifetime.close();
+              void closed.#closing.catch((error) => closed.#presence.failure(error));
+              if (unexpected && gateway.#presence.registered)
+                gateway.#presence.failure(
+                  new Error(
+                    "Helper connection closed; coordination presence is unavailable",
+                  ),
+                );
+            }
+            onClose(gateway);
+          },
+        }),
       );
       const { env, scriptRunner } = yield* gatewayEnvironmentEffect(helper, connection);
       if (transportClosed)

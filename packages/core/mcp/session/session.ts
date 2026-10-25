@@ -1,7 +1,7 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Scope } from "effect";
 import {
   attempt,
   Lifetime,
@@ -23,13 +23,41 @@ interface SessionOptions {
 
 // One lifetime owns startup and calls; failed calls revoke the whole channel
 export class McpSession implements AsyncDisposable {
+  // Roll back this child scope immediately on failure, even when its owner lives on
+  static acquireEffect<A, E, R>(
+    client: Client,
+    transport: Transport,
+    options: SessionOptions,
+    negotiate: (session: McpSession) => Effect.Effect<A, E, R>,
+    timeout = 30_000,
+  ): Effect.Effect<{ session: McpSession; value: A }, unknown, R | Scope.Scope> {
+    return Effect.gen(function* () {
+      const scope = yield* Scope.fork(yield* Effect.scope);
+      return yield* Scope.provide(scope)(
+        Effect.gen(function* () {
+          const session = yield* Effect.acquireRelease(
+            Effect.sync(() => new McpSession(client, options)),
+            (session) => session.closeEffect,
+          );
+          yield* session.openEffect(transport, timeout);
+          const value = yield* negotiate(session);
+          return { session, value };
+        }),
+      ).pipe(
+        Effect.onExit((exit) =>
+          Exit.isFailure(exit) ? Scope.close(scope, exit) : Effect.void,
+        ),
+      );
+    });
+  }
+
   private readonly lifetime = new Lifetime();
   private state: "new" | "opening" | "open" | "closed" = "new";
 
   readonly client: Client;
   private readonly options: SessionOptions;
 
-  constructor(client: Client, options: SessionOptions) {
+  private constructor(client: Client, options: SessionOptions) {
     this.client = client;
     this.options = options;
     const onclose = client.onclose;
@@ -49,7 +77,7 @@ export class McpSession implements AsyncDisposable {
     return this.lifetime.close();
   };
 
-  openEffect(transport: Transport, timeout = 30_000) {
+  private openEffect(transport: Transport, timeout = 30_000) {
     return Effect.gen({ self: this }, function* () {
       yield* Effect.try({
         try: () => {

@@ -152,17 +152,14 @@ export function createDesktop(): DesktopOperations {
             Effect.cached(
               lifetime
                 .runEffect(
-                  Effect.acquireRelease(
-                    Effect.interruptible(
-                      connectHelperEffect("remote-desktop", config, {
-                        ...(wireCodec ? { wireCodec } : {}),
-                        onClose: () => {
-                          if (channels.get(key) === fresh) channels.delete(key);
-                          void fresh.lifetime.close().catch(() => undefined);
-                        },
-                      }),
-                    ),
-                    (client) => client.closeEffect,
+                  Effect.interruptible(
+                    connectHelperEffect("remote-desktop", config, {
+                      ...(wireCodec ? { wireCodec } : {}),
+                      onClose: () => {
+                        if (channels.get(key) === fresh) channels.delete(key);
+                        void fresh.lifetime.close().catch(() => undefined);
+                      },
+                    }),
                   ),
                 )
                 .pipe(

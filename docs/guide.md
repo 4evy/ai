@@ -100,6 +100,11 @@ Choose concurrency explicitly with `Effect.all` or `Effect.forEach`. Do not
 add retries around commands, file writes, or desktop input whose outcome may
 already have taken effect.
 
+Acquire MCP clients with
+[`McpSession.acquireEffect`](../packages/core/mcp/session/session.ts).
+The caller supplies protocol negotiation, while the acquisition scope owns
+startup, immediate rollback, and the negotiated session's lifetime.
+
 ## Check and format changes
 
 Run checks covering the changed behavior on its target platform. Create or

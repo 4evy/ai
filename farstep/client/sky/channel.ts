@@ -1,4 +1,4 @@
-import { run } from "@ai/core/effect/effect";
+import { Lifetime } from "@ai/core/effect/effect";
 import { McpSession } from "@ai/core/mcp/session/session";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -20,10 +20,9 @@ export function structured(result: CallToolResult) {
 }
 
 export class ChannelSession {
-  private readonly session: McpSession;
-  private prepared = false;
+  private readonly lifetime = new Lifetime();
   constructor(
-    client: Client,
+    private readonly client: Client,
     private readonly transport: StdioClientTransport,
     private readonly closedFleet: AbortSignal,
     onClose: () => void,
@@ -31,60 +30,63 @@ export class ChannelSession {
     client.onclose = () => {
       onClose();
     };
-    this.session = new McpSession(client, {
-      closedMessage:
-        "Sky channel closed; reset and observe again. The operation was not replayed",
-    });
   }
-
-  readonly close = (): Promise<void> => this.session.close();
-
-  readonly call = (
-    name: string,
-    input: Record<string, unknown>,
-    signal?: AbortSignal,
-    timeout = 30_000,
-  ): Promise<CallToolResult> =>
-    this.session.call(
-      name,
-      input,
-      signal ? AbortSignal.any([signal, this.closedFleet]) : this.closedFleet,
-      timeout,
-    );
-
-  readonly prepare = async (signal?: AbortSignal): Promise<void> => {
-    if (this.prepared) return;
-    // Provisioning is independent of the cell's execution deadline
-    structured(await this.call("sky.prepare", {}, signal, PROVISION_TIMEOUT_MS));
-    this.prepared = true;
-  };
 
   open(signal?: AbortSignal): Promise<SkyChannel> {
     const active = signal
       ? AbortSignal.any([signal, this.closedFleet])
       : this.closedFleet;
-    return run(
+    return this.lifetime.run(
       Effect.gen({ self: this }, function* () {
-        yield* this.session.openEffect(this.transport);
-        const handshake = yield* this.session.callEffect("helper.handshake", {});
-        const identity = yield* Effect.try({
-          try: () => v.parse(identitySchema, structured(handshake)),
-          catch: (error) => error,
-        });
-        if (!identity.capabilities.includes("sky-mcp-v1"))
-          return yield* Effect.fail(
-            new Error("Upgrade Farstep on this target: it lacks sky-mcp-v1"),
+        const { session, value: identity } = yield* McpSession.acquireEffect(
+          this.client,
+          this.transport,
+          {
+            closedMessage:
+              "Sky channel closed; reset and observe again. The operation was not replayed",
+          },
+          (session) =>
+            Effect.gen(function* () {
+              const handshake = yield* session.callEffect("helper.handshake", {});
+              const identity = yield* Effect.try({
+                try: () => v.parse(identitySchema, structured(handshake)),
+                catch: (error) => error,
+              });
+              if (!identity.capabilities.includes("sky-mcp-v1"))
+                return yield* Effect.fail(
+                  new Error("Upgrade Farstep on this target: it lacks sky-mcp-v1"),
+                );
+              return identity;
+            }),
+        );
+        const call = (
+          name: string,
+          input: Record<string, unknown>,
+          signal?: AbortSignal,
+          timeout = 30_000,
+        ) =>
+          session.call(
+            name,
+            input,
+            signal ? AbortSignal.any([signal, this.closedFleet]) : this.closedFleet,
+            timeout,
           );
+        let prepared = false;
         return {
           identity,
-          call: this.call,
-          prepare: this.prepare,
-          close: this.close,
-          isClosed: this.session.isClosed,
+          call,
+          prepare: async (signal?: AbortSignal) => {
+            if (prepared) return;
+            // Provisioning is independent of the cell's execution deadline
+            structured(await call("sky.prepare", {}, signal, PROVISION_TIMEOUT_MS));
+            prepared = true;
+          },
+          close: () => this.lifetime.close(),
+          isClosed: session.isClosed,
         };
       }).pipe(
         Effect.onExit((exit) =>
-          Exit.isFailure(exit) ? this.session.closeEffect : Effect.void,
+          Exit.isFailure(exit) ? this.lifetime.closeEffect : Effect.void,
         ),
       ),
       active,

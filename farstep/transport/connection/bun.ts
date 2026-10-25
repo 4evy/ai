@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { run } from "@ai/core/effect/effect";
+import { Lifetime } from "@ai/core/effect/effect";
 import { McpSession } from "@ai/core/mcp/session/session";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -67,56 +67,65 @@ function relayTransport(config: HelperConfig, options: ConnectionOptions) {
   });
 }
 
-const openHelperEffect = Effect.fnUntraced(function* (
+export const connectHelperEffect = Effect.fnUntraced(function* (
   name: string,
   config: HelperConfig,
-  options: Omit<ConnectionOptions, "signal">,
+  options: Omit<ConnectionOptions, "signal"> = {},
 ) {
   const client = new Client({ name, version: "1.0.0" });
   client.fallbackNotificationHandler = async (notification) => {
     options.onNotification?.(notification.method, notification.params);
   };
   if (options.onClose) client.onclose = options.onClose;
-  const session = new McpSession(client, {
-    closedMessage: "Helper channel is closed",
-    timeout: config.timeout ?? 30_000,
-    timeoutMessage: "Helper call timed out",
-    requestMode: "request",
-    beforeCall: boundRequest,
-    operation: { name: "helper.call", component: "helper" },
-  });
-  return yield* Effect.gen(function* () {
-    yield* session.openEffect(relayTransport(config, options));
-    const handshake = yield* session.callEffect("helper.handshake", {}, 30_000);
-    const identity = yield* Effect.try({
-      try: () => v.parse(helperHandshakeSchema, structuredResult(handshake)),
-      catch: (error) => error,
-    });
-    return {
-      identity,
-      callEffect: session.callEffect.bind(session),
-      call: session.call.bind(session),
-      close: session.close,
-      closeEffect: session.closeEffect,
-      [Symbol.asyncDispose]: session.close,
-    };
-  }).pipe(
-    Effect.onExit((exit) => (Exit.isFailure(exit) ? session.closeEffect : Effect.void)),
+  const { session, value: identity } = yield* McpSession.acquireEffect(
+    client,
+    relayTransport(config, options),
+    {
+      closedMessage: "Helper channel is closed",
+      timeout: config.timeout ?? 30_000,
+      timeoutMessage: "Helper call timed out",
+      requestMode: "request",
+      beforeCall: boundRequest,
+      operation: { name: "helper.call", component: "helper" },
+    },
+    (session) =>
+      Effect.gen(function* () {
+        const handshake = yield* session.callEffect("helper.handshake", {}, 30_000);
+        return yield* Effect.try({
+          try: () => v.parse(helperHandshakeSchema, structuredResult(handshake)),
+          catch: (error) => error,
+        });
+      }),
   );
+  return {
+    identity,
+    callEffect: session.callEffect.bind(session),
+    call: session.call.bind(session),
+    close: session.close,
+    closeEffect: session.closeEffect,
+    [Symbol.asyncDispose]: session.close,
+  };
 });
-
-export function connectHelperEffect(
-  name: string,
-  config: HelperConfig,
-  options: Omit<ConnectionOptions, "signal"> = {},
-): Effect.Effect<HelperConnection, unknown> {
-  return openHelperEffect(name, config, options);
-}
 
 export function connectHelper(
   name: string,
   config: HelperConfig,
   options: ConnectionOptions = {},
 ): Promise<HelperConnection> {
-  return run(connectHelperEffect(name, config, options), options.signal);
+  const lifetime = new Lifetime();
+  const close = () => lifetime.close();
+  return lifetime.run(
+    connectHelperEffect(name, config, options).pipe(
+      Effect.map((connection) => ({
+        ...connection,
+        close,
+        closeEffect: lifetime.closeEffect,
+        [Symbol.asyncDispose]: close,
+      })),
+      Effect.onExit((exit) =>
+        Exit.isFailure(exit) ? lifetime.closeEffect : Effect.void,
+      ),
+    ),
+    options.signal,
+  );
 }

@@ -68,24 +68,14 @@ export class SkyKernel {
     return Effect.gen({ self: this }, function* () {
       const config = yield* runtimeServerEffect(this.cwd);
       yield* this.installSessionEffect(config.env);
-      const session = yield* Effect.acquireRelease(
-        Effect.try({
-          try: () =>
-            new McpSession(this.client(), {
-              closedMessage: "Sky kernel is closed",
-              awaitOnInterrupt: true,
-            }),
-          catch: (error) => error,
-        }),
-        (session) => session.closeEffect,
-      );
       const env = Records.filter(
         { ...process.env, ...config.env },
         (value) => value !== undefined,
       );
       // CUA derives its trusted services from the enabled surfaces
       if (!WAYLAND) delete env.NODE_REPL_TRUSTED_SERVICES;
-      yield* session.openEffect(
+      const { session } = yield* McpSession.acquireEffect(
+        this.client(),
         new StdioClientTransport({
           command: config.command,
           args: config.args,
@@ -94,15 +84,22 @@ export class SkyKernel {
           stderr: "inherit",
           maxBufferSize: MAX_FRAME,
         }),
+        {
+          closedMessage: "Sky kernel is closed",
+          awaitOnInterrupt: true,
+        },
+        (session) =>
+          Effect.gen(function* () {
+            const { tools } = yield* attempt(
+              (signal) => session.client.listTools({}, { signal, timeout: 30_000 }),
+              { awaitOnInterrupt: true },
+            );
+            for (const name of ["js", "js_reset"]) {
+              if (!tools.some((tool) => tool.name === name))
+                return yield* Effect.fail(new Error(`Sky kernel lacks ${name}`));
+            }
+          }),
       );
-      const { tools } = yield* attempt(
-        (signal) => session.client.listTools({}, { signal, timeout: 30_000 }),
-        { awaitOnInterrupt: true },
-      );
-      for (const name of ["js", "js_reset"]) {
-        if (!tools.some((tool) => tool.name === name))
-          return yield* Effect.fail(new Error(`Sky kernel lacks ${name}`));
-      }
       return session;
     });
   }
