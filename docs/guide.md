@@ -244,3 +244,38 @@ The scheduled Renovate workflow requires the repository Actions secret
 issues, and workflows write access. Restrict fine-grained tokens to this
 repository and renew them before expiry. The default `GITHUB_TOKEN` cannot
 replace it because updates must trigger CI and may change workflow files.
+
+## Improve a prompt before sending
+
+In OMP's interactive editor, write a draft and press **Alt+I**. The
+[prompt-improvement extension](../apps/omp/extensions/improve/index.ts) uses
+**GPT-6 Luna at low effort with Standard service**, independently of the main
+chat's model, effort, and `/fast` setting. Review or edit the result, then
+press **Ctrl+Shift+Enter** to put it back in the composer. It is not sent
+until you submit it normally.
+Press **Escape** during generation or review to keep your original draft.
+Provider errors also leave the original intact. The rewrite must preserve file
+and model mentions, skill and attachment chips, links, and leading slash
+commands. If the model changes those references, the original draft is kept.
+Backticks around file mentions and newly adjacent prose punctuation after
+links do not count as changed references. Shell input (`!` and `$` prefixes)
+is not rewritten.
+
+Like [Super's enhancement action][super-enhance], improvement aims to clarify
+the deliverable and make success concrete, not just paraphrase. Its isolated,
+tool-free request uses the current branch's recorded conversation context,
+without adding chat messages or changing the main agent's settings. It does
+not run a separate repository-research pass or invent facts about unread
+files. If Luna is unavailable or the request fails, the original draft is
+kept rather than silently falling back to an expensive model.
+
+You can also use `/improve <prompt>`, or `/improve` to open a draft editor.
+The extension ships with the default OMP extensions. For a checkout-only run,
+load it with `omp -e ./apps/omp/extensions/improve/index.ts`.
+
+Override only the rewrite route with `--improve-model PROVIDER/MODEL` (or a
+configured model-role alias). Add `--improve-fast` only when you deliberately
+want premium Fast service for rewriting. Neither option changes the main
+chat. The generation indicator shows the rewrite model and service tier.
+
+[super-enhance]: https://super.engineering/docs/terminal-and-chat/#enhance-a-prompt
