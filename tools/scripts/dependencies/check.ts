@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { isBuiltin } from "node:module";
 import { dirname, relative, resolve } from "node:path";
+import { Graph, Option } from "effect";
 import { type Node, parseSync, Visitor } from "oxc-parser";
 import { type ResolveResult, ResolverFactory } from "oxc-resolver";
 import policy from "./rules.json";
@@ -208,45 +209,24 @@ for (const source of pending) {
 // Strongly connected components consider only runtime edges, so a type-only
 // return path cannot turn a runtime import into a runtime cycle
 function runtimeComponents(): Map<string, number> {
-  const indices = new Map<string, number>();
-  const active = new Set<string>();
-  const stack: string[] = [];
-  const components = new Map<string, number>();
-  let nextIndex = 0;
-  let nextComponent = 0;
-
-  function visit(source: string): number {
-    const index = nextIndex++;
-    indices.set(source, index);
-    let lowest = index;
-    active.add(source);
-    stack.push(source);
-    for (const dependency of graph.get(source) ?? []) {
-      if (dependency.typeOnly || !graph.has(dependency.target)) continue;
-      const targetIndex = indices.get(dependency.target);
-      if (targetIndex === undefined) {
-        lowest = Math.min(lowest, visit(dependency.target));
-      } else if (active.has(dependency.target)) {
-        lowest = Math.min(lowest, targetIndex);
+  const indices = new Map<string, Graph.NodeIndex>();
+  const runtime = Graph.directed<string, undefined>((mutable) => {
+    for (const source of graph.keys())
+      indices.set(source, Graph.addNode(mutable, source));
+    for (const [source, dependencies] of graph) {
+      const from = indices.get(source);
+      if (from === undefined) continue;
+      for (const dependency of dependencies) {
+        const to = indices.get(dependency.target);
+        if (!dependency.typeOnly && to !== undefined)
+          Graph.addEdge(mutable, from, to, undefined);
       }
     }
-    if (lowest === index) {
-      let member: string | undefined;
-      do {
-        member = stack.pop();
-        if (member === undefined)
-          throw new Error("Invalid architecture component stack");
-        active.delete(member);
-        components.set(member, nextComponent);
-      } while (member !== source);
-      nextComponent++;
-    }
-    return lowest;
-  }
-
-  for (const source of graph.keys()) {
-    if (!indices.has(source)) visit(source);
-  }
+  });
+  const components = new Map<string, number>();
+  for (const [id, members] of Graph.stronglyConnectedComponents(runtime).entries())
+    for (const member of members)
+      components.set(Option.getOrThrow(Graph.getNode(runtime, member)), id);
   return components;
 }
 

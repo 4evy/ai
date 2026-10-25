@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "devDependencies": {
+    "effect": "4.0.6",
     "oxc-parser": "0.155.0",
     "oxc-resolver": "11.24.2"
   }
