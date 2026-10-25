@@ -1,3 +1,56 @@
+diff --git a/packages/coding-agent/src/modes/controllers/input-controller.ts b/packages/coding-agent/src/modes/controllers/input-controller.ts
+--- a/packages/coding-agent/src/modes/controllers/input-controller.ts
++++ b/packages/coding-agent/src/modes/controllers/input-controller.ts
+@@ -387,6 +387,11 @@
+ 					this.ctx.toggleThinkingBlockVisibility();
+ 					return { consume: true };
+ 				}
++				if (this.ctx.keybindings.matches(data, "app.clipboard.copyResponse")) {
++					if (this.ctx.ui.hasOverlay() || this.ctx.ui.getFocused() instanceof TreeSelectorComponent) return undefined;
++					void this.#copyAgentResponse();
++					return { consume: true };
++				}
+ 				if (this.ctx.keybindings.matches(data, "app.history.search")) {
+ 					if (this.ctx.ui.hasOverlay() || this.ctx.ui.getFocused() instanceof HistorySearchComponent) {
+ 						return undefined;
+@@ -2667,6 +2672,25 @@
+ 		}
+ 	}
+ 
++	/** Copy viewed-agent prose without reasoning or tool output */
++	async #copyAgentResponse(): Promise<void> {
++		const messages = this.ctx.viewSession.messages;
++		for (let index = messages.length - 1; index >= 0; index--) {
++			const message = messages[index]!;
++			if (message.role !== "assistant") continue;
++			const text = this.ctx.extractAssistantText(message);
++			if (!text) continue;
++			try {
++				await copyToClipboard(text);
++				this.ctx.showStatus("Copied agent response to clipboard");
++			} catch {
++				this.ctx.showWarning("Failed to copy agent response to clipboard");
++			}
++			return;
++		}
++		this.ctx.showStatus("No agent response to copy");
++	}
++
+ 	/** Copy current prompt text to system clipboard. */
+ 	handleCopyPrompt(): void {
+ 		const text = this.ctx.editor.getText();
+diff --git a/packages/coding-agent/src/modes/controllers/todo-command-controller.ts b/packages/coding-agent/src/modes/controllers/todo-command-controller.ts
+--- a/packages/coding-agent/src/modes/controllers/todo-command-controller.ts
++++ b/packages/coding-agent/src/modes/controllers/todo-command-controller.ts
+@@ -18,7 +18,7 @@
+ 	"  /todo edit                         Open todos in $EDITOR",
+ 	"  /todo copy                         Copy todos as Markdown to clipboard",
+ 	"  /todo expand                       Show every phase and task in the HUD",
+-	"  /todo collapse                     Restore the bounded HUD preview",
++	"  /todo collapse                     Restore the one-line task overview",
+ 	"  /todo export [<path>]              Write todos to file (default: TODO.md)",
+ 	"  /todo import [<path>]              Replace todos from file (default: TODO.md)",
+ 	"  /todo append [<phase>] <task...>   Append a task; phase fuzzy-matched or auto-created",
 diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/coding-agent/src/modes/interactive-mode.ts
 --- a/packages/coding-agent/src/modes/interactive-mode.ts
 +++ b/packages/coding-agent/src/modes/interactive-mode.ts
@@ -78,54 +131,16 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  	}
  }
  
-@@ -1036,9 +1020,6 @@
- /** Repaint cadence for live-preview elapsed markers while a subagent tool call runs. */
- const SUBAGENT_PREVIEW_TICK_MS = 1000;
- 
--/** Item rows a collapsed jump list shows before the expander. */
--const SUBAGENT_HUD_COLLAPSED_LIMIT = 3;
--
- /** Pinned jump-list layout: painted item rows plus the expander row. */
- export interface PinnedHudLayout {
- 	/** Item rows painted, in registry order. */
-@@ -1049,23 +1030,9 @@
- 	toggleRow: number | undefined;
- }
- 
--/**
-- * Pinned jump-list layout for `runningTotal` live agents. Collapsed shows a
-- * few rows plus an expander; expanded shows every row plus a collapse row.
-- * Single source of truth for the renderer and the click row map, so painted
-- * rows and hit-testing can never disagree.
-- */
-+/** Expanded jump lists keep their collapse control even with only one agent */
+@@ -1056,7 +1040,7 @@
+  * rows and hit-testing can never disagree.
+  */
  export function layoutPinnedHud(runningTotal: number, expanded: boolean): PinnedHudLayout {
 -	if (runningTotal <= SUBAGENT_HUD_COLLAPSED_LIMIT) {
--		return { itemRows: runningTotal, toggle: undefined, toggleRow: undefined };
--	}
--	if (!expanded) {
--		return {
--			itemRows: SUBAGENT_HUD_COLLAPSED_LIMIT,
--			toggle: "expand",
--			toggleRow: 2 + SUBAGENT_HUD_COLLAPSED_LIMIT,
--		};
--	}
-+	if (!expanded) return { itemRows: 0, toggle: undefined, toggleRow: undefined };
- 	return {
- 		itemRows: runningTotal,
- 		toggle: "collapse",
-@@ -1166,6 +1133,10 @@
- 	livePreview = false,
- 	hubKey?: string,
- ): string[] {
-+	if (!expanded) {
-+		const key = hubKey || editorKey("app.agents.hub") || editorKey("app.session.observe");
-+		return compactSubagentHud(sessions, key)?.render(columns).slice() ?? [];
-+	}
- 	const running = sessions.filter(isHudSubagent);
- 	if (running.length === 0) return [];
- 	// `SubagentHudComponent` paints through `Text` with horizontal padding, so
-@@ -1409,14 +1380,6 @@
++	if (runningTotal <= SUBAGENT_HUD_COLLAPSED_LIMIT && !expanded) {
+ 		return { itemRows: runningTotal, toggle: undefined, toggleRow: undefined };
+ 	}
+ 	if (!expanded) {
+@@ -1409,14 +1393,6 @@
  	#workingMessageAccentCacheKey?: WorkingMessageAccentCacheKey;
  	#workingMessageAccentCacheValue?: WorkingMessageAccent;
  	#workingMessageAccentCacheHasValue = false;
@@ -140,7 +155,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  	/** Live gen tok/s for the working row: the viewed session's own meter, so a
  	 * focused subagent shows its own reading and the main session's survives
  	 * focus round-trips. */
-@@ -1431,18 +1394,8 @@
+@@ -1431,18 +1407,8 @@
  		if (rate === null) return undefined;
  		return theme.fg("dim", `${theme.icon.throughput} ${rate.toFixed(1)} tok/s`);
  	}
@@ -160,7 +175,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		if (!trailer) return undefined;
  		return ["", " ".repeat(Math.max(0, width - visibleWidth(trailer))) + trailer];
  	}
-@@ -1777,12 +1730,12 @@
+@@ -1777,12 +1743,12 @@
  		return this.composer.viewportClickCandidates(index);
  	}
  
@@ -175,7 +190,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		this.ui.requestRender();
  	}
  
-@@ -1791,7 +1744,7 @@
+@@ -1791,7 +1757,7 @@
  		// An explicit settings change wins over click state: without the reset,
  		// reselecting the current value would keep showing the old override.
  		this.#pinnedHudOverride = undefined;
@@ -184,7 +199,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		this.ui.requestRender();
  	}
  
-@@ -1980,7 +1933,7 @@
+@@ -1980,7 +1946,7 @@
  		this.progressHudContainer.addChild(this.#downloadActivityHud);
  		this.#eventBusUnsubscribers.push(onDownloadActivity(activity => this.#downloadActivityHud.update(activity)));
  		this.statusContainer = new StatusHudContainer(this);
@@ -193,7 +208,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		this.subagentContainer = new AnchoredLiveContainer();
  		this.btwContainer = new AnchoredLiveContainer();
  		this.omfgContainer = new AnchoredLiveContainer();
-@@ -4414,9 +4367,67 @@
+@@ -4414,9 +4380,60 @@
  		this.#todoHudNative = undefined;
  		const activeDescs = this.#getActiveSubagentDescriptions();
  		this.#todoHudSubagentKey = activeDescs.join("\n");
@@ -238,23 +253,16 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
 +						agents.essential,
 +					]
 +				: [head, smallHead];
-+			this.todoContainer.addChild(new CompactHudComponent(heads, summary.current, hints));
-+			const fallback = text(
-+				[span(`${summary.closed}/${summary.total} · ${summary.current ?? (summary.blocked ? "blocked" : "done")}`)],
-+				{
-+					wrap: "none",
-+					truncate: "end",
-+					lines: 1,
-+				},
-+			);
++			const hud = new CompactHudComponent(heads, summary.current, hints);
++			this.todoContainer.addChild(hud);
 +			this.#todoHudNative = {
 +				checklist: node(
 +					"checklist",
-+					{ phases: todoChecklistPhases(phases), mode: "hud", role: "omp.hud.todo" },
++					{ phases: todoChecklistPhases(phases, isMatched), mode: "hud", role: "omp.hud.todo" },
 +					undefined,
 +					"todo",
 +				),
-+				fallback,
++				fallback: hud.describe(),
 +			};
 +			if (compactAgents) this.subagentContainer.clear();
 +			else this.#renderSubagentList();
@@ -263,7 +271,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		const expanded = this.todoExpanded;
  		const multiPhase = phases.length > 1;
  		const activeIdx = phases.indexOf(this.#getActivePhase(phases) ?? phases[0]);
-@@ -4585,29 +4596,7 @@
+@@ -4585,29 +4602,7 @@
  			"todo",
  		);
  		// A `checklist` HUD is a pill with the whole plan as its popover.
@@ -294,7 +302,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		this.#todoHudNative = {
  			checklist: node(
  				"checklist",
-@@ -4617,72 +4606,9 @@
+@@ -4617,72 +4612,9 @@
  			),
  			fallback,
  		};
@@ -368,7 +376,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  	async #loadTodoList(source: AgentSession = this.session): Promise<void> {
  		this.todoPhases = source.getTodoPhases();
  		this.#todoPhasesOwner = source;
-@@ -4732,6 +4658,19 @@
+@@ -4732,6 +4664,19 @@
  	 */
  	#renderSubagentList(): void {
  		this.#cancelSubagentPreviewTick();
@@ -388,7 +396,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		const view = this.#buildSubagentHudView();
  		if (!view) {
  			this.subagentContainer.clear();
-@@ -7909,7 +7848,7 @@
+@@ -7909,7 +7854,7 @@
  				// status rows so the interrupt glyph reads as indented.
  				[` ${appKey(this.keybindings, "app.interrupt")}`],
  			);
@@ -413,15 +421,154 @@ diff --git a/packages/coding-agent/src/modes/settings.ts b/packages/coding-agent
  			{ value: "full", label: "Full", description: "Always list every live agent" },
  		],
  	},
-diff --git a/packages/coding-agent/src/modes/controllers/todo-command-controller.ts b/packages/coding-agent/src/modes/controllers/todo-command-controller.ts
---- a/packages/coding-agent/src/modes/controllers/todo-command-controller.ts
-+++ b/packages/coding-agent/src/modes/controllers/todo-command-controller.ts
-@@ -18,7 +18,7 @@
- 	"  /todo edit                         Open todos in $EDITOR",
- 	"  /todo copy                         Copy todos as Markdown to clipboard",
- 	"  /todo expand                       Show every phase and task in the HUD",
--	"  /todo collapse                     Restore the bounded HUD preview",
-+	"  /todo collapse                     Restore the one-line task overview",
- 	"  /todo export [<path>]              Write todos to file (default: TODO.md)",
- 	"  /todo import [<path>]              Replace todos from file (default: TODO.md)",
- 	"  /todo append [<phase>] <task...>   Append a task; phase fuzzy-matched or auto-created",
+diff --git a/packages/tui/src/app-keybindings.ts b/packages/tui/src/app-keybindings.ts
+--- a/packages/tui/src/app-keybindings.ts
++++ b/packages/tui/src/app-keybindings.ts
+@@ -47,6 +47,7 @@
+ 	"app.clipboard.pasteTextRaw": true;
+ 	"app.clipboard.copyLine": true;
+ 	"app.clipboard.copyPrompt": true;
++	"app.clipboard.copyResponse": true;
+ 	"app.agents.hub": true;
+ 	"app.session.new": true;
+ 	"app.session.tree": true;
+@@ -190,6 +191,10 @@
+ 		defaultKeys: "alt+shift+c",
+ 		description: "Copy prompt",
+ 	},
++	"app.clipboard.copyResponse": {
++		defaultKeys: [],
++		description: "Copy latest visible agent response",
++	},
+ 	"app.session.new": {
+ 		defaultKeys: [],
+ 		description: "Create new session",
+diff --git a/packages/tui/src/hotkeys-markdown.ts b/packages/tui/src/hotkeys-markdown.ts
+--- a/packages/tui/src/hotkeys-markdown.ts
++++ b/packages/tui/src/hotkeys-markdown.ts
+@@ -115,6 +115,7 @@
+ 				{ keys: [hints(["ctrl+k"])], action: "Delete to end of line" },
+ 				{ keys: [act("app.clipboard.copyLine")], action: "Copy current line" },
+ 				{ keys: [act("app.clipboard.copyPrompt")], action: "Copy whole prompt" },
++				{ keys: [act("app.clipboard.copyResponse")], action: "Copy latest visible agent response" },
+ 			],
+ 		},
+ 		{
+diff --git a/packages/tui/src/prompt/tips.txt b/packages/tui/src/prompt/tips.txt
+--- a/packages/tui/src/prompt/tips.txt
++++ b/packages/tui/src/prompt/tips.txt
+@@ -17,8 +17,8 @@
+ Bulk data to classify or triage? Say `jevify` in your message — the eval kernel's `judge()` processes the batch and you read only what it flags — watch it glow as you type
+ Log in to several accounts of the same provider — `/login` again — and omp load-balances across them automatically
+ Run `omp auth-broker serve` once and every machine pulls live tokens over the wire — refresh keys never leave the host; `omp auth-gateway` fronts it as a drop-in proxy any OpenAI-compatible client can hit
+-Press {key:alt+p} (or /switch) to switch provider, and {key:ctrl+p} to cycle role models smol -> slow -> etc
+-Press {key:ctrl+r} to search your prompt history and reuse a past message
++Press {action:app.model.selectTemporary} (or /switch) to switch provider, and {action:app.model.cycleForward} to cycle role models smol -> slow -> etc
++Press {action:app.history.search} to search your prompt history and reuse a past message
+ `/force read` pins the next turn to one specific tool when the model keeps reaching for the wrong one
+ `/copy code` grabs the last code block to your clipboard — `/copy cmd` grabs the last shell/python command
+ `/shake` rips heavy tool results out of context to reclaim tokens without a full /compact — `/shake images` drops just images
+@@ -28,7 +28,8 @@
+ No native tool_calling? Inference provider botches parsing them? `PI_DIALECT=glm|kimi|anthropic…` rolls it locally for them!
+ Turn on `/advisor` to attach a second model that reviews every turn and quietly injects advice
+ Try starting your prompt with a ->, and writing a list (1. Do X, 2. Do Y)
+-Press {key:shift+tab} to cycle through reasoning effort levels
++Press {action:app.thinking.cycle} to cycle through reasoning effort levels
+ omp can reconfigure and extend itself — ask any questions you have!
+ Lint/type errors piling up? `omp cleanse` (or /cleanse right here) hunts project diagnostics and fixes them with parallel subagents — {key:escape} cancels
+-[NO-TERN] Psst, omp has a natural habitat 🐦 [tern](https://scl.so/tern)
+\ No newline at end of file
++[NO-TERN] Psst, omp has a natural habitat 🐦 [tern](https://scl.so/tern)
++Press {action:app.tools.expand} to expand tool output, or {action:app.tools.toggleVisibility} to show or hide tool activity
+\ No newline at end of file
+diff --git a/packages/tui/src/render/render-utils.ts b/packages/tui/src/render/render-utils.ts
+--- a/packages/tui/src/render/render-utils.ts
++++ b/packages/tui/src/render/render-utils.ts
+@@ -11,8 +11,8 @@
+ import type { Ellipsis } from "@oh-my-pi/pi-natives";
+ import { expandWindowsLongPath, getWindowsShortPath } from "@oh-my-pi/pi-natives/path";
+ import { pluralize, sanitizeText } from "@oh-my-pi/pi-utils";
+-import { formatKeyHint, type KeyId } from "../app-keybindings";
+-import { getKeybindings } from "../keybindings";
++import { formatKeyHint } from "../app-keybindings";
++import { appToolsExpandKey } from "../keybinding-matchers";
+ import type { Theme } from "../theme/theme";
+ import type { Component } from "../tui";
+ import { replaceTabs, sliceByColumn, truncateToWidth, visibleWidth } from "../utils";
+@@ -197,15 +197,9 @@
+ 	RECAP: 280,
+ } as const;
+ 
+-/** Keybinding action that toggles tool-output expansion. */
+-const EXPAND_ACTION = "app.tools.expand";
+-/** Fallback key when no binding is resolvable (e.g. outside an interactive session). */
+-const DEFAULT_EXPAND_KEY: KeyId = "ctrl+o";
+-
+ /** Human-readable primary key bound to tool-output expansion, e.g. `Ctrl+O`. */
+ export function expandKeyHint(): string {
+-	const [key = DEFAULT_EXPAND_KEY] = getKeybindings().getKeys(EXPAND_ACTION);
+-	return formatKeyHint(key);
++	return formatKeyHint(appToolsExpandKey());
+ }
+ 
+ // =============================================================================
+diff --git a/packages/tui/src/theme/loader.ts b/packages/tui/src/theme/loader.ts
+--- a/packages/tui/src/theme/loader.ts
++++ b/packages/tui/src/theme/loader.ts
+@@ -175,6 +175,10 @@
+ 			fgColors[key as ThemeColor] = value;
+ 		}
+ 	}
++	// Keep tool frames and state colors, but inherit the terminal background
++	bgColors.toolPendingBg = "";
++	bgColors.toolSuccessBg = "";
++	bgColors.toolErrorBg = "";
+ 	// Extract symbol configuration - settings override takes precedence over theme
+ 	const symbolPreset: SymbolPreset = symbolPresetOverride ?? themeJson.symbols?.preset ?? "unicode";
+ 	const symbolOverrides = themeJson.symbols?.overrides ?? {};
+diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
+--- a/packages/tui/src/tools/bash.ts
++++ b/packages/tui/src/tools/bash.ts
+@@ -336,6 +336,7 @@
+ 	contextTimeout: number | undefined,
+ 	artifactId: string | undefined,
+ 	isError: boolean,
++	expanded: boolean,
+ ): string[] {
+ 	const timeoutDisabled = details?.timeoutDisabled === true || contextTimeout === 0;
+ 	const timeoutSeconds = timeoutDisabled ? undefined : (details?.timeoutSeconds ?? contextTimeout);
+@@ -347,17 +348,21 @@
+ 	}
+ 	if (details?.service) {
+ 		const service = details.service;
+-		statsParts.push(`Service: ${service.name}`, `State: ${service.state}`);
+-		statsParts.push(`Ready: ${service.ready ? "yes" : service.timedOut ? "timed out" : "no"}`);
+-		if (service.pid !== undefined) statsParts.push(`PID: ${service.pid}`);
++		if (expanded) {
++			statsParts.push(`Service: ${service.name}`, `State: ${service.state}`);
++			statsParts.push(`Ready: ${service.ready ? "yes" : service.timedOut ? "timed out" : "no"}`);
++			if (service.pid !== undefined) statsParts.push(`PID: ${service.pid}`);
++		} else {
++			statsParts.push(service.timedOut ? `${service.state} (readiness timed out)` : service.state);
++		}
+ 	}
+ 	if (wallTimeMs !== undefined) {
+ 		statsParts.push(`Wall: ${formatWallTimeSeconds(wallTimeMs)}s`);
+ 	}
+-	if (timeoutDisabled) {
++	if (expanded && timeoutDisabled) {
+ 		statsParts.push("Timeout: disabled");
+ 	}
+-	if (typeof timeoutSeconds === "number") {
++	if (expanded && typeof timeoutSeconds === "number") {
+ 		statsParts.push(
+ 			requestedTimeoutSeconds !== undefined && requestedTimeoutSeconds !== timeoutSeconds
+ 				? `Timeout: ${timeoutSeconds}s (requested ${requestedTimeoutSeconds}s clamped)`
+@@ -589,6 +594,7 @@
+ 						renderContext?.timeout,
+ 						rawOutputArtifact.artifactId,
+ 						isError,
++						expanded,
+ 					);
+ 					if (elapsedSecond !== undefined && elapsedSecond > 0) {
+ 						statsParts.unshift(`elapsed ${formatDuration(elapsedSecond * 1000)}`);

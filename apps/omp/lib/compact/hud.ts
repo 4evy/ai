@@ -1,18 +1,26 @@
-import { type Component, Text, truncateToWidth, visibleWidth } from "@oh-my-pi/pi-tui";
+import { Text, truncateToWidth, visibleWidth } from "@oh-my-pi/pi-tui";
+import { text } from "@oh-my-pi/pi-tui/native/describe";
+import type { NativeNode } from "@oh-my-pi/pi-tui/native/node";
+import { styledSpans } from "@oh-my-pi/pi-tui/native/spans";
 import type { ObservableSession } from "@oh-my-pi/pi-tui/overlays/session-observer-registry";
 import { theme } from "@oh-my-pi/pi-tui/theme";
 
 /** One responsive overview row, with details yielding space to counts and hints */
-export class CompactHudComponent implements Component {
-  readonly #text: Text;
+export class CompactHudComponent extends Text {
+  readonly #native: NativeNode;
 
   constructor(
     heads: readonly string[],
     detail: string | undefined,
     hints: readonly string[],
   ) {
+    super(heads[0] ?? "", 0, 0);
     const narrowHint = hints.at(-1) ?? "";
-    this.#text = new Text(heads[0] ?? "", 0, 0).setWrapLine((_line, width) => {
+    this.#native = text(
+      styledSpans([heads[0], detail, hints[0]].filter(Boolean).join(" · ")),
+      { wrap: "none", truncate: "end", lines: 1 },
+    );
+    this.setWrapLine((_line, width) => {
       const available = Math.max(0, width - 2);
       const headBudget = Math.max(
         0,
@@ -20,12 +28,15 @@ export class CompactHudComponent implements Component {
       );
       const selectedHead =
         heads.find((head) => visibleWidth(head) <= headBudget) ?? heads.at(-1) ?? "";
+      // Prefer readable current work over a verbose shortcut label
+      const detailReserve = detail ? Math.min(16, visibleWidth(detail)) + 3 : 0;
+      const fits = (hint: string, reserve: number) =>
+        visibleWidth(selectedHead) + visibleWidth(hint) + (hint ? 3 : 0) + reserve <=
+        available;
       const hint =
-        hints.find(
-          (hint) =>
-            visibleWidth(selectedHead) + visibleWidth(hint) + (hint ? 3 : 0) <=
-            available,
-        ) ?? narrowHint;
+        hints.find((hint) => fits(hint, detailReserve)) ??
+        hints.find((hint) => fits(hint, 0)) ??
+        narrowHint;
       const tail = hint
         ? truncateToWidth(theme.fg("dim", ` · ${hint}`), available)
         : "";
@@ -43,12 +54,12 @@ export class CompactHudComponent implements Component {
     });
   }
 
-  render(width: number): readonly string[] {
-    return width > 0 ? this.#text.render(width) : [""];
+  override describe(): NativeNode {
+    return this.#native;
   }
 
-  invalidate(): void {
-    this.#text.invalidate();
+  override render(width: number): readonly string[] {
+    return width > 1 ? super.render(width) : [""];
   }
 }
 
