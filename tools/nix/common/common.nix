@@ -97,6 +97,7 @@ in
           compact = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/compact";
           improve = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/improve";
           mcp = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/mcp";
+          quick = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/quick";
           remote = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/remote";
           skylight = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/skylight";
           thinking = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/thinking";

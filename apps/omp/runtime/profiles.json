@@ -8,13 +8,15 @@
       "ui/todo.patch",
       "quota/quota.patch",
       "schema/schema.patch",
-      "ui/compact.patch"
+      "ui/compact.patch",
+      "ui/session-model.patch"
     ],
     "sdk": [
       "ssh/ssh.patch",
       "compression/compression.patch",
       "mcp/mcp.patch",
-      "ui/todo.patch"
+      "ui/todo.patch",
+      "ui/session-model.patch"
     ]
   },
   "dependencies": {},

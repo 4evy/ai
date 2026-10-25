@@ -1,0 +1,221 @@
+diff --git a/packages/coding-agent/src/session/model-controls.ts b/packages/coding-agent/src/session/model-controls.ts
+--- a/packages/coding-agent/src/session/model-controls.ts
++++ b/packages/coding-agent/src/session/model-controls.ts
+@@ -236,8 +236,9 @@
+ 		options?: {
+ 			selector?: string;
+ 			thinkingLevel?: ThinkingLevel;
+ 			persist?: boolean;
++			ephemeral?: boolean;
+ 		},
+ 	): Promise<{ switched: boolean }> {
+ 		const previousEditMode = this.#host.resolveActiveEditMode();
+ 		if (!this.#host.modelRegistry.hasConfiguredAuth(model)) {
+@@ -248,10 +249,13 @@
+ 
+ 		this.#host.modelRegistry.clearSuppressedSelector(formatModelStringWithRouting(targetModel));
+ 		this.#host.clearActiveRetryFallback();
+ 		await this.#host.setModelWithProviderSessionReset(targetModel);
+-		this.#host.sessionManager.appendModelChange(`${targetModel.provider}/${targetModel.id}`, role);
+-		if (options?.persist) {
++		this.#host.sessionManager.appendModelChange(
++			`${targetModel.provider}/${targetModel.id}`,
++			options?.ephemeral ? EPHEMERAL_MODEL_CHANGE_ROLE : role,
++		);
++		if (options?.persist && !options.ephemeral) {
+ 			this.#host.settings.setModelRole(
+ 				role,
+ 				formatRoleModelValue(
+ 					this.#host.settings,
+@@ -262,9 +266,11 @@
+ 					options.thinkingLevel,
+ 				),
+ 			);
+ 		}
+-		this.#host.settings.getStorage()?.recordModelUsage(`${targetModel.provider}/${targetModel.id}`);
++		if (!options?.ephemeral) {
++			this.#host.settings.getStorage()?.recordModelUsage(`${targetModel.provider}/${targetModel.id}`);
++		}
+ 
+ 		// Re-apply thinking for the newly selected model. Prefer the model's
+ 		// configured defaultLevel; otherwise preserve the current level (or auto).
+ 		this.#reapplyThinkingLevel(targetModel.thinking?.defaultLevel);
+diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
+--- a/packages/coding-agent/src/session/agent-session.ts
++++ b/packages/coding-agent/src/session/agent-session.ts
+@@ -11025,8 +11025,9 @@
+ 		options?: {
+ 			selector?: string;
+ 			thinkingLevel?: ThinkingLevel;
+ 			persist?: boolean;
++			ephemeral?: boolean;
+ 		},
+ 	): Promise<{ switched: boolean }> {
+ 		return this.#models.setModel(model, role, options);
+ 	}
+diff --git a/packages/coding-agent/src/modes/runtime-init.ts b/packages/coding-agent/src/modes/runtime-init.ts
+--- a/packages/coding-agent/src/modes/runtime-init.ts
++++ b/packages/coding-agent/src/modes/runtime-init.ts
+@@ -126,9 +126,9 @@
+ 			getAllTools: () => session.getAllToolInfos(),
+ 			setActiveTools: (toolNames: string[]) =>
+ 				session.setActiveToolsByName(filterActiveTools ? filterActiveTools(toolNames) : toolNames),
+ 			getCommands: () => getSessionSlashCommands(session),
+-			setModel: model => runExtensionSetModel(session, model),
++			setModel: (model, options) => runExtensionSetModel(session, model, options),
+ 			getThinkingLevel: () => session.thinkingLevel,
+ 			setThinkingLevel: level => session.setThinkingLevel(level),
+ 			getServiceTiers: () => session.serviceTierByFamily,
+ 			setServiceTier: (family, tier) => session.setServiceTierFamily(family, tier),
+diff --git a/packages/coding-agent/src/modes/controllers/extension-ui-controller.ts b/packages/coding-agent/src/modes/controllers/extension-ui-controller.ts
+--- a/packages/coding-agent/src/modes/controllers/extension-ui-controller.ts
++++ b/packages/coding-agent/src/modes/controllers/extension-ui-controller.ts
+@@ -25,8 +25,9 @@
+ 	SendMessageHandler,
+ 	SendUserMessageHandler,
+ 	TerminalInputHandler,
+ } from "../../extensibility/extensions";
++import { runExtensionSetModel } from "../../extensibility/extensions/compact-handler";
+ import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
+ import { ApprovalDialogComponent } from "@oh-my-pi/pi-tui/overlays/approval-dialog";
+ import {
+ 	type AskDialogPrompt,
+@@ -227,14 +228,9 @@
+ 			},
+ 			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
+ 			getAllTools: () => this.ctx.session.getAllToolInfos(),
+ 			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
+-			setModel: async model => {
+-				const key = await this.ctx.session.modelRegistry.getApiKey(model);
+-				if (!key) return false;
+-				await this.ctx.session.setModel(model);
+-				return true;
+-			},
++			setModel: (model, options) => runExtensionSetModel(this.ctx.session, model, options),
+ 			getThinkingLevel: () => this.ctx.session.thinkingLevel,
+ 			setThinkingLevel: level => this.ctx.session.setThinkingLevel(level),
+ 			getServiceTiers: () => this.ctx.session.serviceTierByFamily,
+ 			setServiceTier: (family, tier) => this.ctx.session.setServiceTierFamily(family, tier),
+@@ -458,14 +454,9 @@
+ 			},
+ 			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
+ 			getAllTools: () => this.ctx.session.getAllToolInfos(),
+ 			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
+-			setModel: async model => {
+-				const key = await this.ctx.session.modelRegistry.getApiKey(model);
+-				if (!key) return false;
+-				await this.ctx.session.setModel(model);
+-				return true;
+-			},
++			setModel: (model, options) => runExtensionSetModel(this.ctx.session, model, options),
+ 			getThinkingLevel: () => this.ctx.session.thinkingLevel,
+ 			setThinkingLevel: (level, persist) => this.ctx.session.setThinkingLevel(level, persist),
+ 			getServiceTiers: () => this.ctx.session.serviceTierByFamily,
+ 			setServiceTier: (family, tier) => this.ctx.session.setServiceTierFamily(family, tier),
+diff --git a/packages/coding-agent/src/extensibility/extensions/compact-handler.ts b/packages/coding-agent/src/extensibility/extensions/compact-handler.ts
+--- a/packages/coding-agent/src/extensibility/extensions/compact-handler.ts
++++ b/packages/coding-agent/src/extensibility/extensions/compact-handler.ts
+@@ -23,18 +23,22 @@
+ }
+ 
+ interface SetModelCapableSession {
+ 	modelRegistry: { getApiKey(model: Model): Promise<string | undefined> };
+-	setModel(model: Model): Promise<unknown>;
++	setModel(model: Model, role?: string, options?: { ephemeral?: boolean }): Promise<unknown>;
+ }
+ 
+ /**
+  * Helper for wiring the `setModel` action of an {@link ExtensionContext}.
+  *
+  * Returns false when no API key is available for the requested model.
+  */
+-export async function runExtensionSetModel(session: SetModelCapableSession, model: Model): Promise<boolean> {
++export async function runExtensionSetModel(
++	session: SetModelCapableSession,
++	model: Model,
++	options?: { ephemeral?: boolean },
++): Promise<boolean> {
+ 	const key = await session.modelRegistry.getApiKey(model);
+ 	if (!key) return false;
+-	await session.setModel(model);
++	await session.setModel(model, "default", options);
+ 	return true;
+ }
+diff --git a/packages/coding-agent/src/extensibility/extensions/loader.ts b/packages/coding-agent/src/extensibility/extensions/loader.ts
+--- a/packages/coding-agent/src/extensibility/extensions/loader.ts
++++ b/packages/coding-agent/src/extensibility/extensions/loader.ts
+@@ -327,10 +327,10 @@
+ 	getCommands() {
+ 		return this.runtime.getCommands();
+ 	}
+ 
+-	setModel(model: Model): Promise<boolean> {
+-		return this.runtime.setModel(model);
++	setModel(model: Model, options?: Parameters<ExtensionAPI["setModel"]>[1]): Promise<boolean> {
++		return this.runtime.setModel(model, options);
+ 	}
+ 
+ 	getThinkingLevel(): ThinkingLevel | undefined {
+ 		return this.runtime.getThinkingLevel();
+diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packages/coding-agent/src/extensibility/extensions/types.ts
+--- a/packages/coding-agent/src/extensibility/extensions/types.ts
++++ b/packages/coding-agent/src/extensibility/extensions/types.ts
+@@ -1888,10 +1888,13 @@
+ 
+ 	/** Get available slash commands in the current session. */
+ 	getCommands(): SlashCommandInfo[];
+ 
+-	/** Set the current model. Returns false if no API key available. */
+-	setModel(model: Model): Promise<boolean>;
++	/**
++	 * Set the current model. Returns false if no API key is available
++	 * `ephemeral` preserves the session's default model and model-usage history
++	 */
++	setModel(model: Model, options?: { ephemeral?: boolean }): Promise<boolean>;
+ 
+ 	/** Get current thinking level. */
+ 	getThinkingLevel(): ThinkingLevel | undefined;
+ 
+@@ -2120,9 +2123,9 @@
+ export type GetCommandsHandler = () => SlashCommandInfo[];
+ 
+ export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
+ 
+-export type SetModelHandler = (model: Model) => Promise<boolean>;
++export type SetModelHandler = ExtensionAPI["setModel"];
+ 
+ export type GetThinkingLevelHandler = () => ThinkingLevel | undefined;
+ 
+ export type SetThinkingLevelHandler = (level: ThinkingLevel, persist?: boolean) => void;
+diff --git a/packages/coding-agent/src/modes/acp/acp-agent.ts b/packages/coding-agent/src/modes/acp/acp-agent.ts
+--- a/packages/coding-agent/src/modes/acp/acp-agent.ts
++++ b/packages/coding-agent/src/modes/acp/acp-agent.ts
+@@ -52,9 +52,9 @@
+ 	type ExtensionUIDialogOptions,
+ 	getExtensionUISelectOptionLabel,
+ 	timedOutAskDialogResult,
+ } from "../../extensibility/extensions";
+-import { runExtensionCompact } from "../../extensibility/extensions/compact-handler";
++import { runExtensionCompact, runExtensionSetModel } from "../../extensibility/extensions/compact-handler";
+ import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
+ import { buildSkillPromptMessage, parseSkillInvocation } from "../../extensibility/skills";
+ import { MCPManager } from "../../mcp/manager";
+ import { reconnectMcpManagerServer } from "../../mcp/oauth-reauth";
+@@ -2988,16 +2988,9 @@
+ 				getActiveTools: () => record.session.getEnabledToolNames(),
+ 				getAllTools: () => record.session.getAllToolInfos(),
+ 				setActiveTools: toolNames => record.session.setActiveToolsByName(toolNames),
+ 				getCommands: () => getSessionSlashCommands(record.session),
+-				setModel: async model => {
+-					const apiKey = await record.session.modelRegistry.getApiKey(model);
+-					if (!apiKey) {
+-						return false;
+-					}
+-					await record.session.setModel(model);
+-					return true;
+-				},
++				setModel: (model, options) => runExtensionSetModel(record.session, model, options),
+ 				getThinkingLevel: () => record.session.thinkingLevel,
+ 				setThinkingLevel: level => record.session.setThinkingLevel(level),
+ 				getServiceTiers: () => record.session.serviceTierByFamily,
+ 				setServiceTier: (family, tier) => record.session.setServiceTierFamily(family, tier),

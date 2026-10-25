@@ -264,6 +264,19 @@ OMP settings module installs it at `~/.omp/agent/commands/commit.md`. For a
 checkout-only setup, copy the command into the target repository's
 `.omp/commands/commit.md`, then reload OMP.
 
+## Start a quick chat in OMP
+
+Use `/quick` to start a new, empty chat with `openai-codex/gpt-6-luna`.
+The [quick extension](../apps/omp/extensions/quick/index.ts) keeps the
+previous conversation intact and selects Luna only for the new chat. It
+does not update the configured default or last-used model. Closing and
+reopening OMP restores the normal model, including when resuming this chat.
+Starting another chat with `/new` also leaves the quick model behind.
+
+The extension ships with the default OMP extensions and requires the pinned
+patched runtime. For a checkout-only run, load it with
+`omp -e ./apps/omp/extensions/quick/index.ts`.
+
 ## Improve a prompt before sending
 
 In OMP's interactive editor, write a draft and press **Alt+I**. The
