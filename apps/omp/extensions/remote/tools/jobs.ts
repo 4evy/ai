@@ -9,7 +9,16 @@ import type { RemoteJobs } from "../jobs/jobs";
 import { jobPresentation } from "../jobs/presentation";
 import type { Result } from "../jobs/types";
 
-const MAX_BATCH_PREVIEW_STEPS = 128;
+function operationTitle(args: unknown, fallback: string): string {
+  const input = isRecord(args) ? args : undefined;
+  const name =
+    typeof input?.name === "string" && input.name.trim() ? input.name.trim() : fallback;
+  const target =
+    typeof input?.target === "string" && input.target !== "local"
+      ? `SSH · ${input.target}`
+      : "Local";
+  return `${name} · ${target}`;
+}
 
 function batchPreview(input: unknown): string | undefined {
   if (!isRecord(input) || !Array.isArray(input.steps)) return undefined;
@@ -20,7 +29,7 @@ function batchPreview(input: unknown): string | undefined {
   return [
     "# Batch plan: separate scripts managed as dependency steps",
     `# concurrency: ${concurrency}; onFailure: ${onFailure}`,
-    ...input.steps.slice(0, MAX_BATCH_PREVIEW_STEPS).flatMap((step, index) => {
+    ...input.steps.flatMap((step, index) => {
       if (!isRecord(step)) return [`# Step ${index + 1}`];
       const id = "id" in step ? JSON.stringify(step.id) : String(index + 1);
       const dependencies = "dependsOn" in step ? JSON.stringify(step.dependsOn) : "[]";
@@ -56,8 +65,7 @@ export function registerJobTools(
     }),
     createShellRenderer<unknown>({
       ...scriptArguments,
-      resolveTitle: (args) =>
-        `${isRecord(args) && typeof args.target === "string" && args.target !== "local" ? `SSH · ${args.target}` : "Local"}`,
+      resolveTitle: (args) => operationTitle(args, "Run"),
     }),
   );
   registerCompiledTool(
@@ -72,7 +80,7 @@ export function registerJobTools(
     createShellRenderer<unknown>({
       ...scriptArguments,
       resolveCommand: batchPreview,
-      resolveTitle: () => "Batch plan",
+      resolveTitle: (args) => operationTitle(args, "Batch plan"),
     }),
   );
   registerCompiledTool(
