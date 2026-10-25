@@ -4,7 +4,7 @@ import { McpSession } from "@ai/core/mcp/session/session";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { Effect, Exit, Record as Records } from "effect";
+import { Effect, Record as Records } from "effect";
 import type { HelperIdentity } from "farstep/protocol/identity";
 import { helperHandshakeSchema, structuredResult } from "farstep/protocol/identity";
 import { boundRequest } from "farstep/transport/bounds";
@@ -114,7 +114,7 @@ export function connectHelper(
 ): Promise<HelperConnection> {
   const lifetime = new Lifetime();
   const close = () => lifetime.close();
-  return lifetime.run(
+  return lifetime.acquire(
     connectHelperEffect(name, config, options).pipe(
       Effect.map((connection) => ({
         ...connection,
@@ -122,9 +122,6 @@ export function connectHelper(
         closeEffect: lifetime.closeEffect,
         [Symbol.asyncDispose]: close,
       })),
-      Effect.onExit((exit) =>
-        Exit.isFailure(exit) ? lifetime.closeEffect : Effect.void,
-      ),
     ),
     options.signal,
   );

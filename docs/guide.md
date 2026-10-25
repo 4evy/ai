@@ -91,6 +91,11 @@ integration to preserve native errors, cancellation, and tracing. Use
 resources or reporting cancellation. Keep operation spans sanitized through
 `operationEffect`.
 
+Use `Lifetime.acquire` or `acquireEffect` for startup that transfers scoped
+resources into a longer-lived owner. Failed or cancelled startup closes the
+whole lifetime before returning. Use `run` or `runEffect` for ordinary
+operations that must not revoke the owner on failure.
+
 Let scopes own resources with `Effect.acquireRelease` or
 `Effect.acquireDisposable`, and scoped fibers own background work. Prefer
 Effect's existing stream operators and the shared

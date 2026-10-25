@@ -3,7 +3,7 @@ import { McpSession } from "@ai/core/mcp/session/session";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { Effect, Exit, Record as Records, type Scope, Struct } from "effect";
+import { Effect, Record as Records, type Scope, Struct } from "effect";
 import * as v from "valibot";
 import { MAX_RESPONSE_BYTES } from "../../protocol/desktop/desktop";
 import type { HelperIdentity } from "../../protocol/identity";
@@ -90,15 +90,12 @@ export function connectNodeHelper(
   signal?: AbortSignal,
 ): Promise<NodeHelperConnection> {
   const lifetime = new Lifetime();
-  return lifetime.run(
+  return lifetime.acquire(
     acquireNodeHelper(command, args).pipe(
       Effect.map((connection) => ({
         ...connection,
         close: () => lifetime.close(),
       })),
-      Effect.onExit((exit) =>
-        Exit.isFailure(exit) ? lifetime.closeEffect : Effect.void,
-      ),
     ),
     signal,
   );

@@ -3,7 +3,7 @@ import { McpSession } from "@ai/core/mcp/session/session";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { Effect, Exit } from "effect";
+import { Effect } from "effect";
 import { PROVISION_TIMEOUT_MS } from "farstep/protocol/sky/limits";
 import * as v from "valibot";
 
@@ -36,7 +36,7 @@ export class ChannelSession {
     const active = signal
       ? AbortSignal.any([signal, this.closedFleet])
       : this.closedFleet;
-    return this.lifetime.run(
+    return this.lifetime.acquire(
       Effect.gen({ self: this }, function* () {
         const { session, value: identity } = yield* McpSession.acquireEffect(
           this.client,
@@ -84,11 +84,7 @@ export class ChannelSession {
           close: () => this.lifetime.close(),
           isClosed: session.isClosed,
         };
-      }).pipe(
-        Effect.onExit((exit) =>
-          Exit.isFailure(exit) ? this.lifetime.closeEffect : Effect.void,
-        ),
-      ),
+      }),
       active,
     );
   }

@@ -219,11 +219,27 @@ export class Lifetime implements AsyncDisposable {
     );
   }
 
+  // Failed startup rolls back the whole lifetime, outside its owned fiber
+  acquireEffect<A, E, R>(
+    effect: Effect.Effect<A, E, R>,
+  ): Effect.Effect<A, E | Error, Exclude<R, Scope.Scope>> {
+    return this.runEffect(effect).pipe(
+      Effect.onExit((exit) => (Exit.isFailure(exit) ? this.closeEffect : Effect.void)),
+    );
+  }
+
   run<A, E>(
     effect: Effect.Effect<A, E, Scope.Scope>,
     signal?: AbortSignal,
   ): Promise<A> {
     return run(this.runEffect(effect), signal);
+  }
+
+  acquire<A, E>(
+    effect: Effect.Effect<A, E, Scope.Scope>,
+    signal?: AbortSignal,
+  ): Promise<A> {
+    return run(this.acquireEffect(effect), signal);
   }
 
   fork<A, E>(effect: Effect.Effect<A, E, Scope.Scope>): Fiber.Fiber<A, E> {

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { attempt, Lifetime, run } from "@ai/core/effect/effect";
-import { Effect, Exit } from "effect";
+import { Effect } from "effect";
 import * as v from "valibot";
 import type {
   CoordinationOpen,
@@ -150,59 +150,59 @@ export class Gateway {
       });
     };
     const lifetime = new Lifetime("sequential");
-    return yield* Effect.gen(function* () {
-      const helper = yield* Effect.interruptible(
-        connectHelperEffect(`jobs-${randomUUID()}`, transport, {
-          onNotification(method, params) {
-            if (method !== JOB_COMPLETION_METHOD) return;
-            const message = parseJobWireMessage(
-              v.parse(notificationSchema, params).notification,
-            );
-            if (!("event" in message))
-              throw new Error("Invalid job completion notification");
-            deliver(message);
-          },
-          onClose() {
-            transportClosed = true;
-            if (gateway) {
-              const unexpected = !gateway.#closed;
-              gateway.#closed = true;
-              gateway.#presence.stopHeartbeat();
-              const closed = gateway;
-              closed.#closing ??= closed.#lifetime.close();
-              void closed.#closing.catch((error) => closed.#presence.failure(error));
-              if (unexpected && gateway.#presence.registered)
-                gateway.#presence.failure(
-                  new Error(
-                    "Helper connection closed; coordination presence is unavailable",
-                  ),
-                );
-            }
-            onClose(gateway);
-          },
-        }),
-      );
-      const { env, scriptRunner } = yield* gatewayEnvironmentEffect(helper, connection);
-      if (transportClosed)
-        return yield* Effect.fail(new Error("Job gateway closed during negotiation"));
-      gateway = new Gateway(
-        helper,
-        connection.backend,
-        scopeId,
-        owner,
-        env,
-        scriptRunner,
-        lifetime,
-      );
-      gateway.#onRegistered = () => {
-        for (const notification of queued.splice(0)) deliver(notification);
-      };
-      return gateway;
-    }).pipe(
-      (effect) => lifetime.runEffect(effect),
-      Effect.onExit((exit) =>
-        Exit.isFailure(exit) ? lifetime.closeEffect : Effect.void,
-      ),
+    return yield* lifetime.acquireEffect(
+      Effect.gen(function* () {
+        const helper = yield* Effect.interruptible(
+          connectHelperEffect(`jobs-${randomUUID()}`, transport, {
+            onNotification(method, params) {
+              if (method !== JOB_COMPLETION_METHOD) return;
+              const message = parseJobWireMessage(
+                v.parse(notificationSchema, params).notification,
+              );
+              if (!("event" in message))
+                throw new Error("Invalid job completion notification");
+              deliver(message);
+            },
+            onClose() {
+              transportClosed = true;
+              if (gateway) {
+                const unexpected = !gateway.#closed;
+                gateway.#closed = true;
+                gateway.#presence.stopHeartbeat();
+                const closed = gateway;
+                closed.#closing ??= closed.#lifetime.close();
+                void closed.#closing.catch((error) => closed.#presence.failure(error));
+                if (unexpected && gateway.#presence.registered)
+                  gateway.#presence.failure(
+                    new Error(
+                      "Helper connection closed; coordination presence is unavailable",
+                    ),
+                  );
+              }
+              onClose(gateway);
+            },
+          }),
+        );
+        const { env, scriptRunner } = yield* gatewayEnvironmentEffect(
+          helper,
+          connection,
+        );
+        if (transportClosed)
+          return yield* Effect.fail(new Error("Job gateway closed during negotiation"));
+        gateway = new Gateway(
+          helper,
+          connection.backend,
+          scopeId,
+          owner,
+          env,
+          scriptRunner,
+          lifetime,
+        );
+        gateway.#onRegistered = () => {
+          for (const notification of queued.splice(0)) deliver(notification);
+        };
+        return gateway;
+      }),
     );
   });
 
