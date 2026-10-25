@@ -5,7 +5,6 @@ export interface NativePlatform {
   javaHome: string;
   python: string;
   executableSuffix: string;
-  extractZip(archive: string, destination: string): Promise<void>;
 }
 
 export async function command(

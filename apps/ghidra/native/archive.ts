@@ -1,17 +1,8 @@
 import { createHash } from "node:crypto";
-import {
-  mkdir,
-  mkdtempDisposable,
-  readdir,
-  readFile,
-  rename,
-  rm,
-  writeFile,
-} from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { readFile, rm, writeFile } from "node:fs/promises";
+import { basename, join } from "node:path";
 import { run } from "@ai/core/effect/effect";
 import { downloadFile } from "@ai/core/effect/http/http";
-import { platform } from "./common.ts";
 
 type Artifact = { url: string; sha256?: string };
 
@@ -41,22 +32,6 @@ export async function download(
     signal,
   );
   return target;
-}
-
-export async function extract(archive: string, destination: string, stripRoot = true) {
-  await mkdir(destination, { recursive: true });
-  await using staging = await mkdtempDisposable(
-    join(dirname(destination), ".extract-"),
-  );
-  if (archive.endsWith(".zip")) await platform().extractZip(archive, staging.path);
-  else await new Bun.Archive(await Bun.file(archive).bytes()).extract(staging.path);
-  const entries = await readdir(staging.path, { withFileTypes: true });
-  const first = entries[0];
-  if (stripRoot && (entries.length !== 1 || !first?.isDirectory()))
-    throw new Error(`Expected one archive root: ${archive}`);
-  const directory = stripRoot && first ? join(staging.path, first.name) : staging.path;
-  for (const name of await readdir(directory))
-    await rename(join(directory, name), join(destination, name));
 }
 
 export async function replaceFile(path: string, before: string, after: string) {

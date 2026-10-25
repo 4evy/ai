@@ -226,6 +226,13 @@ for fallback to an older cached runtime. See
 [patch maintenance](../tools/scripts/omp/patches/patches.ts) and
 [runtime launch](../tools/scripts/omp/runtime/launch.ts).
 
+Use the shared
+[`extractArchive`](../tools/scripts/archive/archive.ts) for maintenance and
+Ghidra payloads. It stages extraction before validating the single-root layout
+and moving children into the destination. Pass `false` only for flat payloads.
+ZIP extraction uses the installed archive library. Tar extraction stays native
+because the library materializes file symlinks instead of preserving them.
+
 Build Farstep on its target platform. On Unix, build `.#farstep` with Nix and
 run the output's `bin/farstep install --package-path /nix/store/...`. Remote
 installs require a trusted store output on the target. Windows packaging

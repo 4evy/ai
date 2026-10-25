@@ -61,7 +61,8 @@
     "effect": "4.0.6",
     "@ai/core": "workspace:*",
     "diff": "9.0.0",
-    "atomically": "2.1.1"
+    "atomically": "2.1.1",
+    "@oh-my-pi/pi-utils": "18.12.6"
   },
   "type": "module"
 }

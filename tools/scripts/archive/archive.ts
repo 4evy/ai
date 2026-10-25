@@ -3,27 +3,41 @@ import { dirname, join } from "node:path";
 import { attempt, run } from "@ai/core/effect/effect";
 import { temporaryDirectory } from "@ai/core/effect/fs/fs";
 import { downloadFile } from "@ai/core/effect/http/http";
+import { extractArchive as unpack } from "@oh-my-pi/pi-utils/ar";
 import { Effect } from "effect";
 
 export const extractArchiveEffect = Effect.fnUntraced(function* (
   archive: string,
   destination: string,
+  stripRoot = true,
 ) {
   yield* attempt(() => mkdir(destination, { recursive: true }), {
     awaitOnInterrupt: true,
   });
   const staging = yield* temporaryDirectory(join(dirname(destination), ".archive-"));
-  const contents = yield* attempt(() => Bun.file(archive).bytes());
-  yield* attempt(() => new Bun.Archive(contents).extract(staging.path), {
-    awaitOnInterrupt: true,
-  });
+  if (archive.endsWith(".zip")) {
+    yield* attempt(
+      () =>
+        unpack(archive, staging.path, {
+          // Match the existing Sky runtime policy for large SDK and JDK payloads
+          limits: { maxInMemorySize: 4 * 1024 ** 3, maxMemberSize: 1024 ** 3 },
+        }),
+      { awaitOnInterrupt: true },
+    );
+  } else {
+    // The archive library materializes tar symlinks as files; retain native links
+    const contents = yield* attempt(() => Bun.file(archive).bytes());
+    yield* attempt(() => new Bun.Archive(contents).extract(staging.path), {
+      awaitOnInterrupt: true,
+    });
+  }
   const roots = yield* attempt(() => readdir(staging.path, { withFileTypes: true }));
   const root = roots[0];
-  if (roots.length !== 1 || !root?.isDirectory())
+  if (stripRoot && (roots.length !== 1 || !root?.isDirectory()))
     return yield* Effect.fail(
       new Error("Expected an archive with one top-level directory"),
     );
-  const source = join(staging.path, root.name);
+  const source = stripRoot && root ? join(staging.path, root.name) : staging.path;
   const names = yield* attempt(() => readdir(source));
   yield* Effect.forEach(
     names,
@@ -35,8 +49,12 @@ export const extractArchiveEffect = Effect.fnUntraced(function* (
   );
 }, Effect.scoped);
 
-export function extractArchive(archive: string, destination: string): Promise<void> {
-  return run(extractArchiveEffect(archive, destination));
+export function extractArchive(
+  archive: string,
+  destination: string,
+  stripRoot = true,
+): Promise<void> {
+  return run(extractArchiveEffect(archive, destination, stripRoot));
 }
 
 export function downloadArchiveEffect(url: string, destination: string) {

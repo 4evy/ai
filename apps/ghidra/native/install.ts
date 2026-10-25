@@ -6,12 +6,13 @@ import { parseArgs } from "node:util";
 import { writeFile as atomicWrite } from "atomically";
 import { Struct } from "effect";
 import * as v from "valibot";
+import { extractArchive } from "../../../tools/scripts/archive/archive";
 import { installNixPackage } from "../../../tools/scripts/setup/nix/nix";
 import applePin from "../extensions/apple-api-types/source.json";
 import profiles from "../extensions/profiles.json";
 import windowsPin from "../extensions/windows-api-types/source.json";
 import mcpPin from "../mcp/source.json";
-import { download, extract, replaceFile } from "./archive";
+import { download, replaceFile } from "./archive";
 import { applyBridgePatches, readBridgeInputs } from "./bridge";
 import { installationHome, installed, platform } from "./common.ts";
 import { headers } from "./headers";
@@ -117,7 +118,7 @@ export async function install(args: string[]): Promise<void> {
       ["uv", binaries.uv],
       ["gradle", source.gradle],
     ] as const)
-      await extract(
+      await extractArchive(
         await download(artifact, cache, controller.signal),
         join(staging, directory),
         directory !== "uv",
@@ -143,7 +144,7 @@ export async function install(args: string[]): Promise<void> {
     ];
     const ghidra = join(staging, "ghidra");
     const mcp = join(staging, "mcp");
-    await extract(
+    await extractArchive(
       await download(
         {
           url: `https://codeload.github.com/bethington/ghidra-mcp/tar.gz/${mcpPin.rev}`,
@@ -160,7 +161,7 @@ export async function install(args: string[]): Promise<void> {
       [...gradle, "--no-daemon", "buildExtension", `-PGHIDRA_INSTALL_DIR=${ghidra}`],
       { cwd: mcp, env },
     );
-    await extract(
+    await extractArchive(
       join(mcp, `build/distributions/GhidraMCP-${mcpPin.upstreamVersion}.zip`),
       join(ghidra, "Ghidra/Extensions/GhidraMCP"),
     );
@@ -185,7 +186,7 @@ export async function install(args: string[]): Promise<void> {
       ["windows", "winsiderss", "systeminformer", windowsPin, profiles.windows],
     ] as const) {
       const headerSource = join(staging, `${name}-source`);
-      await extract(
+      await extractArchive(
         await download(
           { url: `https://codeload.github.com/${owner}/${repo}/tar.gz/${pin.rev}` },
           cache,
