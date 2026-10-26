@@ -56,8 +56,8 @@ export async function deliverCompletion(
     {
       customType: COMPLETION_TYPE,
       content: result.content,
-      // Keep completion output in model context, not the conversation UI
-      display: false,
+      // The custom renderer separates completion status from retained output
+      display: true,
       details: { ...result.details, completionId: notification.completionId },
     },
     // Aside reaches the next step boundary without interrupting an in-flight tool

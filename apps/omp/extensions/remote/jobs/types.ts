@@ -22,6 +22,7 @@ export type JobInput = v.InferOutput<typeof remoteDefinitions.job.parameters>;
 
 export interface RemoteJobDetails extends BashToolDetails {
   workflow?: WorkflowResult | undefined;
+  notices?: string[] | undefined;
   job?: string | undefined;
   connectionId?: string | undefined;
   cwd?: string | undefined;

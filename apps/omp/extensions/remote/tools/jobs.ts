@@ -1,5 +1,4 @@
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-import { createShellRenderer } from "@oh-my-pi/pi-tui/tools/bash";
 import { isRecord } from "@oh-my-pi/pi-utils/type-guards";
 import { remoteDefinitions } from "farstep/remote/remote";
 import { scriptArguments } from "farstep/remote/tools/shell";
@@ -63,7 +62,7 @@ export function registerJobTools(
         return jobs.run(target, args, ctx, signal, onUpdate);
       },
     }),
-    createShellRenderer<unknown>({
+    jobPresentation({
       ...scriptArguments,
       resolveTitle: (args) => operationTitle(args, "Run"),
     }),
@@ -77,7 +76,7 @@ export function registerJobTools(
         return jobs.batch(target, args, ctx, signal, onUpdate);
       },
     }),
-    createShellRenderer<unknown>({
+    jobPresentation({
       ...scriptArguments,
       resolveCommand: batchPreview,
       resolveTitle: (args) => operationTitle(args, "Batch plan"),

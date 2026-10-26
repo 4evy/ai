@@ -1,6 +1,7 @@
-import type { ExtensionAPI, ToolDefinition } from "@oh-my-pi/pi-coding-agent";
+import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { plainToolCard } from "@oh-my-pi/pi-tui/render";
-import { createShellRenderer } from "@oh-my-pi/pi-tui/tools/bash";
+import type { ShellRendererConfig } from "@oh-my-pi/pi-tui/tools/bash";
+import type { ToolRenderer } from "@oh-my-pi/pi-tui/tools/renderer";
 import { isRecord } from "@oh-my-pi/pi-utils";
 import type {
   JobReceipt,
@@ -10,16 +11,17 @@ import type {
 import type { JobTerminalSize } from "farstep/protocol/jobs/protocol";
 import type { JobResultOptions } from "./output";
 import { COMPLETION_TYPE } from "./records";
+import { createJobRenderer } from "./render";
 import type { RemoteJobDetails } from "./types";
 
-export function jobPresentation(): Pick<
-  ToolDefinition<Record<string, unknown>, RemoteJobDetails>,
-  "renderCall" | "renderResult" | "describeCall" | "describeResult"
-> {
-  const renderer = createShellRenderer<unknown>({
-    resolveTitle: () => "Job",
-    resolveCommand: () => undefined,
-  });
+export function jobPresentation(config?: ShellRendererConfig<unknown>) {
+  const renderer = createJobRenderer(
+    config ?? {
+      resolveTitle: () => "Job",
+      resolveCommand: () => undefined,
+    },
+  );
+  if (config) return renderer;
   const target = (args: unknown) =>
     isRecord(args)
       ? [args.action, args.job, args.step]
@@ -39,11 +41,11 @@ export function jobPresentation(): Pick<
     describeCall: (args: unknown) => ({
       tool: { title: "Job", target: target(args) },
     }),
-  };
+  } satisfies ToolRenderer<unknown, RemoteJobDetails>;
 }
 
 export function registerJobPresentation(api: ExtensionAPI): void {
-  const renderer = createShellRenderer<Record<string, unknown>>({
+  const renderer = createJobRenderer({
     resolveTitle: () => "Job completed",
     resolveCommand: () => undefined,
   });
@@ -63,6 +65,7 @@ export function registerJobPresentation(api: ExtensionAPI): void {
         },
         { ...options, isPartial: false },
         theme,
+        undefined,
       ),
   );
 }

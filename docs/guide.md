@@ -78,6 +78,19 @@ For execution changes, preserve these ownership and recovery rules:
   operations. Update both Rust and TypeScript wire contracts when changing
   shared fields.
 
+## Read Farstep job cards in OMP
+
+Farstep job cards show lifecycle status, exit code, duration, and batch step
+results separately from command output. Foreground observation refreshes the
+card without consuming the final output. Background completion appears as a
+separate card when the job finishes.
+
+Use **Ctrl+O** to expand output and inspect retained-file paths and job
+metadata. Parse errors, truncated capture, readiness failures, and uncertain
+process state stay visible without expansion. The
+[renderers](../apps/omp/extensions/remote/jobs/render.ts) support both ordinary
+and native terminals while preserving the full model-facing output.
+
 ## Compose Effect at runtime boundaries
 
 Use the installed Effect version's source and examples under

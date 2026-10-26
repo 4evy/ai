@@ -29,33 +29,40 @@ export async function observeLaunch(
       job,
       snapshot,
       waitMs,
+      input,
+      onUpdate,
       signal,
     );
   }
   if (!input.ready && !terminal(snapshot) && waitMs > 0) {
-    if (onUpdate) {
-      snapshot = await initialUpdate(
-        session,
-        scope,
-        client,
-        job,
-        snapshot,
-        input,
-        onUpdate,
+    const deadline = performance.now() + waitMs;
+    do {
+      if (onUpdate) {
+        snapshot = await progressUpdate(
+          session,
+          scope,
+          client,
+          job,
+          snapshot,
+          input,
+          onUpdate,
+          signal,
+        );
+      }
+      const remaining = Math.ceil(deadline - performance.now());
+      if (terminal(snapshot) || remaining <= 0) break;
+      const waited = await client.request(
+        {
+          op: "wait",
+          name: job.name,
+          for: "exit",
+          timeoutMs: onUpdate ? Math.min(1000, remaining) : remaining,
+        },
         signal,
       );
-    }
-    const waited = await client.request(
-      {
-        op: "wait",
-        name: job.name,
-        for: "exit",
-        timeoutMs: waitMs,
-      },
-      signal,
-    );
-    assertIdentity(job, waited.snapshot);
-    snapshot = waited.snapshot;
+      assertIdentity(job, waited.snapshot);
+      snapshot = waited.snapshot;
+    } while (onUpdate && !terminal(snapshot));
   }
   const screen = job.pty && !input.raw && !terminal(snapshot);
   const view = screen
@@ -71,15 +78,31 @@ async function waitReadiness(
   job: JobRecord,
   snapshot: JobSnapshot,
   waitMs: number,
+  input: Pick<RunInput, "ready" | "raw" | "compact">,
+  onUpdate: AgentToolUpdateCallback<RemoteJobDetails> | undefined,
   signal?: AbortSignal,
 ): Promise<JobSnapshot> {
   let first = true;
+  let nextUpdate = 0;
   await run(
     attempt(
       async (signal) => {
         if (terminal(snapshot)) return true;
         if (!first) ({ snapshot } = await session.inspect(scope, client, job, signal));
         first = false;
+        if (onUpdate && performance.now() >= nextUpdate) {
+          snapshot = await progressUpdate(
+            session,
+            scope,
+            client,
+            job,
+            snapshot,
+            input,
+            onUpdate,
+            signal,
+          );
+          nextUpdate = performance.now() + 1000;
+        }
         if (terminal(snapshot)) return true;
         const workflow = await client.workflow(job.name, signal);
         const readiness = workflow.steps[0]?.readiness;
@@ -97,7 +120,7 @@ async function waitReadiness(
   );
   return snapshot;
 }
-async function initialUpdate(
+async function progressUpdate(
   session: JobSession,
   scope: Scope,
   client: Gateway,
@@ -114,6 +137,8 @@ async function initialUpdate(
   snapshot = initial.snapshot;
   onUpdate(
     session.result(scope, job, snapshot, initial.logs, {
+      // Progress replaces the visible snapshot without consuming model output
+      consume: false,
       screen: initialScreen,
       ...("screenVersion" in initial
         ? { screenVersion: initial.screenVersion, settled: initial.settled }
