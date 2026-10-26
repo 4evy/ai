@@ -1,5 +1,4 @@
 import { updateSkylight } from "./checksums";
-import { updateFlake } from "./flake";
 import { updateNativeGhidra } from "./native";
 import { run, syncNixDependencies } from "./process";
 import { updateSources } from "./sources";
@@ -9,7 +8,6 @@ const changed = new Set(
 );
 
 if (!Bun.argv.includes("--toolchain-refreshed")) {
-  if (changed.has("flake.lock")) await updateFlake();
   for (const [path, name] of [
     ["tools/nix/javascript/runtime/runtime.nix", "bun"],
     ["tools/nix/fmt/analyzer.nix", "powershell-analyzer"],

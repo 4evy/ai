@@ -215,7 +215,7 @@ Activation preserves undeclared writable settings. `just config generate` and
 | Update API headers                          | `just nix update ghidra-apple-api-types` or `ghidra-windows-api-types` |
 | Refresh Bun hashes or PowerShell analyzer   | `just nix update bun` or `powershell-analyzer`                         |
 | Regenerate Bun-to-Nix dependencies          | `just nix deps`                                                        |
-| Refresh flake inputs                        | `just nix inputs`                                                      |
+| Refresh flake inputs                        | `nix flake update`                                                     |
 
 Keep OMP patches small, independently applicable, and zero-fuzz. Prefer
 extensions for tools and presentation. Leave upstream branches intact when a
@@ -261,10 +261,6 @@ Review pin, hash, lockfile, and generated-file changes together. Renovate's
 [artifact workflow](../tools/scripts/renovate/artifacts.ts) synchronizes derived
 inputs. Read the [runner](../.github/scripts/renovate/renovate.ts) before
 changing automation.
-
-Use `just nix inputs [INPUT...]` rather than bare `nix flake update`. It runs
-the shared [pinning helper](../tools/scripts/renovate/flake.ts) afterward so
-`flake.lock` records an immutable Hydra build URL instead of `latest`.
 
 The scheduled Renovate workflow requires the repository Actions secret
 `RENOVATE_TOKEN`, containing a separate token with contents, pull requests,

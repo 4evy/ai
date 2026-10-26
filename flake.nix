@@ -2,9 +2,7 @@
   description = "AI settings, launchers, and desktop helpers for upstream CLIs";
 
   inputs = {
-    # Hydra's unstable jobset builds the master branch
-    # Use just nix inputs to lock the resolved immutable build URL
-    nixpkgs.url = "https://hydra.nixos.org/job/nixpkgs/unstable/tarball/latest/download/3/nixexprs.tar.zst";
+    nixpkgs.url = "https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.zst";
     bun2nix = {
       url = "github:nix-community/bun2nix";
       inputs = {
