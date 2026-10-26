@@ -4,6 +4,7 @@ import { manageScratch } from "farstep/remote/scratch/scratch";
 import { compileTool, registerCompiledTool } from "#apps/omp/lib/schema/tool";
 import { scriptTransport } from "../connections/execution";
 import type { Connections } from "../connections/state";
+import { farstepPresentation } from "./presentation";
 
 export function registerScratchTool(api: ExtensionAPI, { execution }: Connections) {
   registerCompiledTool(
@@ -24,5 +25,6 @@ export function registerScratchTool(api: ExtensionAPI, { execution }: Connection
         };
       },
     }),
+    farstepPresentation("Scratch"),
   );
 }

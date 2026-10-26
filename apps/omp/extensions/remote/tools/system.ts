@@ -15,6 +15,7 @@ import { compileTool, registerCompiledTool } from "#apps/omp/lib/schema/tool";
 import { helperCommand, remoteArgv } from "../connections/command";
 import type { Connections } from "../connections/state";
 import type { ExecutionTarget } from "../connections/types";
+import { farstepPresentation } from "./presentation";
 
 const SYSTEM_EXEC_GRACE_SECONDS = 15;
 const SYSTEM_PLATFORMS = {
@@ -87,5 +88,6 @@ export function registerSystemTool(api: ExtensionAPI, { execution }: Connections
         };
       },
     }),
+    farstepPresentation("System"),
   );
 }

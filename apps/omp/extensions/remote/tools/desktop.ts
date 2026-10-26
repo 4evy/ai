@@ -4,6 +4,7 @@ import { remoteDefinitions } from "farstep/remote/remote";
 import { compileTool, registerCompiledTool } from "#apps/omp/lib/schema/tool";
 import type { Connections } from "../connections/state";
 import type { DesktopOperations } from "../desktop";
+import { farstepPresentation } from "./presentation";
 
 export function registerDesktopTools(
   api: ExtensionAPI,
@@ -18,6 +19,7 @@ export function registerDesktopTools(
         return desktop(selected(args.connection), args, ctx, signal);
       },
     }),
+    farstepPresentation("Desktop"),
   );
   registerCompiledTool(
     api,
@@ -27,6 +29,7 @@ export function registerDesktopTools(
         return screenshot(selected(args.connection), args, ctx, signal);
       },
     }),
+    farstepPresentation("Screenshot"),
   );
   registerCompiledTool(
     api,
@@ -37,5 +40,6 @@ export function registerDesktopTools(
         return submitInput(selected(connection), args, ctx, signal);
       },
     }),
+    farstepPresentation("Desktop input"),
   );
 }

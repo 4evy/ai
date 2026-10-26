@@ -5,6 +5,7 @@ import { compileTool, registerCompiledTool } from "#apps/omp/lib/schema/tool";
 import type { Connections } from "../connections/state";
 import { manageHelper } from "../helper/manage";
 import type { RemoteJobs } from "../jobs/jobs";
+import { farstepPresentation } from "./presentation";
 import { touchCoordination } from "./registration/registration";
 
 export function registerHelperTool(
@@ -28,5 +29,6 @@ export function registerHelperTool(
         return result;
       },
     }),
+    farstepPresentation("Helper"),
   );
 }

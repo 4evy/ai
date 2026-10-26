@@ -5,6 +5,7 @@ import { connect } from "../connections/connections";
 import type { Connections } from "../connections/state";
 import { connectionState } from "../connections/state";
 import type { RemoteJobs } from "../jobs/jobs";
+import { farstepPresentation } from "./presentation";
 import { touchCoordination } from "./registration/registration";
 
 export function registerConnectionTool(
@@ -42,5 +43,6 @@ export function registerConnectionTool(
         };
       },
     }),
+    farstepPresentation("SSH connection"),
   );
 }

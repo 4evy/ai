@@ -3,6 +3,7 @@ import { remoteDefinitions } from "farstep/remote/remote";
 import { compileTool, registerCompiledTool } from "#apps/omp/lib/schema/tool";
 import type { Connections } from "../connections/state";
 import type { RemoteJobs } from "../jobs/jobs";
+import { farstepPresentation } from "./presentation";
 
 export function registerCoordinationTool(
   api: ExtensionAPI,
@@ -25,5 +26,6 @@ export function registerCoordinationTool(
         };
       },
     }),
+    farstepPresentation("Coordination"),
   );
 }
