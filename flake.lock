@@ -90,9 +90,9 @@
     "nixpkgs": {
       "locked": {
         "lastModified": 315532800,
-        "narHash": "sha256-QyOxfnNHHii5JPNvqW38IwOlnyQIUsOCIJT36BXqrzw=",
+        "narHash": "sha256-OHJUSm5215tjaOYOBeZMFmU7bA2bldOMIR+4gevfc0U=",
         "type": "tarball",
-        "url": "https://hydra.nixos.org/job/nixpkgs/unstable/tarball/latest/download/3/nixexprs.tar.zst"
+        "url": "https://hydra.nixos.org/build/350803656/download/3/nixexprs.tar.zst"
       },
       "original": {
         "type": "tarball",

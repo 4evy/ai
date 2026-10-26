@@ -2,6 +2,11 @@ import '../just.just'
 set working-directory := '../../..'
 set default-list
 
+# Refresh flake inputs and pin Hydra's mutable URL to an immutable build
+inputs *inputs:
+    nix flake update "$@"
+    bun --eval 'import { updateFlake } from "./tools/scripts/renovate/flake.ts"; await updateFlake();'
+
 # Evaluate the flake for all supported systems without building
 eval:
     nix flake check --all-systems --no-build

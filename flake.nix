@@ -3,7 +3,7 @@
 
   inputs = {
     # Hydra's unstable jobset builds the master branch
-    # Pin flake.lock to the resolved build URL after updating this input
+    # Use just nix inputs to lock the resolved immutable build URL
     nixpkgs.url = "https://hydra.nixos.org/job/nixpkgs/unstable/tarball/latest/download/3/nixexprs.tar.zst";
     bun2nix = {
       url = "github:nix-community/bun2nix";
