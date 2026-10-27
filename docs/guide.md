@@ -64,6 +64,12 @@ across workspaces, and relative imports or workspace aliases within them. Check
 Register new subprocess entry points in
 [vite.config.ts](../farstep/vite.config.ts).
 
+Keep workflow scheduling and child lifetimes in the
+[`worker`](../farstep/runtime/jobs/workflow/worker.ts). The
+[`ledger`](../farstep/runtime/jobs/workflow/ledger.ts) owns execution claiming,
+serialized journal writes, recovery and result finalization. Import record types
+and storage operations from their owning modules, not the workflow service.
+
 For execution changes, preserve these ownership and recovery rules:
 
 - The job broker owns processes and output. Gateways connect clients to it.

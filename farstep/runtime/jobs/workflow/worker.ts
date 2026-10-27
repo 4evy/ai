@@ -1,52 +1,17 @@
 import { dirname, join } from "node:path";
-import {
-  attempt,
-  Lifetime,
-  operation,
-  operationEffect,
-  run,
-} from "@ai/core/effect/effect";
+import { attempt, Lifetime, operation, run } from "@ai/core/effect/effect";
 import { postmortem } from "@oh-my-pi/pi-utils";
 import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
-import {
-  Deferred,
-  Effect,
-  Fiber,
-  FiberMap,
-  FiberSet,
-  Schedule,
-  Scope,
-  Semaphore,
-} from "effect";
+import { Deferred, Effect, Fiber, FiberMap, FiberSet, Schedule, Scope } from "effect";
 import * as v from "valibot";
-import {
-  type WorkflowResult,
-  type WorkflowStepResult,
-  workflowResultSchema,
-} from "#farstep/protocol/workflow/workflow";
-import { exists, privateDirectory, privateRead } from "../../state";
+import type { WorkflowStepResult } from "#farstep/protocol/workflow/workflow";
+import { privateDirectory, privateRead } from "../../state";
 import type { RunningChild, StopKind } from "./child";
+import { WorkflowLedger } from "./ledger";
+import { readWorkflowManifest } from "./manifest";
+import { type WorkflowManifest, workflowCancellationSchema } from "./records";
 import { STEP_POLICY } from "./states";
 import { type StepContext, type WorkflowState, WorkflowStep } from "./step";
-import { writeWorkflowRecord } from "./storage";
-import {
-  immutableWorkflowWrite,
-  initialWorkflowResult,
-  markWorkflowUnknown,
-  readWorkflowManifest,
-  type WorkflowJournal,
-  type WorkflowManifest,
-  withWorkflowLock,
-  workflowCancellationSchema,
-  workflowJournalSchema,
-} from "./workflow";
-
-const WORKFLOW_EXIT_CODES: Readonly<Partial<Record<WorkflowResult["state"], number>>> =
-  {
-    succeeded: 0,
-    skipped: 0,
-    cancelled: 130,
-  };
 
 class WorkflowWorker implements StepContext {
   readonly state: WorkflowState = {
@@ -61,13 +26,8 @@ class WorkflowWorker implements StepContext {
   readonly cancelledSteps = new Set<string>();
   private readonly stopping: FiberSet.FiberSet<void, unknown>;
   private readonly completed = Deferred.makeUnsafe<void>();
-  private readonly writes = Semaphore.makeUnsafe(1);
   private rootTimer: Fiber.Fiber<void> | undefined;
-  private journal: WorkflowJournal | undefined;
-  private journalPath: string | undefined;
-  manifest!: WorkflowManifest;
-  private ledger!: WorkflowJournal;
-  private steps = new Map<string, WorkflowStepResult>();
+  private ledger: WorkflowLedger | undefined;
   readonly directory: string;
   readonly artifacts: string;
 
@@ -84,6 +44,15 @@ class WorkflowWorker implements StepContext {
     );
     this.directory = dirname(record);
     this.artifacts = join(this.directory, "artifacts");
+  }
+
+  private get activeLedger(): WorkflowLedger {
+    if (!this.ledger) throw new Error("Workflow execution has not been claimed");
+    return this.ledger;
+  }
+
+  get manifest(): WorkflowManifest {
+    return this.activeLedger.manifest;
   }
 
   requestStop(kind: StopKind, reason: string, cancelRoot = kind === "cancelled"): void {
@@ -114,32 +83,12 @@ class WorkflowWorker implements StepContext {
         { concurrency: "unbounded", discard: true },
       ),
     );
-    if (this.journal && this.journalPath) {
-      markWorkflowUnknown(
-        this.journal,
-        "Workflow controller failed without a durable step completion",
-      );
-      try {
-        await writeWorkflowRecord(this.journalPath, this.journal);
-      } catch {
-        /* Inspection reconciles an interrupted ledger as unknown */
-      }
-    }
+    await this.ledger?.recover();
   }
 
   async save(): Promise<void> {
     try {
-      await run(
-        operationEffect(
-          "workflow.persist",
-          { component: "workflow", phase: this.ledger.phase },
-          this.writes.withPermits(1)(
-            attempt(() =>
-              writeWorkflowRecord(join(this.directory, "journal.json"), this.ledger),
-            ),
-          ),
-        ),
-      );
+      await this.activeLedger.save();
     } catch (error) {
       this.state.persistenceFailed = true;
       this.requestStop(
@@ -177,57 +126,31 @@ class WorkflowWorker implements StepContext {
       this.requestStop("cancelled", this.state.rootReason, false);
   }
 
-  private completedState(): WorkflowJournal["result"]["state"] {
-    if (this.state.cancelled) return "cancelled";
-    if (
-      this.timedOut ||
-      this.ledger.result.steps.some((step) => step.state === "failed")
-    )
-      return "failed";
-    if (this.ledger.result.steps.some((step) => step.state === "cancelled"))
-      return "cancelled";
-    if (this.ledger.result.steps.some((step) => step.state === "blocked"))
-      return "failed";
-    return this.ledger.result.steps.every((step) => step.state === "skipped")
-      ? "skipped"
-      : "succeeded";
-  }
-
-  private completeLedger(): void {
-    this.ledger.result.finishedAt = Date.now();
-    if (
-      this.state.persistenceFailed ||
-      this.ledger.result.steps.some((step) => step.state === "unknown")
-    ) {
-      this.ledger.phase = "unknown";
-      this.ledger.result.state = "unknown";
-    } else {
-      this.ledger.phase = "complete";
-      this.ledger.result.state = this.completedState();
-    }
-  }
-
   private async finishWorkflow(): Promise<void> {
-    v.parse(workflowResultSchema, this.ledger.result);
+    const ledger = this.activeLedger;
+    const exitCode = ledger.complete({
+      cancelled: this.state.cancelled,
+      timedOut: this.timedOut,
+      persistenceFailed: this.state.persistenceFailed,
+    });
     await this.save();
     await run(
       Effect.logInfo("Workflow finished").pipe(
         Effect.annotateLogs({
           component: "workflow",
-          state: this.ledger.result.state,
-          phase: this.ledger.phase,
+          state: ledger.journal.result.state,
+          phase: ledger.journal.phase,
           elapsedMs: Math.round(performance.now() - this.workflowStarted),
         }),
       ),
     );
-    process.exitCode =
-      WORKFLOW_EXIT_CODES[this.ledger.result.state] ?? (this.timedOut ? 124 : 1);
+    process.exitCode = exitCode;
   }
 
   private async blockQueuedSteps(): Promise<void> {
     let changed = false;
     for (const task of this.manifest.input.tasks) {
-      const step = this.steps.get(task.id);
+      const step = this.activeLedger.steps.get(task.id);
       if (step?.state !== "queued" || FiberMap.hasUnsafe(this.pending, task.id))
         continue;
       if (this.state.cancelled || this.cancelledSteps.has(task.id)) {
@@ -238,7 +161,7 @@ class WorkflowWorker implements StepContext {
         step.reason = this.state.rootReason;
       } else if (
         task.dependsOn.some((id) => {
-          const dependency = this.steps.get(id);
+          const dependency = this.activeLedger.steps.get(id);
           return (
             dependency &&
             STEP_POLICY[dependency.state].terminal &&
@@ -263,12 +186,12 @@ class WorkflowWorker implements StepContext {
         this.state.frozen
       )
         break;
-      const step = this.steps.get(task.id);
+      const step = this.activeLedger.steps.get(task.id);
       if (
         step?.state !== "queued" ||
         FiberMap.hasUnsafe(this.pending, task.id) ||
         !task.dependsOn.every((id) => {
-          const dependency = this.steps.get(id);
+          const dependency = this.activeLedger.steps.get(id);
           return dependency && STEP_POLICY[dependency.state].satisfiesDependency;
         })
       )
@@ -297,7 +220,9 @@ class WorkflowWorker implements StepContext {
         return (
           this.state.persistenceFailed ||
           (Effect.runSync(FiberMap.size(this.pending)) === 0 &&
-            this.ledger.result.steps.every((step) => STEP_POLICY[step.state].terminal))
+            this.activeLedger.journal.result.steps.every(
+              (step) => STEP_POLICY[step.state].terminal,
+            ))
         );
       }).pipe(
         Effect.repeat({
@@ -316,47 +241,10 @@ class WorkflowWorker implements StepContext {
     if (this.rootTimer) await run(Fiber.interrupt(this.rootTimer));
   }
 
-  private async claim(): Promise<WorkflowJournal> {
-    return withWorkflowLock(this.directory, "mutation", async () => {
-      if (await exists(join(this.directory, "execution.json")))
-        throw new Error(
-          "Workflow execution was already attempted; no steps were replayed",
-        );
-      let previous: WorkflowJournal;
-      try {
-        previous = v.parse(
-          workflowJournalSchema,
-          JSON.parse(await privateRead(join(this.directory, "journal.json"))),
-        );
-      } catch (error) {
-        if (!isEnoent(error)) throw error;
-        previous = { phase: "prepared", result: initialWorkflowResult(this.manifest) };
-      }
-      if (
-        previous.phase !== "prepared" ||
-        previous.result.fingerprint !== this.manifest.prepared.fingerprint
-      )
-        throw new Error("Workflow ledger is not an unexecuted matching preparation");
-      await immutableWorkflowWrite(join(this.directory, "execution.json"), {
-        workerPid: process.pid,
-        startedAt: Date.now(),
-        fingerprint: this.manifest.prepared.fingerprint,
-      });
-      const claimed: WorkflowJournal = {
-        phase: "active",
-        workerPid: process.pid,
-        result: previous.result,
-      };
-      claimed.result.state = "running";
-      await writeWorkflowRecord(join(this.directory, "journal.json"), claimed);
-      return claimed;
-    });
-  }
-
-  private startDeadline(): void {
-    if (this.manifest.input.timeoutSeconds > 0) {
+  private startDeadline(timeoutSeconds: number): void {
+    if (timeoutSeconds > 0) {
       this.rootTimer = this.lifetime.fork(
-        Effect.sleep(this.manifest.input.timeoutSeconds * 1000).pipe(
+        Effect.sleep(timeoutSeconds * 1000).pipe(
           Effect.andThen(
             Effect.sync(() => {
               this.timedOut = true;
@@ -383,15 +271,11 @@ class WorkflowWorker implements StepContext {
       await run(Deferred.await(this.completed));
     });
     try {
-      this.manifest = await readWorkflowManifest(this.record);
-      this.startDeadline();
+      const manifest = await readWorkflowManifest(this.record);
+      this.startDeadline(manifest.input.timeoutSeconds);
       await privateDirectory(this.artifacts);
-      this.journalPath = join(this.directory, "journal.json");
-      this.ledger = await this.claim();
-      this.journal = this.ledger;
-      this.steps = new Map(this.ledger.result.steps.map((step) => [step.id, step]));
+      this.ledger = await WorkflowLedger.claim(this.directory, manifest);
       await this.drainWorkflow();
-      this.completeLedger();
       await this.finishWorkflow();
     } catch (error) {
       await this.recoverWorkflow();

@@ -17,7 +17,8 @@ import { brokerDirectory } from "../jobs";
 import { type RunningChild, WorkflowChild } from "./child";
 import { startCapture, type WorkflowCapture } from "./output";
 import { evaluateGuards, waitForReady } from "./policy";
-import { type WorkflowManifest, withWorkflowLock } from "./workflow";
+import type { WorkflowManifest } from "./records";
+import { withWorkflowLock } from "./storage";
 
 export interface WorkflowState {
   frozen: boolean;

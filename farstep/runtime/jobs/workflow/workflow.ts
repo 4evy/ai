@@ -28,20 +28,6 @@ import {
 } from "./records";
 import { withWorkflowLock, workflowDirectory, writeWorkflowRecord } from "./storage";
 
-export { readWorkflowManifest } from "./manifest";
-export {
-  initialWorkflowResult,
-  markWorkflowUnknown,
-  type WorkflowJournal,
-  type WorkflowManifest,
-  workflowCancellationSchema,
-  workflowJournalSchema,
-} from "./records";
-export {
-  immutableWorkflowWrite,
-  withWorkflowLock,
-} from "./storage";
-
 export class WorkflowService {
   private readonly preparation: WorkflowPreparation;
 
