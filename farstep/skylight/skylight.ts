@@ -37,7 +37,7 @@ export function createSkylight<C extends ToolContext = ToolContext>(
     parameters: guideParameters,
     label: "Skylight guide",
     description:
-      'Read Skylight setup and usage guidance without starting the runtime. Begin with "start"; load other topics as needed.',
+      'Read Skylight guidance. Begin with "start", then "browser" for browser selection and tabs. Static guides do not start or provision Sky. The "api" topic loads the selected target’s bundled reference.',
     loadMode: "essential",
     approval: "read",
     async execute(

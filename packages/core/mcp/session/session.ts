@@ -18,6 +18,7 @@ interface SessionOptions {
   awaitOnInterrupt?: boolean;
   timeoutMessage?: string;
   beforeCall?: (name: string, input: Record<string, unknown>) => void;
+  requestMeta?: () => Record<string, unknown>;
   operation?: { name: string; component: string };
 }
 
@@ -128,7 +129,11 @@ export class McpSession implements AsyncDisposable {
         },
         catch: (error) => error,
       });
-      const params = { name, arguments: input, _meta: traceCarrier() };
+      const params = {
+        name,
+        arguments: input,
+        _meta: { ...this.options.requestMeta?.(), ...traceCarrier() },
+      };
       const request = attempt(
         (signal) => {
           // Effect owns the deadline so SDK and Effect timers cannot

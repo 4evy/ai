@@ -6,6 +6,10 @@ With `XDG_SESSION_TYPE=x11`, or `DISPLAY` without a Wayland session, Skylight
 uses upstream Sky directly. A Wayland session uses Farstep's monitor bridge.
 Xwayland does not expose the full Wayland desktop.
 
+For browser work on this X11 backend, call {{guideTool}} with {{browserGuide}}
+instead of selecting the browser as a native app. Browser automation is
+unavailable on the Wayland monitor bridge.
+
 In {{skylightTool}}'s code parameter, begin a fresh runtime with inventory.
 cua is initialized automatically:
 

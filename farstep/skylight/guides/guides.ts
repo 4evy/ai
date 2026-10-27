@@ -44,6 +44,15 @@ export async function guideText(
 ) {
   signal?.throwIfAborted();
   const platform = guidePlatform(targetPlatform, skyBackend);
+  if (guide === "browser") {
+    if (platform === "linux")
+      return "Browser automation is unavailable on the Wayland monitor bridge. Use the start guide for supported monitor capture and input. macOS, Windows, and X11 use the upstream CUA browser surface.";
+    return readGuide(
+      new URL("./browser.md", import.meta.url),
+      SKYLIGHT_EXAMPLES,
+      SKYLIGHT_TOOLS,
+    );
+  }
   const url = new URL(`./${platform}/${guide}.md`, import.meta.url);
   if (guide !== "api") return readGuide(url, SKYLIGHT_EXAMPLES, SKYLIGHT_TOOLS);
   if (platform === "linux") return readLinuxApi();

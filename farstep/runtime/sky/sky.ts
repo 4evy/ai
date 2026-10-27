@@ -8,7 +8,12 @@ import { Deferred, Effect } from "effect";
 import { PROVISION_TIMEOUT_MS } from "farstep/protocol/sky/limits";
 import { BoundedFrames } from "farstep/transport/bounds";
 import { waylandReference } from "../../protocol/sky/desktop";
-import { EMPTY_INPUT, EXECUTION_TOOLS, MAX_FRAME } from "../../protocol/sky/execution";
+import {
+  EMPTY_INPUT,
+  EXECUTION_TOOLS,
+  MAX_FRAME,
+  skyTurnSchema,
+} from "../../protocol/sky/execution";
 import { serveStdio, type ToolRegistrar, toolRegistry } from "../jobs/tools";
 import { loadIdentity, PROTOCOL_MAJOR, VERSION } from "../state";
 import { registerExchange } from "./exchange/exchange";
@@ -74,7 +79,7 @@ class SkyConnection {
           cwd: this.cwd,
           skyVersion: SKY_VERSION,
           skyBackend: SKY_BACKEND,
-          capabilities: ["sky-mcp-v1", "sky-file-cas-v1"],
+          capabilities: ["sky-mcp-v1", "sky-file-cas-v1", "sky-browser-turn-v1"],
         },
       };
     });
@@ -130,21 +135,36 @@ class SkyConnection {
   }
 
   private registerExecution(register: ToolRegistrar): void {
-    for (const tool of EXECUTION_TOOLS)
-      register(tool.name, { inputSchema: tool.schema }, (input, signal) =>
+    const [javascript, reset] = EXECUTION_TOOLS;
+    register(
+      javascript.name,
+      { inputSchema: javascript.schema },
+      ({ turn, ...input }, signal) =>
         this.execute(
           (combined) =>
             this.kernel.invoke(
-              tool.name,
+              javascript.name,
               input,
               combined,
-              ("timeout_ms" in input && typeof input.timeout_ms === "number"
-                ? input.timeout_ms
-                : tool.defaultTimeoutMs) + tool.graceMs,
+              (input.timeout_ms ?? javascript.defaultTimeoutMs) + javascript.graceMs,
+              turn,
             ),
           signal,
         ),
-      );
+    );
+    register(reset.name, { inputSchema: reset.schema }, (input, signal) =>
+      this.execute(
+        (combined) =>
+          this.kernel.invoke(reset.name, input, combined, reset.defaultTimeoutMs),
+        signal,
+      ),
+    );
+    register("sky.turn.end", { inputSchema: skyTurnSchema }, (turn, signal) =>
+      this.execute(async (combined) => {
+        const notified = await this.kernel.endTurn(turn, combined);
+        return { content: [], structuredContent: { notified } };
+      }, signal),
+    );
   }
 
   private registerTools(): void {

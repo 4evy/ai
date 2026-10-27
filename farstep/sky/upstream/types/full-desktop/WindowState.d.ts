@@ -29,6 +29,8 @@ export type AccessibilityState = "checked" | "defunct" | "editable" | "enabled" 
 export type WindowState = {
     /** Current metadata for the observed window. */
     window: Window;
+    /** An owned modal with keyboard focus, also identified above the condensed tree. The tree, element IDs and screenshots belong to `window`. */
+    focused_modal?: Window;
     /** Structured accessibility tree with stable element identifiers. Log it directly for condensed text; use JSON.stringify for all data fields. */
     ax_tree: AccessibilityNode;
     /** Whether the tree came from AT-SPI or the dependency-free X11 fallback. */

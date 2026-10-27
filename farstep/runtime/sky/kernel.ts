@@ -12,7 +12,7 @@ import {
   ListRootsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { Effect, Exit, Record as Records, Scope, ScopedRef } from "effect";
-import { MAX_FRAME } from "../../protocol/sky/execution";
+import { MAX_FRAME, type SkyTurn } from "../../protocol/sky/execution";
 import { VERSION } from "../state";
 import { installLinuxServiceEffect } from "./runtime/linux";
 import { WAYLAND } from "./runtime/paths";
@@ -21,6 +21,7 @@ import { runtimeServerEffect } from "./runtime/server";
 export class SkyKernel {
   private readonly lifetime = new Lifetime("sequential");
   private readonly connecting = new Queue();
+  private turn: SkyTurn | undefined;
   private readonly kernel = Effect.runSync(
     Scope.provide(this.lifetime.scope)(
       ScopedRef.make<McpSession | undefined>(() => undefined),
@@ -66,6 +67,7 @@ export class SkyKernel {
 
   private openEffect() {
     return Effect.gen({ self: this }, function* () {
+      this.turn = undefined;
       const config = yield* runtimeServerEffect(this.cwd);
       yield* this.installSessionEffect(config.env);
       const env = Records.filter(
@@ -87,6 +89,15 @@ export class SkyKernel {
         {
           closedMessage: "Sky kernel is closed",
           awaitOnInterrupt: true,
+          requestMeta: () =>
+            this.turn
+              ? {
+                  "x-codex-turn-metadata": {
+                    session_id: this.turn.sessionId,
+                    turn_id: this.turn.turnId,
+                  },
+                }
+              : {},
         },
         (session) =>
           Effect.gen(function* () {
@@ -94,7 +105,7 @@ export class SkyKernel {
               (signal) => session.client.listTools({}, { signal, timeout: 30_000 }),
               { awaitOnInterrupt: true },
             );
-            for (const name of ["js", "js_reset"]) {
+            for (const name of ["js", "js_reset", "turn_ended"]) {
               if (!tools.some((tool) => tool.name === name))
                 return yield* Effect.fail(new Error(`Sky kernel lacks ${name}`));
             }
@@ -127,11 +138,20 @@ export class SkyKernel {
     input: Record<string, unknown>,
     signal: AbortSignal,
     timeout: number,
+    turn?: SkyTurn,
   ) {
     return this.lifetime.run(
       Effect.gen({ self: this }, function* () {
         const client = yield* this.connectEffect();
-        if (name === "js_reset") yield* this.releaseEffect(client);
+        if (turn) {
+          if (
+            this.turn &&
+            (this.turn.sessionId !== turn.sessionId || this.turn.turnId !== turn.turnId)
+          )
+            yield* this.finishTurnEffect(client, this.turn);
+          this.turn = turn;
+        }
+        if (name === "js_reset") yield* this.releaseInputEffect(client);
         return yield* client.callEffect(name, input, timeout);
       }).pipe(
         Effect.onExit((exit) =>
@@ -144,7 +164,50 @@ export class SkyKernel {
     );
   }
 
-  private releaseEffect(client: McpSession) {
+  private finishTurnEffect(client: McpSession, turn: SkyTurn) {
+    return Effect.gen({ self: this }, function* () {
+      const current = this.turn;
+      if (
+        !current ||
+        current.sessionId !== turn.sessionId ||
+        current.turnId !== turn.turnId
+      )
+        return false;
+      if (!client.isClosed()) {
+        const result = yield* client.callEffect(
+          "turn_ended",
+          {
+            hook_event_name: "Stop",
+            session_id: current.sessionId,
+            turn_id: current.turnId,
+          },
+          15_000,
+        );
+        if (result.isError)
+          return yield* Effect.fail(
+            new Error(
+              `Sky browser turn cleanup failed: ${result.content
+                .flatMap((item) => (item.type === "text" ? [item.text] : []))
+                .join("\n")}`,
+            ),
+          );
+      }
+      this.turn = undefined;
+      return !client.isClosed();
+    });
+  }
+
+  endTurn(turn: SkyTurn, signal: AbortSignal): Promise<boolean> {
+    return this.lifetime.run(
+      Effect.gen({ self: this }, function* () {
+        const client = yield* ScopedRef.get(this.kernel);
+        return client ? yield* this.finishTurnEffect(client, turn) : false;
+      }),
+      signal,
+    );
+  }
+
+  private releaseInputEffect(client: McpSession) {
     return Effect.gen(function* () {
       if (!WAYLAND) return;
       const result = yield* client.callEffect(
@@ -161,7 +224,12 @@ export class SkyKernel {
   }
 
   release(client: McpSession): Promise<void> {
-    return run(this.releaseEffect(client));
+    const turn = this.turn;
+    return run(
+      (turn ? this.finishTurnEffect(client, turn) : Effect.void).pipe(
+        Effect.ensuring(this.releaseInputEffect(client).pipe(Effect.orDie)),
+      ),
+    );
   }
 
   settled(): Promise<McpSession | undefined> {

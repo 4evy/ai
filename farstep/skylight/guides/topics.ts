@@ -1,6 +1,7 @@
 export const GUIDE_TOPICS = [
   "start",
   "actions",
+  "browser",
   "screenshots",
   "recovery",
   "api",

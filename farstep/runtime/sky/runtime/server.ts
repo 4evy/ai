@@ -35,7 +35,7 @@ export const runtimeServerEffect = Effect.fnUntraced(function* (cwd: string) {
     ...(!WAYLAND
       ? {
           CUA_REPL_NODE_REPL_PATH: REPL,
-          CUA_REPL_ENABLED_SURFACES: "computer",
+          CUA_REPL_ENABLED_SURFACES: "browser,computer",
         }
       : {}),
     ...(MACOS ? { CODEX_CLI_PATH: CODEX, SKY_CUA_SERVICE_PATH: SERVICE } : {}),

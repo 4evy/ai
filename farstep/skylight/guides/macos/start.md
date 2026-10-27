@@ -1,5 +1,9 @@
 # Select and observe an app
 
+For browser work, call {{guideTool}} with {{browserGuide}} instead of selecting
+the browser as a native app. Browser inventory identifies available providers
+and profiles.
+
 In {{skylightTool}}'s `code` parameter, begin a fresh runtime with one entry
 point. cua is initialized automatically. Use the requested app's name, bundle
 ID or full path. For example, select Calculator:

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { isRecord } from "@oh-my-pi/pi-utils/type-guards";
 import { createSkyFleet } from "farstep/client/sky/sky";
@@ -10,7 +11,8 @@ import { skylightPresentation } from "./presentation";
 import { present } from "./runtime/result";
 
 export default function skylight(api: ExtensionAPI) {
-  const feature = createSkylight<ExtensionContext>(createSkyFleet());
+  const fleet = createSkyFleet();
+  const feature = createSkylight<ExtensionContext>(fleet);
   const { guideParameters } = createSkylightParameters();
   const targets: Record<string, (input: unknown) => string> = {
     [SKYLIGHT_TOOLS.guide]: (input) => {
@@ -33,6 +35,15 @@ export default function skylight(api: ExtensionAPI) {
       (result) => present(result, tool.name),
     );
   }
+  api.on("agent_start", (_event, ctx) => {
+    fleet.beginTurn({
+      sessionId: ctx.sessionManager.getSessionId(),
+      turnId: randomUUID(),
+    });
+  });
+  api.on("agent_end", async (event) => {
+    if (!event.willContinue) await fleet.endTurn();
+  });
   api.on("session_switch", feature.close);
   api.on("session_branch", feature.close);
   api.on("session_tree", feature.close);

@@ -133,6 +133,8 @@ export const validateRuntimeEffect = Effect.fnUntraced(function* (
     join(paths.modules, "@oai/sky/dist/project/cua/sky_js/src/index.d.ts"),
     join(paths.modules, "@oai/sky/dist/project/cua/sky_js/src/service.d.ts"),
     paths.cuaRepl,
+    join(paths.modules, "@oai/browser-desktop/scripts/browser-service.mjs"),
+    join(paths.modules, "@oai/browser-desktop/scripts/browser-client.mjs"),
     ...referencePaths(artifact.platform).map((path) => join(paths.modules, path)),
   ]) {
     yield* attempt(() => access(path, constants.R_OK));

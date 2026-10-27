@@ -1,8 +1,9 @@
 # Capture the selected Wayland monitor
 
 Skylight needs farstep running as the graphical user, an active Wayland
-session, its session bus and XDG_RUNTIME_DIR. X11, accessibility trees and app
-targeting are unavailable. Initialize in {{skylightTool}}'s code parameter:
+session, its session bus and XDG_RUNTIME_DIR. X11, accessibility trees, app
+targeting and CUA browser automation are unavailable on this monitor bridge.
+Initialize in {{skylightTool}}'s code parameter:
 
 ``` js
 var sky = (await import("@oai/sky")).sky;

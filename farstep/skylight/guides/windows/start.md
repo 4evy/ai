@@ -1,5 +1,9 @@
 # Select and observe an app
 
+For browser work, call {{guideTool}} with {{browserGuide}} instead of selecting
+the browser as a native app. Browser inventory identifies available providers
+and profiles.
+
 In {{skylightTool}}'s code parameter, begin a fresh runtime with inventory.
 cua is initialized automatically:
 

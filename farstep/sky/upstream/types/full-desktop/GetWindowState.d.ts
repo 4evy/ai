@@ -7,6 +7,8 @@ export type Input = {
     query?: string;
     /** Whether to include a screenshot bounded to the window; defaults to true. */
     include_screenshot?: boolean;
+    /** Observe this window’s focused modal dialog directly. By default, observe the requested window and report the dialog in `focused_modal`. */
+    follow_focused_modal?: boolean;
 };
 export type Return = Promise<WindowState>;
 /** Read a window's structured accessibility tree and optional screenshot. Log `state.ax_tree` directly for condensed text. */
