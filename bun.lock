@@ -70,6 +70,9 @@
     "farstep": {
       "name": "farstep",
       "version": "1.0.0",
+      "bin": {
+        "farstep-tools": "./integration/cli.ts",
+      },
       "dependencies": {
         "@ai/core": "workspace:*",
         "@logtape/file": "2.4.2",

@@ -42,6 +42,7 @@
     }
   },
   "scripts": {
+    "farstep:tools": "bun farstep/integration/cli.ts",
     "test": "bun test ./packages/core",
     "check": "bun run check:biome && bun run check:github && bun run check:rust && bun run check:sky && bun run check:patches && bun run typecheck && bun run test && bun run check:dependencies && bun run check:architecture && bun run build",
     "check:biome": "bun x --no-install biome check .",

@@ -136,6 +136,48 @@ Matching durable completion events identify unacknowledged delivery. An empty
 queue does not prove acknowledgment, because an explicit unsubscribe can also
 clear it. Handoffs and resource claims remain separate from job-control rights.
 
+## Use Farstep from a shell-based harness
+
+The small JSON CLI shares Farstep's gateway and recovery code without importing
+OMP. It needs Bun, Bash, and an activated compatible helper. SSH targets also
+need OpenSSH batch authentication. It does not install or activate anything.
+
+```sh
+bun run farstep:tools --help
+bun run farstep:tools --discover
+bun run farstep:tools --state /tmp/farstep-work < request.json
+```
+
+`--discover` publishes the validated action schema and existing discoverable
+tool metadata. Installed workspace packages also expose `farstep-tools`.
+Keep the private state directory between invocations. It pins the helper
+installation, execution scope, owner, launch specification, and native job
+identity. Launch intent is flushed before execution, and launch names are
+single-use. After a lost launch reply, observe the same name instead of
+launching again.
+
+For a remote-development workflow, send these actions in order:
+
+1. `connect` with an OpenSSH `target` and absolute `cwd`
+2. `launch` with `name`, TypeScript `script`, and
+   `ready: {"port": 38475, "host": "127.0.0.1"}`. The service must bind its own
+   loopback listener. Jobs persist after the CLI disconnects
+3. `observe` with the same `name` from a fresh invocation. `reconnect` verifies
+   the saved helper identity without launching work
+4. `forward` with the same `name` and `localPort: 38476`, kept running in a
+   separate local process. Inspect `http://127.0.0.1:38476` from the Mac
+5. `retrieve` with the job `name`, absolute remote `source`, local
+   `destination`, and `expectedSha256: null` for a new destination. Supply the
+   current destination's SHA-256 to replace it. Transfers verify both ends and
+   are limited to regular files of at most 16 MiB
+6. `stop` with the same `name`, then observe that the forward exits
+
+Forwarding binds only `127.0.0.1` and follows the owning job's identity and
+state. Stopping the forward process releases the listener but does not stop the
+service. Job exit or an inspection failure closes the listener and SSH channels.
+Retrieval verifies transport integrity, not whether an application has finished
+writing its result.
+
 ## Bound job output without discarding recovery records
 
 Each job bounds pending output persistence to 1 MiB and 256 chunks. Pipe

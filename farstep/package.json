@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "exports": {
     ".": "./farstep.ts",
+    "./integration/*": "./integration/*.ts",
+    "./tools": "./integration/cli.ts",
     "./client/*": "./client/*.ts",
     "./packaging/*": "./packaging/*.ts",
     "./runtime/sky/runtime/pins.json": "./runtime/sky/runtime/pins.json",
@@ -17,6 +19,9 @@
   },
   "imports": {
     "#farstep/*": "./*.ts"
+  },
+  "bin": {
+    "farstep-tools": "./integration/cli.ts"
   },
   "dependencies": {
     "@ai/core": "workspace:*",
