@@ -1,7 +1,7 @@
-import { hash, randomUUID } from "node:crypto";
-import { link, open, realpath, rm } from "node:fs/promises";
+import { hash } from "node:crypto";
+import { link, realpath } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { syncDirectoryAncestors } from "@ai/core/effect/fs/fs";
+import { stageFile, syncDirectoryAncestors } from "@ai/core/effect/fs/fs";
 import { durableJsonWriter, privateDirectory } from "../../state";
 import { withFileLock } from "../lock/lock";
 
@@ -27,18 +27,10 @@ export async function immutableWorkflowWrite(
   path: string,
   value: unknown,
 ): Promise<void> {
-  const temporary = join(dirname(path), `.manifest-${randomUUID()}`);
-  try {
-    {
-      await using file = await open(temporary, "wx", 0o400);
-      await file.writeFile(JSON.stringify(value));
-      await file.sync();
-    }
-    await link(temporary, path);
-    await syncDirectoryAncestors(dirname(path), 5);
-  } finally {
-    await rm(temporary, { force: true });
-  }
+  await using staged = await stageFile(path, 0o400);
+  await staged.write(JSON.stringify(value));
+  await link(staged.path, path);
+  await syncDirectoryAncestors(dirname(path), 5);
 }
 
 export async function withWorkflowLock<T>(

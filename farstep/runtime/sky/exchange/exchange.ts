@@ -1,9 +1,9 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, open, realpath, rename, rm } from "node:fs/promises";
+import { lstat, realpath, rename } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { attempt, run } from "@ai/core/effect/effect";
-import { openFile } from "@ai/core/effect/fs/fs";
+import { openFile, stagedFile } from "@ai/core/effect/fs/fs";
 import { readText } from "@ai/core/text/text";
 import { withFileLock } from "@oh-my-pi/pi-utils/file-lock";
 import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
@@ -79,44 +79,28 @@ const writeEffect = Effect.fnUntraced(function* (
         `Sky exchange conflict: destination digest is ${previous.sha256 ?? "missing"}`,
       ),
     );
-  const parent = dirname(path);
-  const temporary = join(parent, `.farstep-sky-${randomUUID()}`);
-  return yield* Effect.acquireUseRelease(
-    attempt(() => open(temporary, "wx", previous.mode)),
-    (file) =>
-      Effect.gen(function* () {
-        yield* attempt(() => file.writeFile(data), { awaitOnInterrupt: true });
-        yield* attempt(() => file.sync(), { awaitOnInterrupt: true });
-        yield* attempt(() => file.close(), { awaitOnInterrupt: true });
-        // Detect edits by writers that do not participate in the Farstep lock
-        const latest = yield* readEffect(path).pipe(
-          Effect.map((value) => value.sha256),
-          Effect.catch((error) =>
-            isEnoent(error) ? Effect.succeed(null) : Effect.fail(error),
-          ),
-        );
-        if (latest !== previous.sha256)
-          return yield* Effect.fail(
-            new Error("Sky exchange conflict: destination changed during import"),
-          );
-        yield* Effect.gen(function* () {
-          yield* attempt(() => rename(temporary, path));
-          if (process.platform !== "win32") {
-            const directory = yield* openFile(parent, constants.O_RDONLY);
-            yield* attempt(() => directory.sync());
-          }
-        }).pipe(Effect.scoped, Effect.uninterruptible);
-        return result(true);
-      }),
-    (file) =>
-      attempt(() => file.close()).pipe(
-        Effect.ensuring(
-          attempt(() => rm(temporary, { force: true })).pipe(Effect.orDie),
-        ),
-        Effect.orDie,
-      ),
+  const staged = yield* stagedFile(path, previous.mode);
+  yield* attempt(() => staged.write(data), { awaitOnInterrupt: true });
+  // Detect edits by writers that do not participate in the Farstep lock
+  const latest = yield* readEffect(path).pipe(
+    Effect.map((value) => value.sha256),
+    Effect.catch((error) =>
+      isEnoent(error) ? Effect.succeed(null) : Effect.fail(error),
+    ),
   );
-});
+  if (latest !== previous.sha256)
+    return yield* Effect.fail(
+      new Error("Sky exchange conflict: destination changed during import"),
+    );
+  yield* Effect.gen(function* () {
+    yield* attempt(() => rename(staged.path, path));
+    if (process.platform !== "win32") {
+      const directory = yield* openFile(dirname(path), constants.O_RDONLY);
+      yield* attempt(() => directory.sync());
+    }
+  }).pipe(Effect.scoped, Effect.uninterruptible);
+  return result(true);
+}, Effect.scoped);
 
 export function registerExchange(
   register: ToolRegistrar,

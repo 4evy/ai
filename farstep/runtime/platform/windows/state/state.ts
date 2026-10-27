@@ -2,10 +2,10 @@ import { readFileSync as readResource } from "node:fs";
 import { lstat, mkdir, readFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { attempt, run } from "@ai/core/effect/effect";
+import { atomicWriteEffect as write } from "@ai/core/effect/fs/fs";
 import { executeCommand } from "@ai/core/effect/process/process";
 import { render } from "@ai/core/template/template";
 import { Effect } from "effect";
-import { atomicWriteEffect as write } from "../../posix/state";
 
 const ownerScript = readResource(new URL("./owner.ps1", import.meta.url), "utf8");
 const directoryScript = readResource(

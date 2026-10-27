@@ -1,3 +1,4 @@
+import * as fs from "@ai/core/effect/fs/fs";
 import * as posix from "./posix/state";
 import * as windows from "./windows/state/state";
 
@@ -7,7 +8,7 @@ export const privateDirectory =
 export const privateRead =
   process.platform === "win32" ? windows.privateRead : posix.privateRead;
 export const atomicWrite =
-  process.platform === "win32" ? windows.atomicWrite : posix.atomicWrite;
+  process.platform === "win32" ? windows.atomicWrite : fs.atomicWrite;
 export const privateDirectoryEffect =
   process.platform === "win32"
     ? windows.privateDirectoryEffect
@@ -15,4 +16,4 @@ export const privateDirectoryEffect =
 export const privateReadEffect =
   process.platform === "win32" ? windows.privateReadEffect : posix.privateReadEffect;
 export const atomicWriteEffect =
-  process.platform === "win32" ? windows.atomicWriteEffect : posix.atomicWriteEffect;
+  process.platform === "win32" ? windows.atomicWriteEffect : fs.atomicWriteEffect;

@@ -1,9 +1,9 @@
 import { mkdir, rename } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { Effect, Stream } from "effect";
 import { FetchHttpClient, HttpClient } from "effect/http";
 import { attempt } from "../effect";
-import { openFile, temporaryDirectory } from "../fs/fs";
+import { stagedFile } from "../fs/fs";
 
 // The caller's scope owns the response, including bodies rejected by status checks
 export const get = Effect.fnUntraced(
@@ -48,38 +48,32 @@ export const downloadFile = Effect.fnUntraced(function* (
   yield* attempt(() => mkdir(dirname(destination), { recursive: true }), {
     awaitOnInterrupt: true,
   });
-  const staging = yield* temporaryDirectory(join(dirname(destination), ".download-"));
-  const temporary = join(staging.path, "body");
-  // Close the staged handle before rename, including on Windows
-  const digest = yield* Effect.scoped(
-    Effect.gen(function* () {
-      const file = yield* openFile(temporary, "wx", 0o600);
-      const hash = new Bun.CryptoHasher("sha256");
-      let bytes = 0;
-      if (response.status !== 204 && response.status !== 205)
-        yield* response.stream.pipe(
-          Stream.runForEach((chunk) =>
-            attempt(
-              async () => {
-                if (
-                  options.maxBytes !== undefined &&
-                  chunk.byteLength > options.maxBytes - bytes
-                )
-                  throw new Error(`${label} exceeds byte limit (${options.maxBytes})`);
-                await file.writeFile(chunk);
-                bytes += chunk.byteLength;
-                hash.update(chunk);
-              },
-              { awaitOnInterrupt: true },
-            ),
-          ),
-        );
-      const digest = hash.digest("hex");
-      if (options.sha256 !== undefined && digest !== options.sha256.toLowerCase())
-        return yield* Effect.fail(new Error(`${label} checksum mismatch`));
-      return digest;
-    }),
-  );
-  yield* attempt(() => rename(temporary, destination), { awaitOnInterrupt: true });
+  const staged = yield* stagedFile(destination);
+  const hash = new Bun.CryptoHasher("sha256");
+  let bytes = 0;
+  if (response.status !== 204 && response.status !== 205)
+    yield* response.stream.pipe(
+      Stream.runForEach((chunk) =>
+        attempt(
+          async () => {
+            if (
+              options.maxBytes !== undefined &&
+              chunk.byteLength > options.maxBytes - bytes
+            )
+              throw new Error(`${label} exceeds byte limit (${options.maxBytes})`);
+            await staged.file.writeFile(chunk);
+            bytes += chunk.byteLength;
+            hash.update(chunk);
+          },
+          { awaitOnInterrupt: true },
+        ),
+      ),
+    );
+  const digest = hash.digest("hex");
+  if (options.sha256 !== undefined && digest !== options.sha256.toLowerCase())
+    return yield* Effect.fail(new Error(`${label} checksum mismatch`));
+  // Close before rename, including on Windows
+  yield* attempt(() => staged.file.close(), { awaitOnInterrupt: true });
+  yield* attempt(() => rename(staged.path, destination), { awaitOnInterrupt: true });
   return digest;
 }, Effect.scoped);
