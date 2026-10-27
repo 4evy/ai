@@ -4,12 +4,12 @@ import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { toError } from "@oh-my-pi/pi-utils/type-guards";
 import { Deferred } from "effect";
 import type { Gateway } from "farstep/client/jobs/gateway";
+import { assertIdentity } from "farstep/client/jobs/recovery";
 import type {
   JobCompletionNotification,
   JobSnapshot,
 } from "farstep/protocol/jobs/protocol";
 import { REMOTE_TOOLS } from "farstep/remote/tools/names";
-import { assertIdentity } from "./broker";
 import { COMPLETION_TYPE, ENTRY_TYPE, JOB_RECORD_VERSION, nativeKey } from "./records";
 import type { JobSession } from "./session";
 import type { DeliveryRecord, JobRecord, JobView, Result, Scope } from "./types";
@@ -20,15 +20,15 @@ export async function deliverCompletion(
   scope: Scope,
   client: Gateway,
   notification: JobCompletionNotification,
-): Promise<void> {
+): Promise<boolean> {
   assertCompletion(session, scope, client, notification);
   const completed = notification.snapshot;
   // Internal sudo calls return synchronously and have no user-addressable handles
-  if (completed.name.startsWith("remote-sudo-internal-")) return;
+  if (completed.name.startsWith("remote-sudo-internal-")) return true;
   const key = nativeKey(client.installationId, scope.scopeId, completed.id);
   const firstWait = foregroundWait(session, scope, completed.name);
   if (firstWait) await firstWait;
-  if (scope.deliveries.get(key)?.delivered) return;
+  if (scope.deliveries.get(key)?.delivered) return true;
   const { job, view, unavailable } = await completionView(
     session,
     scope,
@@ -37,7 +37,7 @@ export async function deliverCompletion(
   );
   const dispatchWait = foregroundWait(session, scope, completed.name);
   if (dispatchWait) await dispatchWait;
-  if (scope.deliveries.get(key)?.delivered) return;
+  if (scope.deliveries.get(key)?.delivered) return true;
   const deliveredAt = Date.now();
   const finishedAt = completed.exitedAt;
   let result: Result;
@@ -73,6 +73,7 @@ export async function deliverCompletion(
     recordUnavailableDelivery(api, scope, client, notification, key, deliveredAt);
   }
   // The caller acknowledges upstream only after this accepted, persisted delivery
+  return true;
 }
 
 function foregroundWait(

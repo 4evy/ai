@@ -1,18 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { isDeepStrictEqual } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { Deferred, Effect } from "effect";
 import type { Gateway } from "farstep/client/jobs/gateway";
+import { assertIdentity, recoverJob } from "farstep/client/jobs/recovery";
 import type {
   CoordinationRequest,
   CoordinationResult,
 } from "farstep/protocol/coordination";
 import type { JobObservation, TerminationResult } from "farstep/protocol/jobs/gateway";
 import type { JobSnapshot } from "farstep/protocol/jobs/protocol";
-import { parseJobSpec } from "farstep/protocol/jobs/protocol";
 import type { Connections } from "../connections/state";
 import type { ExecutionTarget } from "../connections/types";
-import { assertIdentity } from "./broker";
 import { deliverCompletion } from "./completion";
 import { DEFAULT_TERMINATION_WAIT_MS } from "./limits/limits";
 import { noticeError, sendJobNotice } from "./notices/notices";
@@ -187,16 +185,8 @@ export class JobSession {
   }
 
   async forRecord(scope: Scope, record: LaunchRecord): Promise<Gateway> {
-    if (
-      record.scopeId !== scope.scopeId ||
-      record.owner !== scope.owner ||
-      record.projectDir !== scope.projectDir
-    )
-      throw new Error("Job belongs to a different immutable execution scope");
-    return this.client(
-      scope,
-      await this.#connections.execution(record.connectionId, record.projectDir),
-      record.installationId,
+    return this.#routes.recover(scope, record, (connectionId, projectDir) =>
+      this.#connections.execution(connectionId, projectDir),
     );
   }
 
@@ -228,47 +218,15 @@ export class JobSession {
     record: LaunchRecord,
     signal?: AbortSignal,
   ): Promise<{ job: JobRecord; snapshot: JobSnapshot }> {
-    this.assertCurrent(scope);
-    if (
-      client.installationId !== record.installationId ||
-      client.scopeId !== record.scopeId ||
-      client.owner !== record.owner
-    )
-      throw new Error(
-        `Job ${record.name} belongs to a different helper installation or scope`,
-      );
-    const described = await client.request(
-      { op: "describe", name: record.name },
+    const { identity, snapshot } = await recoverJob(
+      scope,
+      client,
+      record,
+      () => this.assertCurrent(scope),
       signal,
     );
-    this.assertCurrent(scope);
-    const snapshot = described.snapshot;
-    const expected = parseJobSpec(record.spec);
-    // The broker updates lifetime and geometry without restarting the command
-    const actual = {
-      ...described.spec,
-      persist: expected.persist,
-      ...(expected.terminalSize ? { terminalSize: expected.terminalSize } : {}),
-    };
-    if (
-      snapshot.owner !== record.owner ||
-      snapshot.name !== record.name ||
-      !isDeepStrictEqual(actual, expected)
-    )
-      throw new Error(
-        `Native identity or launch specification for ${record.name} changed; refusing control`,
-      );
     const job: JobRecord =
-      record.kind === "job"
-        ? record
-        : {
-            ...record,
-            kind: "job",
-            nativeId: snapshot.id,
-            startedAt: snapshot.startedAt,
-            nativeCreatedAt: snapshot.createdAt,
-          };
-    assertIdentity(job, snapshot);
+      record.kind === "job" ? record : { ...record, ...identity, kind: "job" };
     if (record.kind === "launch") {
       recordInto(scope.all, job);
       if (scope.branch.has(job.name)) this.saveJob(scope, job);

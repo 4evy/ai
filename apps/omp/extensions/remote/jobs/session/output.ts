@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import type { Gateway } from "farstep/client/jobs/gateway";
+import { assertIdentity } from "farstep/client/jobs/recovery";
 import type { JobLogs } from "farstep/protocol/jobs/gateway";
 import type { JobSnapshot } from "farstep/protocol/jobs/protocol";
 import {
@@ -8,7 +9,6 @@ import {
 } from "farstep/protocol/jobs/protocol";
 import { isJobTerminal } from "farstep/protocol/jobs/states";
 import { DEFAULT_LINES } from "farstep/remote/jobs/validation/validation";
-import { assertIdentity, terminal } from "../broker";
 import { decodeOutput, type OutputRead } from "../decoding";
 import { type JobResultOptions, jobResult } from "../output";
 import { ENTRY_TYPE, JOB_RECORD_VERSION, nativeKey } from "../records";
@@ -155,7 +155,7 @@ export class SessionOutput {
     if (
       !screenLogs &&
       options.cursor === undefined &&
-      terminal(snapshot) &&
+      isJobTerminal(snapshot.state) &&
       output.cursor < output.availableEnd
     ) {
       output = await client.request(
@@ -294,7 +294,7 @@ function completeOutput(
   read: OutputRead | undefined,
 ): boolean {
   const complete =
-    terminal(snapshot) &&
+    isJobTerminal(snapshot.state) &&
     isJobTerminal(logs.state) &&
     (!read || read.cursor >= read.availableEnd);
   return complete;

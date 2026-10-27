@@ -7,8 +7,8 @@ import type {
   TerminationStatus,
 } from "farstep/protocol/jobs/gateway";
 import type { JobSnapshot } from "farstep/protocol/jobs/protocol";
+import { isJobTerminal as terminal } from "farstep/protocol/jobs/states";
 import type { WorkflowResult } from "farstep/protocol/workflow/workflow";
-import { terminal } from "./broker";
 import { showWorkflow, workflowFailed, workflowText } from "./output/workflow";
 import { jobNotices } from "./presentation";
 import type { JobRecord, Logs, Result } from "./types";
@@ -97,7 +97,8 @@ function screenVisible(
   redrawing: boolean,
 ): boolean {
   return Boolean(
-    options.screen || (!terminal(snapshot) && compact && redrawing && !options.raw),
+    options.screen ||
+      (!terminal(snapshot.state) && compact && redrawing && !options.raw),
   );
 }
 
@@ -141,7 +142,7 @@ function renderedOutput(
 function jobContext(snapshot: JobSnapshot, logs: Logs, options: JobResultOptions) {
   const terminationStatus = options.terminationStatus ?? logs.terminationStatus;
   return {
-    finished: terminal(snapshot),
+    finished: terminal(snapshot.state),
     size: terminalSize(snapshot),
     view: outputView(snapshot, logs, options),
     finishedAt: options.finishedAt ?? snapshot.exitedAt,

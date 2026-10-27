@@ -1,13 +1,14 @@
 import type { ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { toError } from "@oh-my-pi/pi-utils/type-guards";
 import type { Gateway } from "farstep/client/jobs/gateway";
+import { assertIdentity } from "farstep/client/jobs/recovery";
 import type { JobObservation } from "farstep/protocol/jobs/gateway";
+import { isJobTerminal as terminal } from "farstep/protocol/jobs/states";
 import {
   DEFAULT_LINES,
   validateLogPattern,
 } from "farstep/remote/jobs/validation/validation";
 import { ACTION_HANDLERS, type ControlContext, type ControlEffects } from "./actions";
-import { assertIdentity, terminal } from "./broker";
 import { publicReceipt } from "./output";
 import { receiptStatus } from "./presentation";
 import type { JobSession } from "./session";
@@ -318,7 +319,7 @@ function controlScreen(
   input: JobInput,
   snapshot: ControlContext["snapshot"],
 ): boolean {
-  return job.pty && !input.raw && !terminal(snapshot) && input.action !== "logs";
+  return job.pty && !input.raw && !terminal(snapshot.state) && input.action !== "logs";
 }
 
 async function controlUnread(

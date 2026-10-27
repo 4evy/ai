@@ -101,6 +101,12 @@ Closing request input still lets the helper flush its final response and exit.
 A native PTY setup failure releases the startup wait with the original error
 after the broker records the failed job.
 
+Reconnecting restores job routes and completion subscriptions, not the agent's
+conversation or model loop. Persistent jobs can survive transport loss. They
+do not promise continuation after a supervisor crash or reboot. An interrupted
+supervisor can leave the outcome unknown, so inspect the existing handle rather
+than launching the operation again.
+
 Desktop opening follows the helper's advertised `open` availability. The native
 backend still enforces its prerequisites and reports failures with their
 original codes and text-input receipts. An isolated workspace is not a security

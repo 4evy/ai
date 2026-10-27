@@ -2,7 +2,7 @@ import { truncateTail } from "@oh-my-pi/pi-tui/tools/streaming-output";
 import { sanitizeText } from "@oh-my-pi/pi-utils";
 import type { JobSnapshot } from "farstep/protocol/jobs/protocol";
 import { JOB_OUTPUT_MAX_BYTES } from "farstep/protocol/jobs/protocol";
-import { terminal } from "./broker";
+import { isJobTerminal as terminal } from "farstep/protocol/jobs/states";
 import { hasTerminalRedraw } from "./output";
 import type { DeliveryRecord, Logs } from "./types";
 
@@ -113,7 +113,7 @@ function decodeBytes(
   const continuing = cursor === delivery.outputCursor && cursor >= read.startCursor;
   if (continuing && delivery.decoderPending && read.cursor >= cursor)
     bytes = Buffer.concat([Buffer.from(delivery.decoderPending, "base64"), bytes]);
-  const streaming = !terminal(snapshot) || read.cursor < read.availableEnd;
+  const streaming = !terminal(snapshot.state) || read.cursor < read.availableEnd;
   const pendingLength = streaming ? incompleteUtf8Tail(bytes) : 0;
   const text = new TextDecoder("utf-8", {
     ignoreBOM: cursor > 0 || read.startCursor > 0,

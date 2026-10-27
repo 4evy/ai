@@ -111,10 +111,9 @@ export class Gateway {
     connection: GatewayConnection,
     scopeId: string,
     owner: string,
-    onCompletion: (
-      client: Gateway,
-      notification: JobCompletionNotification,
-    ) => Promise<void>,
+    onCompletion:
+      | ((client: Gateway, notification: JobCompletionNotification) => Promise<boolean>)
+      | undefined,
     onClose: (client: Gateway | undefined) => void,
   ) {
     const transport = connection.transport;
@@ -122,6 +121,8 @@ export class Gateway {
     let transportClosed = false;
     const queued: JobCompletionNotification[] = [];
     const deliver = (notification: JobCompletionNotification) => {
+      // Unsubscribed harnesses leave completions pending at the broker
+      if (!onCompletion) return;
       if (!gateway) {
         queued.push(notification);
         return;
@@ -133,10 +134,16 @@ export class Gateway {
       const current = gateway;
       void run(
         Effect.gen(function* () {
-          yield* attempt(() => onCompletion(current, notification), {
+          if (
+            notification.owner !== current.owner ||
+            notification.snapshot.owner !== current.owner
+          )
+            return yield* Effect.fail(new Error("Remote completion owner mismatch"));
+          // A harness must explicitly accept delivery before it is acknowledged
+          const accepted = yield* attempt(() => onCompletion(current, notification), {
             awaitOnInterrupt: true,
           });
-          if (current.#closed) return;
+          if (accepted !== true || current.#closed) return;
           const response = yield* current.#helper.callEffect("job.ack_completion", {
             completionId: notification.completionId,
           });
@@ -210,10 +217,9 @@ export class Gateway {
     connection: GatewayConnection,
     scopeId: string,
     owner: string,
-    onCompletion: (
-      client: Gateway,
-      notification: JobCompletionNotification,
-    ) => Promise<void>,
+    onCompletion:
+      | ((client: Gateway, notification: JobCompletionNotification) => Promise<boolean>)
+      | undefined,
     onClose: (client: Gateway | undefined) => void,
   ): Promise<Gateway> {
     return run(

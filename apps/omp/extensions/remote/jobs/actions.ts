@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { toError } from "@oh-my-pi/pi-utils/type-guards";
 import type { Gateway } from "farstep/client/jobs/gateway";
+import { assertIdentity } from "farstep/client/jobs/recovery";
 import {
   keyBytes,
   parseTerminalKeys,
@@ -10,7 +11,7 @@ import {
 import type { ActionReceipt, TerminationResult } from "farstep/protocol/jobs/gateway";
 import type { JobSnapshot } from "farstep/protocol/jobs/protocol";
 import { parseJobTerminalSize } from "farstep/protocol/jobs/protocol";
-import { assertIdentity, terminal } from "./broker";
+import { isJobTerminal as terminal } from "farstep/protocol/jobs/states";
 import { DEFAULT_TERMINATION_WAIT_MS, MAX_TERMINATION_WAIT_MS } from "./limits/limits";
 import { publicReceipt } from "./output";
 import type { JobSession } from "./session";
@@ -263,7 +264,7 @@ async function waitAction(context: ControlContext): Promise<ControlEffects> {
   const snapshot = waited.snapshot;
   const waitTimedOut = waited.timedOut;
   const matched = waited.matched;
-  if (input.pattern && matched === undefined && terminal(snapshot))
+  if (input.pattern && matched === undefined && terminal(snapshot.state))
     notice = "The remote process finished without observing the requested log pattern";
   return { notice, waitTimedOut, matched, snapshot };
 }
