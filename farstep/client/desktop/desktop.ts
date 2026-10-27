@@ -93,13 +93,13 @@ const DESKTOP_ACTIONS = {
     const opener = capabilities.operations.find(
       (operation) => operation.operation === "open",
     );
-    if (!opener?.available || opener.backend !== "gnome-mutter-workspace")
+    if (!opener?.available)
       return present({
         status: "error",
         code: "prerequisite",
         message:
           opener?.reason ??
-          "Upgrade the Linux helper and activate its GNOME workspace adapter before opening a GUI",
+          "The native helper does not advertise an available isolated workspace opener",
       });
     return present(await client.request("desktop.open", { uri: input.uri ?? "" }));
   },

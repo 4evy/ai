@@ -90,6 +90,14 @@ For execution changes, preserve these ownership and recovery rules:
   operations. Update both Rust and TypeScript wire contracts when changing
   shared fields.
 
+### Execution and desktop boundaries
+
+Desktop opening follows the helper's advertised `open` availability. The native
+backend still enforces its prerequisites and reports failures with their
+original codes and text-input receipts. An isolated workspace is not a security
+sandbox or a guarantee of background input. Frame-bound input rejects stale
+captures but does not make observation and action atomic.
+
 ## Read Farstep job cards in OMP
 
 Farstep job cards show lifecycle status, exit code, duration, and batch step
