@@ -130,17 +130,16 @@ impl State {
         handle: &QueueHandle<Self>,
         output_name: &str,
     ) -> Result<()> {
-        let outputs: Vec<_> = self
+        let mut outputs = self
             .outputs
             .outputs()
-            .filter(|o| self.outputs.info(o).and_then(|i| i.name).as_deref() == Some(output_name))
-            .collect();
-        let [output]: [_; 1] = outputs.try_into().map_err(|_| {
-            Failure::new(
+            .filter(|o| self.outputs.info(o).and_then(|i| i.name).as_deref() == Some(output_name));
+        let (Some(output), None) = (outputs.next(), outputs.next()) else {
+            return Err(Failure::new(
                 "mapping-unavailable",
                 "outputName does not identify exactly one Wayland output",
-            )
-        })?;
+            ));
+        };
         let initial = output_geometry(&self.outputs, &output).ok_or_else(|| {
             Failure::new(
                 "mapping-unavailable",

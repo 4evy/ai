@@ -1,3 +1,5 @@
+import { Record as Records } from "effect";
+
 export interface TerminalKeyDefinition {
   code: number;
   legacy?: string;
@@ -165,42 +167,13 @@ export const LEGACY_CONTROL_KEYS: ReadonlySet<number> = new Set([
   TERMINAL_KEY_DEFINITIONS.backspace.code,
 ]);
 
-const KEYPAD_KEYS = [
-  "kp0",
-  "kp1",
-  "kp2",
-  "kp3",
-  "kp4",
-  "kp5",
-  "kp6",
-  "kp7",
-  "kp8",
-  "kp9",
-  "kpdecimal",
-  "kpdivide",
-  "kpmultiply",
-  "kpsubtract",
-  "kpadd",
-  "kpenter",
-  "kpequal",
-  "kpseparator",
-  "kpleft",
-  "kpright",
-  "kpup",
-  "kpdown",
-  "kppageup",
-  "kppagedown",
-  "kphome",
-  "kpend",
-  "kpinsert",
-  "kpdelete",
-  "kpbegin",
-] as const satisfies readonly TerminalKeyName[];
 const KEYPAD_PREFIXES = ["keypad", "numpad"] as const;
 const keypadAliases: Record<string, TerminalKeyName> = {};
-for (const name of KEYPAD_KEYS)
+for (const name of Records.keys(TERMINAL_KEY_DEFINITIONS)) {
+  if (!name.startsWith("kp")) continue;
   for (const prefix of KEYPAD_PREFIXES)
     keypadAliases[`${prefix}${name.slice(2)}`] = name;
+}
 
 export const TERMINAL_KEY_ALIASES = {
   ...keypadAliases,

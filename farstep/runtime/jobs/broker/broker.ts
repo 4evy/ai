@@ -188,13 +188,15 @@ export class JobBroker {
   }
 
   #list(): JobRpcResult<"list"> {
-    const jobs = [...this.#jobs.values()];
+    const { active = [], completed = [] } = Object.groupBy(
+      this.#jobs.values(),
+      (job) => (ended(job) ? "completed" : "active"),
+    );
     return {
       op: "list",
       snapshots: [
-        ...jobs.filter((job) => !ended(job)),
-        ...jobs
-          .filter(ended)
+        ...active,
+        ...completed
           .sort((a, b) => (b.snapshot.exitedAt ?? 0) - (a.snapshot.exitedAt ?? 0))
           .slice(0, 10),
       ].map((job) => ({ ...job.snapshot })),

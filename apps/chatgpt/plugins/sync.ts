@@ -94,12 +94,11 @@ export class Synchronizer {
           entry,
         ]),
       );
-      const selected = yield* Effect.forEach(plugins, (name) => {
-        const entry = entries.get(name);
-        return entry
-          ? self.materialize(name).pipe(Effect.map((ready) => (ready ? [entry] : [])))
-          : Effect.succeed([]);
-      }).pipe(Effect.map((entries) => entries.flat()));
+      const selected = yield* Effect.filter(
+        plugins.map((name) => entries.get(name)).filter((entry) => entry !== undefined),
+        ({ name }) => self.materialize(name),
+        { concurrency: 1 },
+      );
       const path = join(self.destination, ".agents/plugins/marketplace.json");
       yield* attempt(() => mkdir(dirname(path), { recursive: true }), {
         awaitOnInterrupt: true,
