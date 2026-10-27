@@ -237,7 +237,8 @@ export function createJobRenderer(config: ShellRendererConfig<unknown>) {
   return {
     ...shell,
     renderResult(result, options, theme, args) {
-      if (!result.details?.job) return fallback.renderResult(result, options, theme);
+      if (!result.details?.job)
+        return fallback.renderResult(result, options, theme, args);
       const view = jobView(result, options, config.resolveTitle(args, options));
       const command = config.resolveCommand?.(args);
       if (command)

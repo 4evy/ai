@@ -3,7 +3,7 @@ import { describeMCPResult, renderMCPResult } from "@oh-my-pi/pi-tui/tools/mcp";
 import type { ToolRenderer, ToolRenderResult } from "@oh-my-pi/pi-tui/tools/renderer";
 import { isRecord } from "@oh-my-pi/pi-utils";
 
-// Use OMP's bounded, expandable JSON trees instead of serialized payloads
+// Use OMP's bounded JSON trees and expandable arguments in both renderers
 // Content and details remain untouched for the model and persisted history
 export function farstepPresentation(title: string) {
   const target = (input: unknown): string => {
@@ -29,11 +29,20 @@ export function farstepPresentation(title: string) {
         },
         applyBg: false,
       })),
-    renderResult: (result, options, theme) =>
-      renderMCPResult(viewResult(result), options, theme),
+    renderResult: (result, options, theme, args) =>
+      renderMCPResult(
+        viewResult(result),
+        options,
+        theme,
+        isRecord(args) ? args : undefined,
+      ),
     describeCall: (args) => ({ tool: { title, target: target(args) } }),
     describeResult: (result, options, args) => ({
-      ...describeMCPResult(viewResult(result), options),
+      ...describeMCPResult(
+        viewResult(result),
+        options,
+        isRecord(args) ? args : undefined,
+      ),
       tool: { title, target: target(args) },
     }),
   } satisfies ToolRenderer<unknown, unknown>;

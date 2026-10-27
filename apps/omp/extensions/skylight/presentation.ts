@@ -56,12 +56,17 @@ export function skylightPresentation(
       } satisfies ToolCardSnapshot;
       return plainToolCard(theme, () => snapshot);
     },
-    renderResult: (result, options, theme) => renderMCPResult(result, options, theme),
+    renderResult: (result, options, theme, args) =>
+      renderMCPResult(result, options, theme, isRecord(args) ? args : undefined),
     describeCall: (args) => ({
       tool: { title: label, target: target(args) },
     }),
-    describeResult: (result, options) => {
-      const view = describeMCPResult(result, options);
+    describeResult: (result, options, args) => {
+      const view = describeMCPResult(
+        result,
+        options,
+        isRecord(args) ? args : undefined,
+      );
       return {
         ...view,
         tool: { title: label, meta: outputMeta(result) },

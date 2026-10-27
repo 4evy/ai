@@ -212,6 +212,10 @@ process state stay visible without expansion. The
 [renderers](../apps/omp/extensions/remote/jobs/render.ts) support both ordinary
 and native terminals while preserving the full model-facing output.
 
+Farstep management tools and Skylight retain their full arguments in the
+result card. Expand **Args** in native terminals, or expand the result in an
+ordinary terminal. This does not change the model-facing result.
+
 ## Compose Effect at runtime boundaries
 
 Use the installed Effect version's source and examples under
