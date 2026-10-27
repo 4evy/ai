@@ -187,7 +187,7 @@ async function runScript(
       throw new Error(
         "Script finished with running zx commands; await every command before returning",
       );
-    return 0;
+    return Number(process.exitCode ?? 0);
   } catch (error) {
     console.error(
       error instanceof zx.ProcessOutput

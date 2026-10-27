@@ -13,6 +13,7 @@ function frameStream(
   convert: (source: AsyncIterable<Buffer>) => AsyncIterable<Buffer>,
 ) {
   const input = new PassThrough();
+  // Bun's native duplex pair masks framing errors as aborts
   return Duplex.fromWeb({
     writable: Writable.toWeb(input),
     readable: Readable.toWeb(Readable.from(convert(input), { objectMode: false })),

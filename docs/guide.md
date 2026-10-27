@@ -92,6 +92,15 @@ For execution changes, preserve these ownership and recovery rules:
 
 ### Execution and desktop boundaries
 
+Scripts preserve an explicitly assigned `process.exitCode`. An uncaught error
+still fails the script, and an uncaught zx child failure preserves the child's
+exit status. Await every zx command before returning.
+
+Helper startup failures fail the connection before protocol traffic starts.
+Closing request input still lets the helper flush its final response and exit.
+A native PTY setup failure releases the startup wait with the original error
+after the broker records the failed job.
+
 Desktop opening follows the helper's advertised `open` availability. The native
 backend still enforces its prerequisites and reports failures with their
 original codes and text-input receipts. An isolated workspace is not a security

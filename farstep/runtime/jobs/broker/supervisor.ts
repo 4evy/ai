@@ -92,10 +92,11 @@ export class JobSupervisor {
                 ),
               { awaitOnInterrupt: true },
             ),
+          // Native setup can reject without invoking the startup callback
           onFailure: (error) =>
             attempt(() => this.settle(job, undefined, String(error)), {
               awaitOnInterrupt: true,
-            }),
+            }).pipe(Effect.ensuring(Deferred.fail(started, error))),
         }),
         Effect.ensuring(Deferred.succeed(started, undefined)),
       ),

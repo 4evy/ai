@@ -36,28 +36,40 @@ function stop(error?: Error | null) {
     ),
   );
 }
-if (compressed) {
-  pipeline(
-    process.stdin,
-    new BoundedFrames(MAX_REQUEST_BYTES),
-    zstdFrames(MAX_REQUEST_BYTES),
-    child.stdin,
-    stop,
-  );
-  pipeline(
-    child.stdout,
-    unzstdFrames(MAX_RESPONSE_BYTES),
-    new BoundedFrames(MAX_RESPONSE_BYTES),
-    process.stdout,
-    stop,
-  );
-} else {
-  pipeline(process.stdin, new BoundedFrames(MAX_REQUEST_BYTES), child.stdin, stop);
-  pipeline(child.stdout, new BoundedFrames(MAX_RESPONSE_BYTES), process.stdout, stop);
-}
+const inputFinished = (error?: Error | null) => {
+  // EOF closes the child's input, but its final response and exit are pending
+  if (error) stop(error);
+};
 child.on("error", (error) => {
   stop(error);
   if (child.pid === undefined) Deferred.doneUnsafe(exited, Effect.void);
+});
+child.once("spawn", () => {
+  // Failed spawns have no usable pipes, so wait until startup succeeds
+  if (compressed) {
+    pipeline(
+      process.stdin,
+      new BoundedFrames(MAX_REQUEST_BYTES),
+      zstdFrames(MAX_REQUEST_BYTES),
+      child.stdin,
+      inputFinished,
+    );
+    pipeline(
+      child.stdout,
+      unzstdFrames(MAX_RESPONSE_BYTES),
+      new BoundedFrames(MAX_RESPONSE_BYTES),
+      process.stdout,
+      stop,
+    );
+  } else {
+    pipeline(
+      process.stdin,
+      new BoundedFrames(MAX_REQUEST_BYTES),
+      child.stdin,
+      inputFinished,
+    );
+    pipeline(child.stdout, new BoundedFrames(MAX_RESPONSE_BYTES), process.stdout, stop);
+  }
 });
 child.on("exit", (code) => {
   process.exitCode = process.exitCode || code || (code === 0 ? 0 : 1);
