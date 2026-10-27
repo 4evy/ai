@@ -70,6 +70,12 @@ Keep workflow scheduling and child lifetimes in the
 serialized journal writes, recovery and result finalization. Import record types
 and storage operations from their owning modules, not the workflow service.
 
+Keep native MCP schemas, tool metadata and response encoding in
+[`tools.rs`](../farstep/native/desktop-runtime/src/server/tools.rs). Session
+ownership, consent gates and input belong in
+[`session.rs`](../farstep/native/desktop-runtime/src/server/session.rs).
+Helper negotiation and workspace leases have separate modules alongside them.
+
 For execution changes, preserve these ownership and recovery rules:
 
 - The job broker owns processes and output. Gateways connect clients to it.

@@ -1,4 +1,7 @@
+mod helper;
+mod session;
 mod tools;
+mod workspace;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -10,11 +13,12 @@ use rmcp::model::*;
 use rmcp::service::RequestContext;
 use rmcp::{RoleServer, ServerHandler, ServiceExt};
 use serde_json::{Value, json};
+use session::SessionOperations;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::{Mutex, OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::AbortOnDropHandle;
-use tools::{ToolFailure, ToolSession};
+use tools::ToolFailure;
 
 use crate::backend::{Backend, DesktopSession, WorkspaceLease};
 use crate::transport;
@@ -28,7 +32,7 @@ pub struct Shared {
     lease: Arc<Semaphore>,
     sessions: AtomicUsize,
     profiles: Mutex<()>,
-    tools: ToolRouter<ToolSession>,
+    tools: ToolRouter<SessionOperations>,
 }
 
 #[derive(Clone)]
@@ -42,14 +46,6 @@ pub struct Channel {
 }
 
 impl Channel {
-    async fn release(&self, session: &mut Option<Box<dyn DesktopSession>>) {
-        if let Some(mut previous) = session.take() {
-            previous.close().await;
-            self.shared.sessions.fetch_sub(1, Ordering::AcqRel);
-        }
-        self.control.lock().await.take();
-    }
-
     async fn finish_tool(
         &self,
         response: &mut CallToolResponse,
@@ -122,7 +118,7 @@ impl ServerHandler for Channel {
                 .and_then(|action| action.get("method"))
                 .and_then(Value::as_str)
                 == Some("type_text");
-        let mut tools = ToolSession {
+        let mut tools = SessionOperations {
             channel: self.clone(),
             session: Mutex::new(None),
         };
@@ -183,7 +179,7 @@ impl Shared {
             lease: Arc::new(Semaphore::new(1)),
             sessions: AtomicUsize::new(0),
             profiles: Mutex::new(()),
-            tools: ToolSession::router(),
+            tools: SessionOperations::router(),
         })
     }
 }

@@ -26,11 +26,12 @@ pub enum Owner {
     DataControl { _child: tokio::process::Child },
 }
 
+/// Owns the payload for sequential, borrowed portal transfers
 struct PortalPublication {
     clipboard: Arc<ashpd::desktop::clipboard::Clipboard>,
     session: Arc<ashpd::desktop::Session<RemoteDesktop>>,
     expected: serde_json::Value,
-    bytes: Arc<Vec<u8>>,
+    bytes: Vec<u8>,
     effects: Arc<std::sync::Mutex<super::protocol::Receipt>>,
 }
 
@@ -45,7 +46,7 @@ impl PortalPublication {
         let session = session.clone();
         let expected =
             serde_json::to_value(session.as_ref()).map_err(|e| Failure::new("backend-error", e))?;
-        let bytes = Arc::new(text.as_bytes().to_vec());
+        let bytes = text.as_bytes().to_vec();
         Ok(Self {
             clipboard,
             session,
