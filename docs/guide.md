@@ -107,6 +107,27 @@ original codes and text-input receipts. An isolated workspace is not a security
 sandbox or a guarantee of background input. Frame-bound input rejects stale
 captures but does not make observation and action atomic.
 
+## Bound job output without discarding recovery records
+
+Each job bounds pending output persistence to 1 MiB and 256 chunks. Pipe
+readers await storage. PTY callbacks cannot wait, so overflow or a storage
+failure fails the job and stops its producer instead of silently dropping
+output. Completion publication waits for settled output and durable metadata.
+Recorded storage diagnostics include queue peaks, rejected bytes, retained
+bytes, and failures.
+
+Output rotates through two generations of at most 25 MiB each. Job metadata,
+single-use name reservations, pending completions, and action receipts remain
+retained indefinitely. Their storage can therefore grow, but rotation does not
+discard unresolved outcomes or shorten deduplication.
+
+Durable broker records live under the execution scope's `broker/jobs`
+directory. Short-lived sockets, PID files, and tokens remain in the short
+runtime directory. Existing runtime job records migrate through synced staging
+before the old copy is removed. An explicit supervisor shutdown waits for owned
+jobs and output persistence. A killed supervisor still yields an unknown
+outcome on recovery rather than adopting surviving processes or replaying work.
+
 ## Read Farstep job cards in OMP
 
 Farstep job cards show lifecycle status, exit code, duration, and batch step

@@ -111,6 +111,7 @@ export class JobCompletions {
     request: JobWireRequest,
     owner: string,
   ): Promise<void> {
+    if (job.settling) await job.settling;
     if (!job.capable) {
       job.capable = true;
       await this.persist(job);

@@ -6,6 +6,7 @@ import { Lifetime, run } from "@ai/core/effect/effect";
 import { Queue } from "@ai/core/effect/queue/queue";
 import { errorMessage } from "@ai/core/error/error";
 import { FileLock } from "@oh-my-pi/pi-natives";
+import { postmortem } from "@oh-my-pi/pi-utils";
 import { ConcatSink } from "@oh-my-pi/pi-utils/stream";
 import { Deferred, Effect, Fiber, Schedule } from "effect";
 import {
@@ -73,7 +74,7 @@ export class JobBroker {
     readonly secret: string,
     readonly idleGraceMs: number,
   ) {
-    this.#records = new JobRecords(directory);
+    this.#records = new JobRecords(join(projectDir, "broker"));
     this.#completions = new JobCompletions(this.#jobs, (job) =>
       this.#records.persist(job),
     );
@@ -87,7 +88,7 @@ export class JobBroker {
   }
 
   async run(): Promise<void> {
-    await this.#records.recover(this.#jobs);
+    await this.#records.recover(this.#jobs, this.directory);
     const endpoint = join(this.directory, "broker.sock");
     await rm(endpoint, { force: true });
     const server = createServer((socket) => this.#accept(socket));
@@ -96,19 +97,16 @@ export class JobBroker {
     await once(server, "listening");
     await chmod(endpoint, 0o600);
     this.#idle();
-    const shutdown = () => {
-      void this.close().catch((error) => {
-        console.error(error);
-        process.exit(1);
-      });
-    };
-    process.once("SIGTERM", shutdown);
-    process.once("SIGINT", shutdown);
+    // Process-wide signal cleanup must await jobs and their durable output
+    const cancelCleanup = postmortem.register(
+      `farstep-job-broker-${this.directory}`,
+      () => this.close(),
+      { exitOnly: true },
+    );
     try {
       await run(Deferred.await(this.#done));
     } finally {
-      process.off("SIGTERM", shutdown);
-      process.off("SIGINT", shutdown);
+      cancelCleanup();
     }
   }
 
@@ -233,7 +231,7 @@ export class JobBroker {
       throw new Error("Job name already exists; use a fresh job name");
     const pattern = spec.ready?.log ? new RegExp(spec.ready.log, "u") : undefined;
     const now = Date.now();
-    const directory = join(this.directory, "jobs", spec.name);
+    const directory = this.#records.jobDirectory(spec.name);
     const size = spec.pty
       ? (spec.terminalSize ?? { columns: JOB_PTY_COLUMNS, rows: JOB_PTY_ROWS })
       : undefined;
@@ -311,6 +309,7 @@ export class JobBroker {
     );
     for (const job of this.#jobs.values()) {
       if (job.snapshot.state !== "unknown") await this.#supervisor.stop(job, 2000);
+      await job.finished;
       await job.log.flush();
       await this.#records.persisted(job);
     }

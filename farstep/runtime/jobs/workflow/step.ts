@@ -13,7 +13,6 @@ import type {
 } from "#farstep/protocol/workflow/workflow";
 import { subreaperScript } from "#farstep/runtime/platform/processes";
 import { privateDirectory } from "../../state";
-import { brokerDirectory } from "../jobs";
 import { type RunningChild, WorkflowChild } from "./child";
 import { startCapture, type WorkflowCapture } from "./output";
 import { evaluateGuards, waitForReady } from "./policy";
@@ -52,7 +51,7 @@ function outputFailed(
 
 async function nativeReadinessLog(directory: string, name: string) {
   const scope = dirname(dirname(directory));
-  const logDirectory = join(await brokerDirectory(scope), "jobs", name);
+  const logDirectory = join(scope, "broker", "jobs", name);
   await privateDirectory(logDirectory);
   const buffer = Buffer.alloc(64 * 1024);
   // Reading the native log must not lease a session job past disconnect

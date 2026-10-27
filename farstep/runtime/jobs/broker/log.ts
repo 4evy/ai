@@ -13,6 +13,8 @@ import {
 import { atomicWrite } from "../../state";
 
 const MAX_LOG_BYTES = 25 * 1024 * 1024;
+const MAX_BACKLOG_BYTES = 1024 * 1024;
+const MAX_BACKLOG_CHUNKS = 256;
 const READ_BYTES = 2 * 1024 * 1024;
 
 async function size(path: string): Promise<number> {
@@ -48,15 +50,28 @@ export class JobLog {
   #origin: number;
   #current: number;
   #end: number;
+  #previousBytes: number;
+  #queuedBytes = 0;
+  #queuedChunks = 0;
+  #peakQueuedBytes = 0;
+  #peakQueuedChunks = 0;
+  #rejectedBytes = 0;
   readonly #queue = new Queue();
   #writeFailure: { error: unknown } | undefined;
+  #historicalFailure: string | undefined;
 
-  private constructor(directory: string, origin: number, current: number) {
+  private constructor(
+    directory: string,
+    origin: number,
+    current: number,
+    previous = 0,
+  ) {
     this.path = join(directory, "output.log");
     this.previous = join(directory, "output.previous.log");
     this.#origin = origin;
     this.#current = current;
     this.#end = origin + current;
+    this.#previousBytes = previous;
   }
 
   static async create(directory: string): Promise<JobLog> {
@@ -67,7 +82,15 @@ export class JobLog {
     return log;
   }
 
-  static async recover(directory: string): Promise<JobLog> {
+  static async recover(
+    directory: string,
+    history?: {
+      peakQueuedBytes: number;
+      peakQueuedChunks: number;
+      rejectedBytes: number;
+      failure?: string | undefined;
+    },
+  ): Promise<JobLog> {
     const path = join(directory, "output.log");
     let origin = 0;
     try {
@@ -77,34 +100,88 @@ export class JobLog {
     }
     if (!Number.isSafeInteger(origin) || origin < 0)
       throw new Error("Invalid job log origin");
-    return new JobLog(directory, origin, await size(path));
+    const log = new JobLog(
+      directory,
+      origin,
+      await size(path),
+      await size(join(directory, "output.previous.log")),
+    );
+    if (history) {
+      log.#peakQueuedBytes = history.peakQueuedBytes;
+      log.#peakQueuedChunks = history.peakQueuedChunks;
+      log.#rejectedBytes = history.rejectedBytes;
+      log.#historicalFailure = history.failure;
+    }
+    return log;
   }
 
   get end(): number {
     return this.#end;
   }
 
+  // Metadata is retained indefinitely, only the two output generations rotate
+  get storage() {
+    return {
+      backlogLimitBytes: MAX_BACKLOG_BYTES,
+      backlogLimitChunks: MAX_BACKLOG_CHUNKS,
+      queuedBytes: this.#queuedBytes,
+      queuedChunks: this.#queuedChunks,
+      peakQueuedBytes: this.#peakQueuedBytes,
+      peakQueuedChunks: this.#peakQueuedChunks,
+      acceptedBytes: this.#end,
+      persistedBytes: this.#origin + this.#current,
+      rejectedBytes: this.#rejectedBytes,
+      retainedBytes: this.#previousBytes + this.#current,
+      retentionLimitBytes: 2 * MAX_LOG_BYTES,
+      failure: this.#writeFailure
+        ? String(this.#writeFailure.error).slice(0, 1024)
+        : this.#historicalFailure,
+    };
+  }
+
   append(value: string | Uint8Array): Promise<void> {
+    const length = typeof value === "string" ? Buffer.byteLength(value) : value.length;
+    if (this.#writeFailure) {
+      this.#rejectedBytes += length;
+      throw this.#writeFailure.error;
+    }
+    if (
+      length > MAX_BACKLOG_BYTES - this.#queuedBytes ||
+      this.#queuedChunks >= MAX_BACKLOG_CHUNKS
+    ) {
+      this.#rejectedBytes += length;
+      const error = new Error(
+        `Job output persistence backlog exceeded ${MAX_BACKLOG_BYTES} bytes or ${MAX_BACKLOG_CHUNKS} chunks`,
+      );
+      this.#writeFailure = { error };
+      throw error;
+    }
     const bytes = Buffer.from(value);
-    this.#end += bytes.length;
+    this.#end += length;
+    this.#queuedBytes += length;
+    this.#queuedChunks++;
+    this.#peakQueuedBytes = Math.max(this.#peakQueuedBytes, this.#queuedBytes);
+    this.#peakQueuedChunks = Math.max(this.#peakQueuedChunks, this.#queuedChunks);
     return this.#queue.run(async () => {
-      if (this.#writeFailure) throw this.#writeFailure.error;
       try {
-        if (this.#current && this.#current + bytes.length > MAX_LOG_BYTES) {
+        if (this.#writeFailure) throw this.#writeFailure.error;
+        if (this.#current + length > MAX_LOG_BYTES) {
           await rm(this.previous, { force: true });
           await rename(this.path, this.previous);
+          this.#previousBytes = this.#current;
           this.#origin += this.#current;
           this.#current = 0;
           await atomicWrite(`${this.path}.offset`, String(this.#origin));
         }
-        {
-          await using file = await open(this.path, "a", 0o600);
-          await file.writeFile(bytes);
-        }
-        this.#current += bytes.length;
+        await using file = await open(this.path, "a", 0o600);
+        await file.writeFile(bytes);
+        this.#current += length;
       } catch (error) {
-        this.#writeFailure = { error };
+        this.#writeFailure ??= { error };
         throw error;
+      } finally {
+        this.#queuedBytes -= length;
+        this.#queuedChunks--;
       }
     });
   }
@@ -112,9 +189,8 @@ export class JobLog {
   #snapshot<T>(read: (end: number) => Promise<T>): Promise<T> {
     const end = this.#end;
     return this.#queue.run(async () => {
-      // A failed append rejects the next snapshot before reopening the write queue
+      // A storage failure remains visible to every reader and durability barrier
       const failure = this.#writeFailure;
-      this.#writeFailure = undefined;
       if (failure) throw failure.error;
       return read(end);
     });
@@ -194,9 +270,14 @@ export class JobLog {
 
   flush(): Promise<void> {
     return this.#queue.run(async () => {
-      if (this.#writeFailure) throw this.#writeFailure.error;
-      await using file = await open(this.path, "r");
-      await file.sync();
+      try {
+        if (this.#writeFailure) throw this.#writeFailure.error;
+        await using file = await open(this.path, "r");
+        await file.sync();
+      } catch (error) {
+        this.#writeFailure ??= { error };
+        throw error;
+      }
     });
   }
 }

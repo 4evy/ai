@@ -25,7 +25,13 @@ export class JobSupervisor {
       throw new Error("Job was stopped before its process started");
     if (job.spec.pty) await this.#launchPty(job);
     else this.#launchPipes(job);
-    await this.persist(job);
+    try {
+      await this.persist(job);
+    } catch (error) {
+      this.#failOutput(job, error);
+      await job.finished;
+      throw error;
+    }
   }
 
   async #launchPty(job: ManagedJob): Promise<void> {
@@ -56,7 +62,7 @@ export class JobSupervisor {
       },
       (error, chunk) => {
         if (error) {
-          console.error(error);
+          this.#failOutput(job, error);
           return;
         }
         if (!chunk) return;
@@ -66,7 +72,12 @@ export class JobSupervisor {
             terminal.write(reply);
           } catch {}
         }
-        this.#output(job, chunk);
+        if (job.outputFailure) return;
+        try {
+          void this.#output(job, chunk).catch((error) => this.#failOutput(job, error));
+        } catch (error) {
+          this.#failOutput(job, error);
+        }
       },
       (error, pid) => {
         if (error) {
@@ -76,6 +87,7 @@ export class JobSupervisor {
         if (!ended(job)) {
           job.snapshot.pid = pid;
           job.process = Process.fromPid(pid) ?? undefined;
+          if (job.outputFailure) this.#terminateOutput(job);
         }
         Deferred.doneUnsafe(started, Effect.void);
       },
@@ -101,6 +113,7 @@ export class JobSupervisor {
         Effect.ensuring(Deferred.succeed(started, undefined)),
       ),
     );
+    void job.finished.catch((error) => console.error(error));
     await run(Deferred.await(started));
   }
 
@@ -130,12 +143,17 @@ export class JobSupervisor {
           onSuccess: ([code]) =>
             attempt(() => this.settle(job, code), { awaitOnInterrupt: true }),
           onFailure: (error) =>
-            attempt(() => this.settle(job, undefined, String(error)), {
-              awaitOnInterrupt: true,
-            }),
+            attempt(
+              async () => {
+                this.#failOutput(job, error);
+                await this.settle(job, undefined, String(error));
+              },
+              { awaitOnInterrupt: true },
+            ),
         }),
       ),
     );
+    void job.finished.catch((error) => console.error(error));
   }
 
   #drainEffect(job: ManagedJob, stream: ReadableStream<Uint8Array>) {
@@ -146,11 +164,16 @@ export class JobSupervisor {
         onError: (error) => error,
       }).pipe(
         Stream.runForEach((chunk) =>
-          Effect.try({
-            try: () =>
-              this.#output(job, chunk, decoder.decode(chunk, { stream: true })),
-            catch: (error) => error,
-          }),
+          attempt(
+            async () => {
+              // Await bounded writes before reading more from either OS pipe
+              for (let offset = 0; offset < chunk.length; offset += 65536) {
+                const bytes = chunk.subarray(offset, offset + 65536);
+                await this.#output(job, bytes, decoder.decode(bytes, { stream: true }));
+              }
+            },
+            { awaitOnInterrupt: true },
+          ),
         ),
         Effect.andThen(
           Effect.try({
@@ -165,14 +188,34 @@ export class JobSupervisor {
     });
   }
 
-  #output(job: ManagedJob, bytes: string | Uint8Array, text?: string): void {
+  #output(job: ManagedJob, bytes: string | Uint8Array, text?: string): Promise<void> {
     job.snapshot.outputBytes +=
       typeof bytes === "string" ? Buffer.byteLength(bytes) : bytes.length;
-    void job.log.append(bytes).catch((error) => {
-      console.error(error);
-      void this.stop(job, 0);
+    if (job.outputFailure) return Promise.reject(job.outputFailure.error);
+    return job.log.append(bytes).then(() => {
+      if (!job.outputFailure) this.#track(job, text ?? String(bytes));
     });
-    this.#track(job, text ?? String(bytes));
+  }
+
+  #failOutput(job: ManagedJob, error: unknown, terminate = true): void {
+    if (job.outputFailure) return;
+    job.outputFailure = { error };
+    console.error(error);
+    // A PTY callback cannot await storage, overflow fails the job and producer
+    if (terminate) this.#terminateOutput(job);
+  }
+
+  #terminateOutput(job: ManagedJob): void {
+    try {
+      job.process?.killTree(constants.signals.SIGKILL);
+    } catch (error) {
+      console.error(error);
+    }
+    try {
+      job.terminal?.kill();
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   #track(job: ManagedJob, text: string): void {
@@ -188,7 +231,14 @@ export class JobSupervisor {
   }
 
   ready(job: ManagedJob): void {
-    if (ended(job) || job.stopped || job.snapshot.readyAt !== undefined) return;
+    if (
+      ended(job) ||
+      job.stopped ||
+      job.outputFailure ||
+      job.snapshot.readyAt !== undefined
+    )
+      return;
+    const previous = job.snapshot.readyPending?.join(",");
     if (job.logReady && job.portReady) {
       job.snapshot.state = job.spec.ready ? "ready" : "running";
       job.snapshot.readyAt = Date.now();
@@ -198,7 +248,11 @@ export class JobSupervisor {
         ...(!job.logReady ? ["log" as const] : []),
         ...(!job.portReady ? ["port" as const] : []),
       ];
-    void this.persist(job).catch((error) => console.error(error));
+    if (
+      job.snapshot.readyAt !== undefined ||
+      previous !== job.snapshot.readyPending?.join(",")
+    )
+      void this.persist(job).catch((error) => this.#failOutput(job, error));
   }
 
   pollPort(job: ManagedJob): void {
@@ -227,11 +281,23 @@ export class JobSupervisor {
     );
   }
 
-  async settle(job: ManagedJob, code?: number, error?: string): Promise<void> {
-    if (ended(job)) return;
-    job.snapshot.state = !job.stopped && (error || code !== 0) ? "failed" : "exited";
+  settle(job: ManagedJob, code?: number, error?: string): Promise<void> {
+    if (job.settling) return job.settling;
+    if (ended(job)) return Promise.resolve();
+    job.settling = this.#settle(job, code, error);
+    return job.settling;
+  }
+
+  async #settle(job: ManagedJob, code?: number, error?: string): Promise<void> {
+    try {
+      await job.log.flush();
+    } catch (failure) {
+      this.#failOutput(job, failure, false);
+    }
+    const failure = job.outputFailure ? String(job.outputFailure.error) : error;
+    job.snapshot.state = failure || (!job.stopped && code !== 0) ? "failed" : "exited";
     job.snapshot.exitCode = code;
-    job.snapshot.exitReason = error;
+    job.snapshot.exitReason = failure;
     job.snapshot.exitedAt = Date.now();
     job.snapshot.pid = undefined;
     job.snapshot.readyPending = undefined;
@@ -245,7 +311,7 @@ export class JobSupervisor {
         snapshot: { ...job.snapshot },
       });
     }
-    await job.log.flush();
+    // No completion is published until output and the final receipt have settled
     await this.persist(job);
     this.deliver(job);
     this.idle();
@@ -256,7 +322,10 @@ export class JobSupervisor {
       throw new Error(
         "Previous supervisor exited; this process cannot be safely controlled",
       );
-    if (ended(job)) return;
+    if (ended(job)) {
+      await job.settling;
+      return;
+    }
     job.stopped = true;
     job.snapshot.state = "stopping";
     await this.persist(job);
@@ -270,5 +339,6 @@ export class JobSupervisor {
       job.process?.killTree(constants.signals.SIGKILL);
       await until(() => ended(job), 1000);
     }
+    await job.settling;
   }
 }

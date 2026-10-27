@@ -24,6 +24,8 @@ export interface ManagedJob {
   input?: Bun.FileSink | undefined;
   process?: Process | undefined;
   finished?: Promise<void>;
+  settling?: Promise<void>;
+  outputFailure?: { error: unknown };
   buffer: string;
   pattern?: RegExp | undefined;
   logReady: boolean;

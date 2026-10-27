@@ -1,6 +1,7 @@
 import { hasFsCode } from "@oh-my-pi/pi-utils/fs-error";
 
-// Darwin's AF_UNIX limit includes the socket name, so keep the broker root short
+// AF_UNIX paths must stay short, only disposable transport files belong here
+// Durable job records live under the canonical scope, never under /tmp
 export function brokerRoot(): string {
   if (process.platform !== "linux" && process.platform !== "darwin")
     throw new Error("Farstep jobs need a native broker transport for this platform");
