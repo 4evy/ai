@@ -17,6 +17,7 @@ import {
   RESPONSE_BUDGET,
   type Session,
 } from "./context";
+import type { CoordinationStore } from "./store/store";
 import * as tables from "./store/tables";
 import type { CoordinationWork } from "./work";
 
@@ -63,54 +64,85 @@ export class CoordinationViews {
   }
 
   snapshot(allProjects: boolean, offset: number, limit: number): CoordinationResult {
-    const project = this.context.session.project;
-    const sessions = this.context.store.queries
+    return CoordinationViews.snapshot(
+      this.context.store,
+      allProjects ? undefined : this.context.session.project,
+      offset,
+      limit,
+    );
+  }
+
+  static snapshot(
+    store: CoordinationStore,
+    project: string | undefined,
+    offset: number,
+    limit: number,
+    includeHandoffs = false,
+  ): CoordinationResult {
+    const observedAt = Date.now();
+    const sessions = store.queries
       .select({
         payload: tables.sessions.payload,
         generation: tables.sessions.generation,
         connected: tables.sessions.connected,
       })
       .from(tables.sessions)
-      .where(allProjects ? undefined : eq(tables.sessions.project, project))
+      .where(project === undefined ? undefined : eq(tables.sessions.project, project))
       .orderBy(tables.sessions.project, tables.sessions.id)
       .limit(limit + 1)
       .offset(offset)
       .all();
-    const works = this.context.store.queries
+    const works = store.queries
       .select({ payload: tables.works.payload })
       .from(tables.works)
-      .where(allProjects ? undefined : eq(tables.works.project, project))
+      .where(project === undefined ? undefined : eq(tables.works.project, project))
       .orderBy(tables.works.project, tables.works.id)
       .limit(limit + 1)
       .offset(offset)
       .all();
-    const claims = this.context.store.queries
+    const claims = store.queries
       .select({ payload: tables.claims.payload })
       .from(tables.claims)
       .where(
         and(
-          gt(tables.claims.expires, Date.now()),
-          allProjects ? undefined : eq(tables.claims.project, project),
+          gt(tables.claims.expires, observedAt),
+          project === undefined ? undefined : eq(tables.claims.project, project),
         ),
       )
       .orderBy(tables.claims.project, tables.claims.work)
       .limit(limit + 1)
       .offset(offset)
       .all();
-    const jobs = this.context.store.queries
+    const jobs = store.queries
       // Budget raw stored bytes before decoding only the selected prefix
       .select({ payload: sql<string>`${tables.jobs.payload}` })
       .from(tables.jobs)
-      .where(allProjects ? undefined : eq(tables.jobs.project, project))
+      .where(project === undefined ? undefined : eq(tables.jobs.project, project))
       .orderBy(tables.jobs.project, tables.jobs.scope, tables.jobs.name)
       .limit(limit + 1)
       .offset(offset)
       .all();
+    const notes = includeHandoffs
+      ? store.queries
+          .select({ payload: tables.notes.payload })
+          .from(tables.notes)
+          .where(
+            and(
+              project === undefined ? undefined : eq(tables.notes.project, project),
+              sql`json_extract(${tables.notes.payload}, '$.kind') = 'handoff'`,
+              sql`json_extract(${tables.notes.payload}, '$.acknowledgedAt') IS NULL`,
+            ),
+          )
+          .orderBy(tables.notes.project, tables.notes.sequence)
+          .limit(limit + 1)
+          .offset(offset)
+          .all()
+      : [];
     // Keep one prefix width so the cursor advances equally across collections
     let width = limit;
     while (
       width > 1 &&
-      [sessions, works, claims, jobs].reduce(
+      [sessions, works, claims, jobs, notes].reduce(
         (bytes, rows) =>
           bytes +
           rows
@@ -128,7 +160,11 @@ export class CoordinationViews {
       jobs: jobs.length > width,
     };
     return {
-      cursor: this.context.cursor(),
+      cursor:
+        store.queries
+          .select({ cursor: sql<number>`coalesce(max(${tables.events.id}), 0)` })
+          .from(tables.events)
+          .get()?.cursor ?? 0,
       sessions: sessions
         .values()
         .take(width)
@@ -137,7 +173,7 @@ export class CoordinationViews {
           return {
             ...session,
             presence:
-              row.connected === 1 && Date.now() - session.lastSeenAt > STALE_PRESENCE_MS
+              row.connected === 1 && observedAt - session.lastSeenAt > STALE_PRESENCE_MS
                 ? ("stale" as const)
                 : session.presence,
           };
@@ -159,9 +195,18 @@ export class CoordinationViews {
         .map((row) => v.parse(coordinationJobSchema, JSON.parse(row.payload)))
         .toArray(),
       truncated,
+      ...(includeHandoffs
+        ? {
+            notes: notes
+              .values()
+              .take(width)
+              .map((row) => v.parse(coordinationNoteSchema, JSON.parse(row.payload)))
+              .toArray(),
+          }
+        : {}),
       pagination: {
         nextCursor: offset + width,
-        hasMore: Object.values(truncated).some(Boolean),
+        hasMore: Object.values(truncated).some(Boolean) || notes.length > width,
       },
     };
   }

@@ -6,7 +6,14 @@ import { attempt, run } from "@ai/core/effect/effect";
 import { isEexist, isEnoent } from "@oh-my-pi/pi-utils/fs-error";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { Effect } from "effect";
-import { loadIdentityEffect, paths, privateDirectoryEffect } from "../../state";
+import { uuidSchema } from "farstep/protocol/identity";
+import * as v from "valibot";
+import {
+  loadIdentityEffect,
+  paths,
+  privateDirectoryEffect,
+  privateRead,
+} from "../../state";
 import * as tables from "./tables";
 
 const schema = readResource(new URL("./schema.sql", import.meta.url), "utf8");
@@ -86,6 +93,32 @@ export class CoordinationStore implements Disposable {
 
   static acquireEffect(installationId: string) {
     return Effect.acquireDisposable(CoordinationStore.createEffect(installationId));
+  }
+
+  static async openReadOnly(): Promise<CoordinationStore> {
+    const state = await realpath(paths().state);
+    v.parse(
+      v.strictObject({ installationId: uuidSchema }),
+      JSON.parse(await privateRead(join(state, "installation.json"))),
+    );
+    const directory = join(state, "coordination");
+    if ((await realpath(directory)) !== directory)
+      throw new Error("Coordination directory must be canonical");
+    const path = join(directory, "registry.sqlite");
+    CoordinationStore.assertFiles(path);
+    const db = new Database(path, { readonly: true, strict: true });
+    try {
+      db.exec("PRAGMA busy_timeout = 10000;");
+      const version =
+        db.query<{ user_version: number }, []>("PRAGMA user_version").get()
+          ?.user_version ?? 0;
+      if (version !== 1)
+        throw new Error("Coordination database schema is unavailable or unsupported");
+      return new CoordinationStore(db, path);
+    } catch (error) {
+      db.close();
+      throw error;
+    }
   }
 
   private static assertFiles(path: string): void {

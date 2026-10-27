@@ -113,6 +113,29 @@ original codes and text-input receipts. An isolated workspace is not a security
 sandbox or a guarantee of background input. Frame-bound input rejects stale
 captures but does not make observation and action atomic.
 
+## Inspect Farstep without starting work
+
+```sh
+bun farstep/runtime/main.ts doctor --command bun
+bun farstep/runtime/main.ts work list --project "$PWD" --limit 20
+```
+
+Installed helpers expose the same routes as `farstep doctor` and
+`farstep work list`. Doctor inspects existing state without starting a broker,
+loading a shell environment, requesting desktop authorization, or capturing a
+screen. Use `--scope SCOPE_ID` to inspect a recorded scope's endpoint.
+
+Work list reads the existing coordination registry. Follow
+`pagination.nextCursor` while `pagination.hasMore` is true. Without `--project`,
+it includes all projects for the user. Each collection uses the same page
+offset, and pages are not a frozen snapshot.
+
+Record age and presence are not process liveness. The output separates recorded
+state from current state, which remains unknown without a live observation.
+Matching durable completion events identify unacknowledged delivery. An empty
+queue does not prove acknowledgment, because an explicit unsubscribe can also
+clear it. Handoffs and resource claims remain separate from job-control rights.
+
 ## Bound job output without discarding recovery records
 
 Each job bounds pending output persistence to 1 MiB and 256 chunks. Pipe

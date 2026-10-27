@@ -4,6 +4,8 @@ import { flushObservability, operation } from "@ai/core/effect/effect";
 import { errorMessage } from "@ai/core/error/error";
 import { Match } from "effect";
 import { commandHelp, parseCommand } from "./cli/cli";
+import { doctor } from "./cli/doctor";
+import { workList } from "./cli/work";
 import { relayDesktop } from "./desktop";
 import { runDeadline } from "./jobs/deadline";
 import { runJobs } from "./jobs/jobs";
@@ -99,6 +101,12 @@ function executeCommand(options: Command, native: Native): Promise<void> {
         await runJobs(request.scope, request.owner);
       },
       status: () => writeResult(management.status()),
+      doctor: (request) => writeResult(doctor(request)),
+      "work-list": async (request) => {
+        const result = await workList(request);
+        await writeResult(result);
+        if (result.availability === "unavailable") process.exitCode = 1;
+      },
       prepare: () => writeResult(management.prepareUpgrade()),
       cancel: (request) =>
         writeResult(management.cancelUpgrade(request.maintenanceToken)),

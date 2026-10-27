@@ -13,6 +13,17 @@ const installation = {
   waylandDisplay: optional(option("--wayland-display", text)),
   maintenanceToken: optional(option("--maintenance-token", text)),
 };
+const pageNumber = (minimum: number, maximum = Number.MAX_SAFE_INTEGER) =>
+  valibot(
+    v.pipe(
+      v.string(),
+      v.toNumber(),
+      v.safeInteger(),
+      v.minValue(minimum),
+      v.maxValue(maximum),
+    ),
+    { placeholder: minimum },
+  );
 const parser = or(
   command(
     "sky",
@@ -25,6 +36,33 @@ const parser = or(
     ),
   ),
   command("status", constant({ action: "status" } as const)),
+  command(
+    "doctor",
+    object({
+      action: constant("doctor"),
+      command: optional(option("--command", text)),
+      scope: optional(
+        option(
+          "--scope",
+          valibot(v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/u)), {
+            placeholder: "scope-id",
+          }),
+        ),
+      ),
+    }),
+  ),
+  command(
+    "work",
+    command(
+      "list",
+      object({
+        action: constant("work-list"),
+        project: optional(option("--project", text)),
+        cursor: withDefault(option("--cursor", pageNumber(0)), 0),
+        limit: withDefault(option("--limit", pageNumber(1, 100)), 50),
+      }),
+    ),
+  ),
   command("install", object({ action: constant("install"), ...installation })),
   command(
     "upgrade",
