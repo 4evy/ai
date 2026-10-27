@@ -53,7 +53,7 @@ export class CompletionChannel {
   acknowledge(completionId: string): void {
     const pending = this.acknowledgments.get(completionId);
     if (!pending) throw new Error("Unknown or expired completion acknowledgment");
-    Effect.runSync(Deferred.succeed(pending, undefined));
+    Deferred.doneUnsafe(pending, Effect.void);
   }
 
   wait(): Promise<void> {
@@ -66,13 +66,11 @@ export class CompletionChannel {
     this.disconnected.abort();
     this.unsubscribe?.({ preservePending: true });
     for (const pending of this.acknowledgments.values())
-      Effect.runSync(
-        Deferred.fail(
-          pending,
-          new Error("Completion channel closed before acknowledgment"),
-        ),
+      Deferred.doneUnsafe(
+        pending,
+        Effect.fail(new Error("Completion channel closed before acknowledgment")),
       );
     this.acknowledgments.clear();
-    Effect.runSync(Deferred.succeed(this.completed, undefined));
+    Deferred.doneUnsafe(this.completed, Effect.void);
   }
 }

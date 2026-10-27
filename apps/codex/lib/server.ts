@@ -1,4 +1,4 @@
-import { attempt, Lifetime, operationEffect, run } from "@ai/core/effect/effect";
+import { attempt, Lifetime, operationEffect } from "@ai/core/effect/effect";
 import { terminateProcess } from "@ai/core/effect/process/process";
 import { errorMessage } from "@ai/core/error/error";
 import { processCommand } from "@ai/core/process/launch";
@@ -57,10 +57,6 @@ export class AppServer implements AsyncDisposable {
     );
   }
 
-  notify(method: string): Promise<void> {
-    return run(this.notifyEffect(method));
-  }
-
   requestEffect(method: string, params: Record<string, unknown>) {
     return Effect.suspend(() => {
       if (this.#failure) return Effect.fail(this.#failure);
@@ -90,10 +86,6 @@ export class AppServer implements AsyncDisposable {
     });
   }
 
-  request(method: string, params: Record<string, unknown>, signal?: AbortSignal) {
-    return run(this.requestEffect(method, params), signal);
-  }
-
   #fail(error: unknown): void {
     if (this.#failure) return;
     this.#failure = error instanceof Error ? error : new Error(errorMessage(error));
@@ -106,20 +98,20 @@ export class AppServer implements AsyncDisposable {
   }
 }
 
-export async function appServer(
+export const appServer = Effect.fnUntraced(function* (
   real: string,
   clientName = "codex-launcher",
   lifetimeMs?: number,
-): Promise<AppServer> {
-  const server = new AppServer(real, lifetimeMs);
-  try {
-    await server.request("initialize", {
-      clientInfo: { name: clientName, version: "1" },
-    });
-    await server.notify("initialized");
-    return server;
-  } catch (error) {
-    await server[Symbol.asyncDispose]();
-    throw error;
-  }
-}
+) {
+  const server = yield* Effect.acquireDisposable(
+    Effect.try({
+      try: () => new AppServer(real, lifetimeMs),
+      catch: (error) => error,
+    }),
+  );
+  yield* server.requestEffect("initialize", {
+    clientInfo: { name: clientName, version: "1" },
+  });
+  yield* server.notifyEffect("initialized");
+  return server;
+});

@@ -1,8 +1,10 @@
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
+import { run } from "@ai/core/effect/effect";
 import { errorMessage } from "@ai/core/error/error";
 import { isRecord } from "@ai/core/value/value";
+import { Effect } from "effect";
 import * as v from "valibot";
 import { type AppServer, appServer } from "./server.ts";
 
@@ -30,12 +32,12 @@ function parseThreadPage(result: unknown): { paths: string[]; cursor: string | n
   return { paths, cursor };
 }
 
-async function launchPaths(server: AppServer, cwd: string): Promise<Set<string>> {
+const launchPaths = Effect.fnUntraced(function* (server: AppServer, cwd: string) {
   const paths = new Set([cwd]);
   let cursor: string | null = null;
   const seen = new Set<string>();
   while (true) {
-    const result = await server.request("thread/list", {
+    const result = yield* server.requestEffect("thread/list", {
       archived: false,
       cursor,
       limit: 100,
@@ -51,7 +53,7 @@ async function launchPaths(server: AppServer, cwd: string): Promise<Set<string>>
     seen.add(page.cursor);
     cursor = page.cursor;
   }
-}
+});
 
 function hookTrustState(hooks: unknown[]): Record<string, { trusted_hash: string }> {
   const trust: Record<string, { trusted_hash: string }> = {};
@@ -71,8 +73,8 @@ function hookTrustState(hooks: unknown[]): Record<string, { trusted_hash: string
   return trust;
 }
 
-async function trustHooks(server: AppServer, cwd: string): Promise<void> {
-  const result = await server.request("hooks/list", { cwds: [cwd] });
+const trustHooks = Effect.fnUntraced(function* (server: AppServer, cwd: string) {
+  const result = yield* server.requestEffect("hooks/list", { cwds: [cwd] });
   if (!isRecord(result) || !Array.isArray(result.data))
     throw new Error("Codex hooks/list returned an invalid response");
   const entry: unknown = result.data.find(
@@ -86,12 +88,12 @@ async function trustHooks(server: AppServer, cwd: string): Promise<void> {
     throw new Error("Codex hooks/list returned invalid hooks");
   const trust = hookTrustState(entry.hooks);
   if (Object.keys(trust).length) {
-    await server.request("config/batchWrite", {
+    yield* server.requestEffect("config/batchWrite", {
       edits: [{ keyPath: "hooks.state", mergeStrategy: "upsert", value: trust }],
       reloadUserConfig: true,
     });
   }
-}
+});
 
 function trustedProject(config: unknown, path: string): boolean {
   if (!isRecord(config) || !isRecord(config.projects)) return false;
@@ -111,27 +113,31 @@ export async function trustLaunchProjects(
   const config: unknown = existsSync(configPath)
     ? Bun.TOML.parse(readFileSync(configPath, "utf8"))
     : {};
-  await using server = await appServer(real);
-  const paths = agents ? await launchPaths(server, cwd) : new Set([cwd]);
-  const git = Bun.which("git");
-  const projects = new Set(
-    [...paths]
-      .filter((path) => existsSync(path) && statSync(path).isDirectory())
-      .map((path) => projectRoot(path, git)),
+  await run(
+    Effect.gen(function* () {
+      const server = yield* appServer(real);
+      const paths = agents ? yield* launchPaths(server, cwd) : new Set([cwd]);
+      const git = Bun.which("git");
+      const projects = new Set(
+        [...paths]
+          .filter((path) => existsSync(path) && statSync(path).isDirectory())
+          .map((path) => projectRoot(path, git)),
+      );
+      const untrusted = [...projects]
+        .sort()
+        .filter((path) => !trustedProject(config, path));
+      if (untrusted.length) {
+        yield* server.requestEffect("config/batchWrite", {
+          edits: untrusted.map((path) => ({
+            keyPath: `projects.${JSON.stringify(path)}.trust_level`,
+            mergeStrategy: "upsert",
+            value: "trusted",
+          })),
+        });
+      }
+      yield* trustHooks(server, cwd);
+    }).pipe(Effect.scoped),
   );
-  const untrusted = [...projects]
-    .sort()
-    .filter((path) => !trustedProject(config, path));
-  if (untrusted.length) {
-    await server.request("config/batchWrite", {
-      edits: untrusted.map((path) => ({
-        keyPath: `projects.${JSON.stringify(path)}.trust_level`,
-        mergeStrategy: "upsert",
-        value: "trusted",
-      })),
-    });
-  }
-  await trustHooks(server, cwd);
 }
 
 export function launchDirectory(args: string[]): string {

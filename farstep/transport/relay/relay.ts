@@ -57,12 +57,12 @@ if (compressed) {
 }
 child.on("error", (error) => {
   stop(error);
-  if (child.pid === undefined) Effect.runSync(Deferred.succeed(exited, undefined));
+  if (child.pid === undefined) Deferred.doneUnsafe(exited, Effect.void);
 });
 child.on("exit", (code) => {
   process.exitCode = process.exitCode || code || (code === 0 ? 0 : 1);
   process.stdin.destroy();
-  Effect.runSync(Deferred.succeed(exited, undefined));
+  Deferred.doneUnsafe(exited, Effect.void);
 });
 const interrupt = () => stop();
 process.on("SIGTERM", interrupt);

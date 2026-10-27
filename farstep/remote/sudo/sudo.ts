@@ -32,7 +32,7 @@ const OUTPUT_POLL_MS = 1000;
 class SudoExecution {
   readonly state = sudoState();
   #bound: JobSnapshot | undefined;
-  #credentialTask: Promise<void> | undefined;
+  #credentialTask: Fiber.Fiber<void, unknown> | undefined;
   #deadline: Fiber.Fiber<void> | undefined;
   readonly #lifetime = new Lifetime();
   #stopping: Promise<void> | undefined;
@@ -143,17 +143,13 @@ class SudoExecution {
 
   readonly #controls: Readonly<Record<string, () => void>> = {
     credentials: () => {
-      this.#credentialTask ??= run(
-        Fiber.join(
-          this.#lifetime.fork(
-            Effect.uninterruptible(attempt(() => this.#credentials())).pipe(
-              Effect.catch(() =>
-                attempt(async () => {
-                  this.state.promptCancelled = true;
-                  await this.#stop();
-                }),
-              ),
-            ),
+      this.#credentialTask ??= this.#lifetime.fork(
+        Effect.uninterruptible(attempt(() => this.#credentials())).pipe(
+          Effect.catch(() =>
+            attempt(async () => {
+              this.state.promptCancelled = true;
+              await this.#stop();
+            }),
           ),
         ),
       );
@@ -227,7 +223,7 @@ class SudoExecution {
       this.#deadline?.interruptUnsafe();
       signal?.removeEventListener("abort", this.#cancel);
       this.#cancellation.abort();
-      await this.#credentialTask;
+      if (this.#credentialTask) await run(Fiber.join(this.#credentialTask));
       await this.#stopping;
       await this.#lifetime.close();
       this.#frames.consume(Buffer.alloc(0), true);

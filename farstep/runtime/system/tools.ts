@@ -102,7 +102,7 @@ export async function runSystem() {
     if (closing) return;
     closing = true;
     disconnected.abort();
-    Effect.runSync(Deferred.succeed(completed, undefined));
+    Deferred.doneUnsafe(completed, Effect.void);
   };
   server.onclose = close;
   process.on("SIGTERM", close);

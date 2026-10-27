@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { constants } from "node:os";
 import { attempt, type Lifetime, run } from "@ai/core/effect/effect";
-import { connectSocket } from "@ai/core/effect/socket/socket";
+import { scopedSocket } from "@ai/core/effect/socket/socket";
 import { Process, PtySession } from "@oh-my-pi/pi-natives";
 import { sanitizeText } from "@oh-my-pi/pi-utils";
 import { TerminalQueryResponder } from "@oh-my-pi/pi-utils/vterm";
@@ -70,14 +70,14 @@ export class JobSupervisor {
       },
       (error, pid) => {
         if (error) {
-          Effect.runSync(Deferred.fail(started, error));
+          Deferred.doneUnsafe(started, Effect.fail(error));
           return;
         }
         if (!ended(job)) {
           job.snapshot.pid = pid;
           job.process = Process.fromPid(pid) ?? undefined;
         }
-        Effect.runSync(Deferred.succeed(started, undefined));
+        Deferred.doneUnsafe(started, Effect.void);
       },
     );
     job.finished = run(
@@ -205,14 +205,10 @@ export class JobSupervisor {
       Effect.suspend(() => {
         if (ended(job) || job.stopped || job.portReady) return Effect.succeed(true);
         return Effect.scoped(
-          Effect.acquireRelease(
-            connectSocket({
-              port: job.spec.ready?.port ?? 0,
-              host: job.spec.ready?.host ?? "127.0.0.1",
-            }),
-            (socket) => Effect.sync(() => socket.destroy()),
-            { interruptible: true },
-          ).pipe(Effect.as(true)),
+          scopedSocket({
+            port: job.spec.ready?.port ?? 0,
+            host: job.spec.ready?.host ?? "127.0.0.1",
+          }).pipe(Effect.as(true)),
         ).pipe(
           Effect.catch(() => Effect.succeed(false)),
           Effect.timeoutOrElse({ duration: 250, orElse: () => Effect.succeed(false) }),

@@ -400,7 +400,7 @@ class WorkflowWorker implements StepContext {
       if (this.rootTimer) await run(Fiber.interrupt(this.rootTimer));
       for (const [signal, handler] of signals) process.off(signal, handler);
       cancelCleanup();
-      Effect.runSync(Deferred.succeed(this.completed, undefined));
+      Deferred.doneUnsafe(this.completed, Effect.void);
     }
   }
 }

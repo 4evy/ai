@@ -290,10 +290,10 @@ export class JobBroker {
   close(): Promise<void> {
     this.#closing ??= this.#close().then(
       () => {
-        Effect.runSync(Deferred.succeed(this.#done, undefined));
+        Deferred.doneUnsafe(this.#done, Effect.void);
       },
       (error: unknown) => {
-        Effect.runSync(Deferred.fail(this.#done, error));
+        Deferred.doneUnsafe(this.#done, Effect.fail(error));
         throw error;
       },
     );

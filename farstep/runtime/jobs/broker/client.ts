@@ -9,7 +9,7 @@ import { connectSocket } from "@ai/core/effect/socket/socket";
 import { isEexist } from "@oh-my-pi/pi-utils/fs-error";
 import { ConcatSink } from "@oh-my-pi/pi-utils/stream";
 import { toError } from "@oh-my-pi/pi-utils/type-guards";
-import { Deferred, Effect, type Fiber, Schedule, Scope } from "effect";
+import { Effect, type Fiber, Schedule, Scope } from "effect";
 import {
   type JobCompletionNotification,
   type JobOperation,
@@ -144,28 +144,23 @@ class BrokerConnection implements JobBrokerClient {
       throw new Error("Job broker connection is unavailable");
     const id = randomUUID();
     const timeout = operationTimeout(operation);
-    const result = Deferred.makeUnsafe<JobRpcResult<Operation["op"]>, Error>();
     const removed = [...this.#unsubscribed];
     const replays = [...this.#replays];
     return this.#lifetime.run(
-      Effect.sync(() => {
+      Effect.callback<JobRpcResult<Operation["op"]>, Error>((resume) => {
         // Capture the operation with its typed decoder before storing pending work
         this.#pending.set(id, {
           succeed: (value) =>
-            Effect.runSync(
-              Deferred.complete(
-                result,
-                Effect.try({
-                  try: () => parseJobRpcResult(operation, value),
-                  catch: toError,
-                }),
-              ),
+            resume(
+              Effect.try({
+                try: () => parseJobRpcResult(operation, value),
+                catch: toError,
+              }),
             ),
-          fail: (error) => Effect.runSync(Deferred.fail(result, error)),
+          fail: (error) => resume(Effect.fail(error)),
         });
         this.#send({ id, operation, completionUnsubscribes: removed });
       }).pipe(
-        Effect.andThen(Deferred.await(result)),
         Effect.timeoutOrElse({
           duration: timeout,
           orElse: () => Effect.fail(new Error(`Job ${operation.op} request timed out`)),

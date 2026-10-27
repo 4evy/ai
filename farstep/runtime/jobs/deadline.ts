@@ -1,9 +1,9 @@
 import { hash, randomUUID } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
-import { attempt, Lifetime, run } from "@ai/core/effect/effect";
+import { attempt, run } from "@ai/core/effect/effect";
 import { Process } from "@oh-my-pi/pi-natives";
 import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
-import { Deferred, Effect, Fiber } from "effect";
+import { Deferred, Effect } from "effect";
 import { uuidSchema } from "farstep/protocol/identity";
 import type { JobSpec } from "farstep/protocol/jobs/protocol";
 import * as v from "valibot";
@@ -140,7 +140,6 @@ export async function runDeadline(args: string[]): Promise<void> {
   const record = v.parse(recordSchema, JSON.parse(await privateRead(path)));
   if (record.evidence.deadlineSeconds !== seconds)
     throw new Error("Managed deadline identity mismatch");
-  await using lifetime = new Lifetime();
   const evidence = record.evidence;
   evidence.startedAt = Date.now();
   await persist(path, record);
@@ -163,78 +162,77 @@ export async function runDeadline(args: string[]): Promise<void> {
     return code;
   });
   const failed = Deferred.makeUnsafe<never, Error>();
-  const watchdog = lifetime.fork(
-    Effect.sleep(seconds * 1000).pipe(
-      Effect.andThen(
-        // Once enforcement starts, finish native cleanup and durable evidence
-        Effect.uninterruptible(
+  const watchdog = Effect.sleep(seconds * 1000).pipe(
+    Effect.andThen(
+      // Once enforcement starts, finish native cleanup and durable evidence
+      Effect.gen(function* () {
+        if (exited) return;
+        yield* attempt(async () => {
+          if (root) tracked = deadlineProcesses(root, evidence);
+          evidence.deadlineTriggeredAt = Date.now();
+          await persist(path, record);
+          const treeSignalled = signalDeadlineTree(root, evidence);
+          let signalSent = treeSignalled;
+          if (!treeSignalled && !exited) {
+            child.kill("SIGTERM");
+            signalSent = true;
+          }
+          if (signalSent) evidence.signalSentAt = Date.now();
+          await persist(path, record);
+        });
+        yield* Effect.sleep(1000);
+        yield* attempt(async () => {
+          // Stable native references avoid signalling a PID reused after the leader
+          // exit
+          let forceSent = forceDeadlineProcesses(tracked, evidence);
+          if (!exited) {
+            child.kill("SIGKILL");
+            forceSent = true;
+          }
+          if (forceSent) evidence.forceSentAt = Date.now();
+          await persist(path, record);
+        });
+      }).pipe(
+        Effect.catch(() =>
           attempt(async () => {
-            if (exited) return;
-            if (root) tracked = deadlineProcesses(root, evidence);
-            evidence.deadlineTriggeredAt = Date.now();
-            await persist(path, record);
-            const treeSignalled = signalDeadlineTree(root, evidence);
-            let signalSent = treeSignalled;
-            if (!treeSignalled && !exited) {
-              child.kill("SIGTERM");
-              signalSent = true;
-            }
-            if (signalSent) evidence.signalSentAt = Date.now();
-            await persist(path, record);
-            await run(Effect.sleep(1000));
-            // Stable native references avoid signalling a PID reused after the leader
-            // exit
-            let forceSent = forceDeadlineProcesses(tracked, evidence);
+            evidence.error = "deadline-enforcement-failed";
             if (!exited) {
-              child.kill("SIGKILL");
-              forceSent = true;
+              try {
+                child.kill("SIGKILL");
+                evidence.forceSentAt = Date.now();
+              } catch {
+                /* Report failure without claiming cleanup */
+              }
             }
-            if (forceSent) evidence.forceSentAt = Date.now();
-            await persist(path, record);
+            try {
+              await persist(path, record);
+            } catch {
+              /* The evidence store itself may be unavailable */
+            }
           }).pipe(
-            Effect.catch(() =>
-              attempt(async () => {
-                evidence.error = "deadline-enforcement-failed";
-                if (!exited) {
-                  try {
-                    child.kill("SIGKILL");
-                    evidence.forceSentAt = Date.now();
-                  } catch {
-                    /* Report failure without claiming cleanup */
-                  }
-                }
-                try {
-                  await persist(path, record);
-                } catch {
-                  /* The evidence store itself may be unavailable */
-                }
-              }).pipe(
-                Effect.andThen(
-                  Deferred.fail(
-                    failed,
-                    new Error(
-                      "Managed deadline enforcement failed; child cleanup is not confirmed",
-                    ),
-                  ),
+            Effect.andThen(
+              Deferred.fail(
+                failed,
+                new Error(
+                  "Managed deadline enforcement failed; child cleanup is not confirmed",
                 ),
               ),
             ),
           ),
         ),
+        Effect.uninterruptible,
       ),
     ),
   );
-  let exitCode: number;
-  try {
-    exitCode = await run(
-      Effect.raceFirst(
+  const exitCode = await run(
+    Effect.gen(function* () {
+      yield* Effect.forkScoped(watchdog);
+      return yield* Effect.raceFirst(
         attempt(() => exit),
         Deferred.await(failed),
-      ),
-    );
-  } finally {
-    await run(Fiber.interrupt(watchdog));
-  }
+      );
+    }).pipe(Effect.scoped),
+  );
   evidence.exitCode = exitCode;
   evidence.leaderExited = true;
   if (tracked.length)

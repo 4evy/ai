@@ -118,6 +118,16 @@ Choose concurrency explicitly with `Effect.all` or `Effect.forEach`. Do not
 add retries around commands, file writes, or desktop input whose outcome may
 already have taken effect.
 
+Bridge one-shot native responses with `Effect.callback`. Complete an existing
+shared `Deferred` from a synchronous host callback with `Deferred.doneUnsafe`,
+without starting a separate Effect runner. Keep owned work as fibers until a
+Promise boundary actually needs the result.
+
+Use TypeScript's inferred predicates when filtering optional values instead of
+asserting the result type. Use `using` or `await using` for native disposable
+resources instead of cleanup-only `finally` blocks. Keep explicit cleanup when
+it also enforces publication, rollback, or process-termination ordering.
+
 Bind each job record domain's directory-flush depth once with
 [`durableJsonWriter`](../farstep/runtime/state.ts). The shared writer retains
 private atomic publication and then flushes directory entries nearest-first.
