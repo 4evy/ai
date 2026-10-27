@@ -1,7 +1,7 @@
 diff --git a/packages/coding-agent/src/tools/browser/launch.ts b/packages/coding-agent/src/tools/browser/launch.ts
 --- a/packages/coding-agent/src/tools/browser/launch.ts
 +++ b/packages/coding-agent/src/tools/browser/launch.ts
-@@ -36,6 +36,7 @@
+@@ -38,6 +38,7 @@
  import stealthPluginsScript from "../puppeteer/10_stealth_plugins.txt" with { type: "text" };
  import stealthHardwareScript from "../puppeteer/11_stealth_hardware.txt" with { type: "text" };
  import stealthCodecsScript from "../puppeteer/12_stealth_codecs.txt" with { type: "text" };
@@ -9,7 +9,7 @@ diff --git a/packages/coding-agent/src/tools/browser/launch.ts b/packages/coding
  import stealthWorkerScript from "../puppeteer/13_stealth_worker.txt" with { type: "text" };
  import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
  import { withDownload } from "../../downloads/activity";
-@@ -562,7 +563,7 @@
+@@ -663,7 +664,7 @@
  	try {
  		if (userDataDir) await seedOwnedProfilePreferences(userDataDir);
  		const executablePath = await ensureChromiumExecutable();
@@ -18,7 +18,7 @@ diff --git a/packages/coding-agent/src/tools/browser/launch.ts b/packages/coding
  			headless: opts.headless,
  			defaultViewport: opts.headless ? initialViewport : null,
  			executablePath,
-@@ -673,10 +674,11 @@
+@@ -774,10 +775,11 @@
  		args: buildHeadlessLaunchArgs(vp),
  		userDataDir: opts.userDataDir,
  	});
@@ -44,7 +44,7 @@ diff --git a/packages/coding-agent/src/tools/browser/registry.ts b/packages/codi
  
  export type PuppeteerBrowserKind =
  	| {
-@@ -334,6 +335,9 @@
+@@ -332,6 +333,9 @@
  	}
  	const appArgs = kind.args ?? [];
  	const reused = await findReusableCdp(exe, { signal: opts.signal, appArgs });
@@ -54,7 +54,7 @@ diff --git a/packages/coding-agent/src/tools/browser/registry.ts b/packages/codi
  	let cdpUrl: string;
  	let pid: number;
  	let subprocess: Subprocess | undefined;
-@@ -344,7 +348,8 @@
+@@ -342,7 +346,8 @@
  	} else {
  		const port = await findFreeCdpPort();
  		const launchArgs = [...appArgs, `--remote-debugging-port=${port}`];
@@ -80,11 +80,18 @@ diff --git a/packages/coding-agent/src/tools/browser/shared-daemon.ts b/packages
 diff --git a/packages/coding-agent/src/utils/browser-session.ts b/packages/coding-agent/src/utils/browser-session.ts
 --- a/packages/coding-agent/src/utils/browser-session.ts
 +++ b/packages/coding-agent/src/utils/browser-session.ts
-@@ -8,2 +8,3 @@
+@@ -6,6 +6,7 @@
+ import { logger, withTimeout } from "@oh-my-pi/pi-utils";
+ import { untilAborted } from "@oh-my-pi/pi-utils/abortable";
  import type { Browser } from "puppeteer-core";
 +import { launchWorkspaceBrowser } from "../tools/browser/workspace";
  import { gracefulKillTreeOnce } from "../tools/browser/attach";
-@@ -36,4 +37,4 @@
+ import {
+ 	DISABLE_AUTOMATION_CONTROLLED_ARG,
+@@ -40,7 +41,7 @@
+ 		// Do not race launch: retain ownership even if cancellation happens before it resolves.
+ 		// Unlike general browser tooling, authentication keeps sandbox and TLS checks enabled.
+ 		// Automation mode must stay off: Google sign-in rejects automation-controlled browsers.
 -		browser = await puppeteer.launch({
 +		browser = await launchWorkspaceBrowser(puppeteer, {
  			executablePath,

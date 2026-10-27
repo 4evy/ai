@@ -1,7 +1,7 @@
 diff --git a/packages/coding-agent/src/modes/controllers/input-controller.ts b/packages/coding-agent/src/modes/controllers/input-controller.ts
 --- a/packages/coding-agent/src/modes/controllers/input-controller.ts
 +++ b/packages/coding-agent/src/modes/controllers/input-controller.ts
-@@ -387,6 +387,11 @@
+@@ -402,6 +402,11 @@
  					this.ctx.toggleThinkingBlockVisibility();
  					return { consume: true };
  				}
@@ -13,7 +13,7 @@ diff --git a/packages/coding-agent/src/modes/controllers/input-controller.ts b/p
  				if (this.ctx.keybindings.matches(data, "app.history.search")) {
  					if (this.ctx.ui.hasOverlay() || this.ctx.ui.getFocused() instanceof HistorySearchComponent) {
  						return undefined;
-@@ -2667,6 +2672,25 @@
+@@ -2788,6 +2793,25 @@
  		}
  	}
  
@@ -199,7 +199,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		this.ui.requestRender();
  	}
  
-@@ -1980,7 +1946,7 @@
+@@ -1981,7 +1947,7 @@
  		this.progressHudContainer.addChild(this.#downloadActivityHud);
  		this.#eventBusUnsubscribers.push(onDownloadActivity(activity => this.#downloadActivityHud.update(activity)));
  		this.statusContainer = new StatusHudContainer(this);
@@ -208,7 +208,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		this.subagentContainer = new AnchoredLiveContainer();
  		this.btwContainer = new AnchoredLiveContainer();
  		this.omfgContainer = new AnchoredLiveContainer();
-@@ -4414,9 +4380,60 @@
+@@ -4426,9 +4392,60 @@
  		this.#todoHudNative = undefined;
  		const activeDescs = this.#getActiveSubagentDescriptions();
  		this.#todoHudSubagentKey = activeDescs.join("\n");
@@ -271,7 +271,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		const expanded = this.todoExpanded;
  		const multiPhase = phases.length > 1;
  		const activeIdx = phases.indexOf(this.#getActivePhase(phases) ?? phases[0]);
-@@ -4585,29 +4602,7 @@
+@@ -4597,29 +4614,7 @@
  			"todo",
  		);
  		// A `checklist` HUD is a pill with the whole plan as its popover.
@@ -302,7 +302,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		this.#todoHudNative = {
  			checklist: node(
  				"checklist",
-@@ -4617,72 +4612,9 @@
+@@ -4629,72 +4624,9 @@
  			),
  			fallback,
  		};
@@ -376,27 +376,44 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  	async #loadTodoList(source: AgentSession = this.session): Promise<void> {
  		this.todoPhases = source.getTodoPhases();
  		this.#todoPhasesOwner = source;
-@@ -4732,6 +4664,19 @@
+@@ -4744,6 +4676,24 @@
  	 */
- 	#renderSubagentList(): void {
+ 	#renderSubagentList(): boolean {
  		this.#cancelSubagentPreviewTick();
 +		const mode = cfgDisplayPinnedAgents.get(settings);
 +		const expanded = this.#pinnedHudOverride ?? mode === "full";
 +		if (mode !== "off" && !expanded) {
-+			if (!this.todoExpanded && !this.#todoHudHidden && this.todoPhases.some(phase => phase.tasks.length > 0)) {
++			const sessions = this.#observerRegistry.getSessions();
++			const merged = !this.todoExpanded && !this.#todoHudHidden && this.todoPhases.some(phase => phase.tasks.length > 0);
++			const hubKey = appKey(this.keybindings, "app.agents.hub") || appKey(this.keybindings, "app.session.observe");
++			const key = JSON.stringify(["compact", compactSubagentState(sessions), hubKey, merged]);
++			if (key === this.#subagentHudKey) return false;
++			this.#subagentHudKey = key;
++			if (merged) {
 +				this.#renderTodoList();
-+				return;
++				return true;
 +			}
 +			this.subagentContainer.clear();
-+			const key = appKey(this.keybindings, "app.agents.hub") || appKey(this.keybindings, "app.session.observe");
-+			const hud = compactSubagentHud(this.#observerRegistry.getSessions(), key);
++			const hud = compactSubagentHud(sessions, hubKey);
 +			if (hud) this.subagentContainer.addChild(hud);
-+			return;
++			return true;
 +		}
  		const view = this.#buildSubagentHudView();
  		if (!view) {
- 			this.subagentContainer.clear();
-@@ -7909,7 +7854,7 @@
+ 			const changed = this.subagentContainer.children.length > 0;
+@@ -4757,7 +4707,10 @@
+ 		this.#subagentHudKey = key;
+ 		const hud = this.subagentContainer.children[0];
+ 		if (hud instanceof SubagentHudComponent) hud.update(view.lines, view.order, view.toggleRow);
+-		else this.subagentContainer.addChild(new SubagentHudComponent(view.lines, view.order, view.toggleRow));
++		else {
++			this.subagentContainer.clear();
++			this.subagentContainer.addChild(new SubagentHudComponent(view.lines, view.order, view.toggleRow));
++		}
+ 		return true;
+ 	}
+ 
+@@ -7927,7 +7880,7 @@
  				// status rows so the interrupt glyph reads as indented.
  				[` ${appKey(this.keybindings, "app.interrupt")}`],
  			);
@@ -424,7 +441,7 @@ diff --git a/packages/coding-agent/src/modes/settings.ts b/packages/coding-agent
 diff --git a/packages/tui/src/app-keybindings.ts b/packages/tui/src/app-keybindings.ts
 --- a/packages/tui/src/app-keybindings.ts
 +++ b/packages/tui/src/app-keybindings.ts
-@@ -47,6 +47,7 @@
+@@ -48,6 +48,7 @@
  	"app.clipboard.pasteTextRaw": true;
  	"app.clipboard.copyLine": true;
  	"app.clipboard.copyPrompt": true;
@@ -432,7 +449,7 @@ diff --git a/packages/tui/src/app-keybindings.ts b/packages/tui/src/app-keybindi
  	"app.agents.hub": true;
  	"app.session.new": true;
  	"app.session.tree": true;
-@@ -190,6 +191,10 @@
+@@ -195,6 +196,10 @@
  		defaultKeys: "alt+shift+c",
  		description: "Copy prompt",
  	},
@@ -446,7 +463,7 @@ diff --git a/packages/tui/src/app-keybindings.ts b/packages/tui/src/app-keybindi
 diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/read-tool-group.ts
 --- a/packages/tui/src/chat/read-tool-group.ts
 +++ b/packages/tui/src/chat/read-tool-group.ts
-@@ -4,6 +4,7 @@
+@@ -3,6 +3,7 @@
  import { type Component } from "../tui";
  import { Container } from "../tui";
  import { Text } from "../components/text";
@@ -454,7 +471,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  import { getLanguageFromPath, theme } from "../theme";
  import { parseLineRanges, selectorLineRanges } from "../tools/line-ranges";
  import {
-@@ -15,9 +16,9 @@
+@@ -14,9 +15,9 @@
  	splitPathAndSel,
  } from "../tools/read";
  import { PREVIEW_LIMITS, shortenPath } from "../render/render-utils";
@@ -466,7 +483,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  import { canonicalizeMessage } from "./thinking-display";
  import { internalUrlSchemeSpec, splitUrlScheme } from "../tools/url-scheme-host";
  import type { ToolExecutionHandle } from "./tool-execution";
-@@ -367,6 +368,7 @@
+@@ -366,6 +367,7 @@
  	#text: Text;
  	#expanded = false;
  	#toolActivityVisible = true;
@@ -474,7 +491,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  	#showContentPreview: boolean;
  	// A read group accretes entries across multiple assistant completions for as
  	// long as the run of reads is uninterrupted. It remains active while its
-@@ -396,9 +398,19 @@
+@@ -395,9 +397,19 @@
  	}
  
  	override render(width: number): readonly string[] {
@@ -496,7 +513,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  	isTranscriptBlockFinalized(): boolean {
  		if (this.#sealed) return true;
  		if (!this.#finalized) return false;
-@@ -599,8 +611,8 @@
+@@ -598,8 +610,8 @@
  	}
  
  	/**
@@ -507,7 +524,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  	 * `Read (N)` in the head, a `list` of path items (status tone, link,
  	 * correction and conflict detail, nested usage) and a clamped preview per
  	 * read when content previews are on.
-@@ -614,7 +626,7 @@
+@@ -613,7 +625,7 @@
  	}
  
  	/**
@@ -516,7 +533,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  	 * `tool` (role `omp.tool.read`). One file: `Read path:13-36`, a failure's
  	 * message in the head. Several: `Read 3 files` over one 22px row per file
  	 * (glyph, dim dir, strong name, range). Each content preview is numbered
-@@ -678,7 +690,7 @@
+@@ -677,7 +689,7 @@
  				title: "Read",
  				status,
  				tone: status === "error" ? "error" : undefined,
@@ -525,7 +542,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  				collapsible,
  				collapsed: collapsible ? !this.#expanded : undefined,
  				preview: collapsible ? TRIMMED_BODY_PREVIEW : undefined,
-@@ -851,8 +863,8 @@
+@@ -850,8 +862,8 @@
  		return card(
  			{
  				role: "omp.tool.read",
@@ -536,7 +553,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  				status,
  				tone: status === "error" ? "error" : status === "running" ? "pending" : undefined,
  				head,
-@@ -894,6 +906,17 @@
+@@ -893,6 +905,17 @@
  		return text([span(plainText(line), "dim")], { wrap: "word", key, role: "omp.usage" });
  	}
  
@@ -554,7 +571,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  	#updateDisplay(): void {
  		this.#displayVersion++;
  		const entries = [...this.#entries.values()];
-@@ -908,7 +931,7 @@
+@@ -907,7 +930,7 @@
  
  		if (displayRows.length === 0) {
  			this.#text.setText(` ${theme.format.bullet} ${theme.fg("toolTitle", theme.bold("Read"))}`);
@@ -563,7 +580,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  			return;
  		}
  
-@@ -921,7 +944,7 @@
+@@ -920,7 +943,7 @@
  				const usageRows = this.#usageRowsBySummaryRow(displayRows).get(0) ?? [];
  				this.#appendUsageRows(lines, usageRows, "   ");
  				this.#text.setText(lines.join("\n"));
@@ -572,7 +589,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  			}
  			for (const entry of this.#previewEntriesForRow(row)) {
  				this.#addContentPreview(entry);
-@@ -941,7 +964,7 @@
+@@ -940,7 +963,7 @@
  		}
  
  		this.#text.setText(lines.join("\n"));
@@ -757,7 +774,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
 diff --git a/packages/tui/src/chrome/transcript-container.ts b/packages/tui/src/chrome/transcript-container.ts
 --- a/packages/tui/src/chrome/transcript-container.ts
 +++ b/packages/tui/src/chrome/transcript-container.ts
-@@ -649,9 +649,14 @@
+@@ -676,9 +676,14 @@
  			return output;
  		}
  
@@ -775,7 +792,7 @@ diff --git a/packages/tui/src/chrome/transcript-container.ts b/packages/tui/src/
  		// Surplus rows favor ordinary transcript blocks over dynamic tool-activity
  		// cards (newest-first within each class), so a growing tool card collapses to
  		// its compact form instead of clipping already-visible assistant text (#9718).
-@@ -664,7 +669,7 @@
+@@ -691,7 +696,7 @@
  		}
  		for (const index of order) {
  			if (surplus <= 0) break;
@@ -894,7 +911,7 @@ diff --git a/packages/tui/src/render/render-utils.ts b/packages/tui/src/render/r
 --- a/packages/tui/src/render/render-utils.ts
 +++ b/packages/tui/src/render/render-utils.ts
 @@ -11,8 +11,8 @@
- import type { Ellipsis } from "@oh-my-pi/pi-natives";
+ import { Ellipsis } from "@oh-my-pi/pi-natives";
  import { expandWindowsLongPath, getWindowsShortPath } from "@oh-my-pi/pi-natives/path";
  import { pluralize, sanitizeText } from "@oh-my-pi/pi-utils";
 -import { formatKeyHint, type KeyId } from "../app-keybindings";
@@ -903,7 +920,7 @@ diff --git a/packages/tui/src/render/render-utils.ts b/packages/tui/src/render/r
 +import { appToolsExpandKey } from "../keybinding-matchers";
  import type { Theme } from "../theme/theme";
  import type { Component } from "../tui";
- import { replaceTabs, sliceByColumn, truncateToWidth, visibleWidth } from "../utils";
+ import { replaceTabs, sliceByColumn, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "../utils";
 @@ -197,15 +197,9 @@
  	RECAP: 280,
  } as const;

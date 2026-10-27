@@ -584,7 +584,7 @@ diff --git a/packages/coding-agent/src/modes/controllers/mcp-command-controller.
 diff --git a/packages/coding-agent/src/sdk.ts b/packages/coding-agent/src/sdk.ts
 --- a/packages/coding-agent/src/sdk.ts
 +++ b/packages/coding-agent/src/sdk.ts
-@@ -3504,6 +3504,7 @@
+@@ -3528,6 +3528,7 @@
  			}),
  			createAnnotationsAPI,
  		);
@@ -592,9 +592,9 @@ diff --git a/packages/coding-agent/src/sdk.ts b/packages/coding-agent/src/sdk.ts
  		// A dialog waits for the user, not the agent: the session lets the display sleep while one is open.
  		const trackUserWait: UserWaitTracker = dialog => (hasSession ? session.waitForUser(dialog) : dialog());
  		extensionRunner.setUserWaitTracker(trackUserWait);
-@@ -4868,6 +4869,7 @@
- 					}
- 				: undefined,
+@@ -4930,6 +4931,7 @@
+ 				hostMcpServerInstructions = source;
+ 			},
  			disconnectOwnedMcpManager: ownedMcpManager ? () => ownedMcpManager.disconnectAll() : undefined,
 +			disconnectMcpAtAgentEnd: ownedMcpManager ? () => ownedMcpManager.stopAgentEndServers() : undefined,
  			ttsrManager,
@@ -603,7 +603,7 @@ diff --git a/packages/coding-agent/src/sdk.ts b/packages/coding-agent/src/sdk.ts
 diff --git a/packages/coding-agent/src/session/agent-session-types.ts b/packages/coding-agent/src/session/agent-session-types.ts
 --- a/packages/coding-agent/src/session/agent-session-types.ts
 +++ b/packages/coding-agent/src/session/agent-session-types.ts
-@@ -402,6 +402,8 @@
+@@ -407,6 +407,8 @@
  	advisorConfigWarnings?: string[];
  	/** Disconnect the MCP manager owned by this session during disposal. */
  	disconnectOwnedMcpManager?: () => Promise<void>;
@@ -615,7 +615,7 @@ diff --git a/packages/coding-agent/src/session/agent-session-types.ts b/packages
 diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
 --- a/packages/coding-agent/src/session/agent-session.ts
 +++ b/packages/coding-agent/src/session/agent-session.ts
-@@ -1106,6 +1106,7 @@
+@@ -1124,6 +1124,7 @@
  	#sideStreamFn: StreamFn;
  	#convertToLlm: (messages: AgentMessage[]) => Message[] | Promise<Message[]>;
  	#disconnectOwnedMcpManager: (() => Promise<void>) | undefined;
@@ -623,7 +623,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  
  	readonly #ttsr: TtsrCoordinator;
  	readonly #stats: SessionStatsTracker;
-@@ -2271,6 +2272,7 @@
+@@ -2323,6 +2324,7 @@
  			skillsReloadable: config.skillsReloadable,
  		});
  		this.#disconnectOwnedMcpManager = config.disconnectOwnedMcpManager;
@@ -631,7 +631,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  		const ttsrHost: TtsrCoordinatorHost = {
  			agent: this.agent,
  			sessionManager: this.sessionManager,
-@@ -5429,6 +5431,9 @@
+@@ -5551,6 +5553,9 @@
  		// `yielded` alone also covers queued steer/follow-up and IRC continuations,
  		// which `#flushPendingAgentEnd` re-tags non-terminal.
  		const awaitingAsyncWork = options?.willContinue === true && options.awaitingAsyncWork === true;
@@ -641,7 +641,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  		await this.#emitSessionEvent({
  			...event,
  			isTerminal: !options?.willContinue,
-@@ -6021,7 +6026,7 @@
+@@ -6143,7 +6148,7 @@
  		try {
  			await withTimeout(
  				this.#disconnectOwnedMcpManager(),

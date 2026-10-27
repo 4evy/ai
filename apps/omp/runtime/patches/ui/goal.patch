@@ -87,7 +87,7 @@ diff --git a/packages/coding-agent/src/modes/rpc/rpc-goal.ts b/packages/coding-a
 diff --git a/packages/coding-agent/src/modes/rpc/rpc-mode.ts b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
 --- a/packages/coding-agent/src/modes/rpc/rpc-mode.ts
 +++ b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
-@@ -1814,6 +1814,7 @@
+@@ -1819,6 +1819,7 @@
  					settings: session.settings,
  					cwd: session.sessionManager.getCwd(),
  					output: commandOutput => output({ type: "command_output", text: commandOutput }),
@@ -98,7 +98,7 @@ diff --git a/packages/coding-agent/src/modes/rpc/rpc-mode.ts b/packages/coding-a
 diff --git a/packages/coding-agent/src/slash-commands/builtin-modes.ts b/packages/coding-agent/src/slash-commands/builtin-modes.ts
 --- a/packages/coding-agent/src/slash-commands/builtin-modes.ts
 +++ b/packages/coding-agent/src/slash-commands/builtin-modes.ts
-@@ -378,6 +378,8 @@
+@@ -335,6 +335,8 @@
  		name: "goal",
  		icon: "goal",
  		description: "Toggle goal mode (persistent autonomous objective for this session)",
@@ -107,7 +107,7 @@ diff --git a/packages/coding-agent/src/slash-commands/builtin-modes.ts b/package
  		subcommands: [
  			{ name: "set", description: "Set or replace the goal", usage: "<objective>" },
  			{ name: "show", description: "Show current goal details" },
-@@ -394,6 +396,10 @@
+@@ -351,6 +353,10 @@
  			const state = runtime.ctx.session.getGoalModeState();
  			return state ? `Goal: ${state.goal.status} (${shortDetail(state.goal.objective)})` : "Goal: off";
  		},
@@ -116,7 +116,7 @@ diff --git a/packages/coding-agent/src/slash-commands/builtin-modes.ts b/package
 +			await runtime.output(await runtime.runGoalCommand(command.args));
 +		},
  		handleTui: async (command, runtime) => {
- 			await runWithDetachedModeDraft(command, runtime, () =>
+ 			await runWithDetachedDraft(command, runtime, () =>
  				runtime.ctx.handleGoalModeCommand(command.args || undefined, runtime.input),
 diff --git a/packages/coding-agent/src/slash-commands/types.ts b/packages/coding-agent/src/slash-commands/types.ts
 --- a/packages/coding-agent/src/slash-commands/types.ts

@@ -1,8 +1,7 @@
 diff --git a/packages/coding-agent/src/session/model-controls.ts b/packages/coding-agent/src/session/model-controls.ts
 --- a/packages/coding-agent/src/session/model-controls.ts
 +++ b/packages/coding-agent/src/session/model-controls.ts
-@@ -236,8 +236,9 @@
- 		options?: {
+@@ -237,6 +237,7 @@
  			selector?: string;
  			thinkingLevel?: ThinkingLevel;
  			persist?: boolean;
@@ -10,9 +9,7 @@ diff --git a/packages/coding-agent/src/session/model-controls.ts b/packages/codi
  		},
  	): Promise<{ switched: boolean }> {
  		const previousEditMode = this.#host.resolveActiveEditMode();
- 		if (!this.#host.modelRegistry.hasConfiguredAuth(model)) {
-@@ -248,10 +249,13 @@
- 
+@@ -249,8 +250,11 @@
  		this.#host.modelRegistry.clearSuppressedSelector(formatModelStringWithRouting(targetModel));
  		this.#host.clearActiveRetryFallback();
  		await this.#host.setModelWithProviderSessionReset(targetModel);
@@ -26,9 +23,7 @@ diff --git a/packages/coding-agent/src/session/model-controls.ts b/packages/codi
  			this.#host.settings.setModelRole(
  				role,
  				formatRoleModelValue(
- 					this.#host.settings,
-@@ -262,9 +266,11 @@
- 					options.thinkingLevel,
+@@ -263,7 +267,9 @@
  				),
  			);
  		}
@@ -39,12 +34,10 @@ diff --git a/packages/coding-agent/src/session/model-controls.ts b/packages/codi
  
  		// Re-apply thinking for the newly selected model. Prefer the model's
  		// configured defaultLevel; otherwise preserve the current level (or auto).
- 		this.#reapplyThinkingLevel(targetModel.thinking?.defaultLevel);
 diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
 --- a/packages/coding-agent/src/session/agent-session.ts
 +++ b/packages/coding-agent/src/session/agent-session.ts
-@@ -11025,8 +11025,9 @@
- 		options?: {
+@@ -11212,6 +11212,7 @@
  			selector?: string;
  			thinkingLevel?: ThinkingLevel;
  			persist?: boolean;
@@ -52,12 +45,10 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  		},
  	): Promise<{ switched: boolean }> {
  		return this.#models.setModel(model, role, options);
- 	}
 diff --git a/packages/coding-agent/src/modes/runtime-init.ts b/packages/coding-agent/src/modes/runtime-init.ts
 --- a/packages/coding-agent/src/modes/runtime-init.ts
 +++ b/packages/coding-agent/src/modes/runtime-init.ts
-@@ -126,9 +126,9 @@
- 			getAllTools: () => session.getAllToolInfos(),
+@@ -127,7 +127,7 @@
  			setActiveTools: (toolNames: string[]) =>
  				session.setActiveToolsByName(filterActiveTools ? filterActiveTools(toolNames) : toolNames),
  			getCommands: () => getSessionSlashCommands(session),
@@ -66,12 +57,10 @@ diff --git a/packages/coding-agent/src/modes/runtime-init.ts b/packages/coding-a
  			getThinkingLevel: () => session.thinkingLevel,
  			setThinkingLevel: level => session.setThinkingLevel(level),
  			getServiceTiers: () => session.serviceTierByFamily,
- 			setServiceTier: (family, tier) => session.setServiceTierFamily(family, tier),
 diff --git a/packages/coding-agent/src/modes/controllers/extension-ui-controller.ts b/packages/coding-agent/src/modes/controllers/extension-ui-controller.ts
 --- a/packages/coding-agent/src/modes/controllers/extension-ui-controller.ts
 +++ b/packages/coding-agent/src/modes/controllers/extension-ui-controller.ts
-@@ -25,8 +25,9 @@
- 	SendMessageHandler,
+@@ -26,6 +26,7 @@
  	SendUserMessageHandler,
  	TerminalInputHandler,
  } from "../../extensibility/extensions";
@@ -79,9 +68,7 @@ diff --git a/packages/coding-agent/src/modes/controllers/extension-ui-controller
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
  import { ApprovalDialogComponent } from "@oh-my-pi/pi-tui/overlays/approval-dialog";
  import {
- 	type AskDialogPrompt,
-@@ -227,14 +228,9 @@
- 			},
+@@ -228,12 +229,7 @@
  			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
  			getAllTools: () => this.ctx.session.getAllToolInfos(),
  			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
@@ -95,9 +82,7 @@ diff --git a/packages/coding-agent/src/modes/controllers/extension-ui-controller
  			getThinkingLevel: () => this.ctx.session.thinkingLevel,
  			setThinkingLevel: level => this.ctx.session.setThinkingLevel(level),
  			getServiceTiers: () => this.ctx.session.serviceTierByFamily,
- 			setServiceTier: (family, tier) => this.ctx.session.setServiceTierFamily(family, tier),
-@@ -458,14 +454,9 @@
- 			},
+@@ -459,12 +455,7 @@
  			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
  			getAllTools: () => this.ctx.session.getAllToolInfos(),
  			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
@@ -111,12 +96,10 @@ diff --git a/packages/coding-agent/src/modes/controllers/extension-ui-controller
  			getThinkingLevel: () => this.ctx.session.thinkingLevel,
  			setThinkingLevel: (level, persist) => this.ctx.session.setThinkingLevel(level, persist),
  			getServiceTiers: () => this.ctx.session.serviceTierByFamily,
- 			setServiceTier: (family, tier) => this.ctx.session.setServiceTierFamily(family, tier),
 diff --git a/packages/coding-agent/src/extensibility/extensions/compact-handler.ts b/packages/coding-agent/src/extensibility/extensions/compact-handler.ts
 --- a/packages/coding-agent/src/extensibility/extensions/compact-handler.ts
 +++ b/packages/coding-agent/src/extensibility/extensions/compact-handler.ts
-@@ -23,18 +23,22 @@
- }
+@@ -24,7 +24,7 @@
  
  interface SetModelCapableSession {
  	modelRegistry: { getApiKey(model: Model): Promise<string | undefined> };
@@ -125,7 +108,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/compact-handler.
  }
  
  /**
-  * Helper for wiring the `setModel` action of an {@link ExtensionContext}.
+@@ -32,9 +32,13 @@
   *
   * Returns false when no API key is available for the requested model.
   */
@@ -144,8 +127,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/compact-handler.
 diff --git a/packages/coding-agent/src/extensibility/extensions/loader.ts b/packages/coding-agent/src/extensibility/extensions/loader.ts
 --- a/packages/coding-agent/src/extensibility/extensions/loader.ts
 +++ b/packages/coding-agent/src/extensibility/extensions/loader.ts
-@@ -327,10 +327,10 @@
- 	getCommands() {
+@@ -328,8 +328,8 @@
  		return this.runtime.getCommands();
  	}
  
@@ -156,12 +138,10 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/loader.ts b/pack
  	}
  
  	getThinkingLevel(): ThinkingLevel | undefined {
- 		return this.runtime.getThinkingLevel();
 diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packages/coding-agent/src/extensibility/extensions/types.ts
 --- a/packages/coding-agent/src/extensibility/extensions/types.ts
 +++ b/packages/coding-agent/src/extensibility/extensions/types.ts
-@@ -1888,10 +1888,13 @@
- 
+@@ -1894,8 +1894,11 @@
  	/** Get available slash commands in the current session. */
  	getCommands(): SlashCommandInfo[];
  
@@ -175,9 +155,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packa
  
  	/** Get current thinking level. */
  	getThinkingLevel(): ThinkingLevel | undefined;
- 
-@@ -2120,9 +2123,9 @@
- export type GetCommandsHandler = () => SlashCommandInfo[];
+@@ -2126,7 +2129,7 @@
  
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
  
@@ -186,23 +164,19 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packa
  
  export type GetThinkingLevelHandler = () => ThinkingLevel | undefined;
  
- export type SetThinkingLevelHandler = (level: ThinkingLevel, persist?: boolean) => void;
 diff --git a/packages/coding-agent/src/modes/acp/acp-agent.ts b/packages/coding-agent/src/modes/acp/acp-agent.ts
 --- a/packages/coding-agent/src/modes/acp/acp-agent.ts
 +++ b/packages/coding-agent/src/modes/acp/acp-agent.ts
-@@ -52,9 +52,9 @@
- 	type ExtensionUIDialogOptions,
+@@ -53,7 +53,7 @@
  	getExtensionUISelectOptionLabel,
  	timedOutAskDialogResult,
  } from "../../extensibility/extensions";
 -import { runExtensionCompact } from "../../extensibility/extensions/compact-handler";
 +import { runExtensionCompact, runExtensionSetModel } from "../../extensibility/extensions/compact-handler";
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
- import { buildSkillPromptMessage, parseSkillInvocation } from "../../extensibility/skills";
- import { MCPManager } from "../../mcp/manager";
- import { reconnectMcpManagerServer } from "../../mcp/oauth-reauth";
-@@ -2988,16 +2988,9 @@
- 				getActiveTools: () => record.session.getEnabledToolNames(),
+ import { parseSkillInvocation } from "../../extensibility/skills";
+ import { PYTHON_KERNEL_CANCEL_BUDGET_MS } from "../../eval/py/kernel";
+@@ -2990,14 +2990,7 @@
  				getAllTools: () => record.session.getAllToolInfos(),
  				setActiveTools: toolNames => record.session.setActiveToolsByName(toolNames),
  				getCommands: () => getSessionSlashCommands(record.session),
@@ -218,4 +192,3 @@ diff --git a/packages/coding-agent/src/modes/acp/acp-agent.ts b/packages/coding-
  				getThinkingLevel: () => record.session.thinkingLevel,
  				setThinkingLevel: level => record.session.setThinkingLevel(level),
  				getServiceTiers: () => record.session.serviceTierByFamily,
- 				setServiceTier: (family, tier) => record.session.setServiceTierFamily(family, tier),

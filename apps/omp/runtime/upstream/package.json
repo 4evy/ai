@@ -1,17 +1,17 @@
 {
   "name": "ai-tools-omp-runtime-dependencies",
-  "private": true,
-  "version": "18.12.6",
-  "type": "module",
+  "version": "18.13.1",
   "dependencies": {
-    "@oh-my-pi/pi-coding-agent": "18.12.6",
-    "@oh-my-pi/pi-natives": "18.12.6",
-    "@oh-my-pi/pi-tui": "18.12.6",
-    "@oh-my-pi/pi-utils": "18.12.6",
+    "@oh-my-pi/pi-coding-agent": "18.13.1",
+    "@oh-my-pi/pi-natives": "18.13.1",
+    "@oh-my-pi/pi-tui": "18.13.1",
+    "@oh-my-pi/pi-utils": "18.13.1",
     "ipaddr.js": "2.5.0",
     "katex": "0.19.0",
     "lucide-react": "1.61.0",
     "react": "19.3.1",
     "react-dom": "19.3.1"
-  }
+  },
+  "private": true,
+  "type": "module"
 }

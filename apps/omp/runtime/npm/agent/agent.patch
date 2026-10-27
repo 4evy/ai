@@ -65,7 +65,7 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
      /** Calling session's `local://` root mapping for external tool bridges. */
      localProtocolOptions?: LocalProtocolOptions;
      /** Current model (may be undefined) */
-@@ -1351,8 +1354,13 @@
+@@ -1356,8 +1359,13 @@
      setActiveTools(toolNames: string[]): Promise<void>;
      /** Get available slash commands in the current session. */
      getCommands(): SlashCommandInfo[];
@@ -81,7 +81,7 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
      /** Get current thinking level. */
      getThinkingLevel(): ThinkingLevel | undefined;
      /** Set thinking level for the current session. */
-@@ -1546,7 +1554,7 @@
+@@ -1551,7 +1559,7 @@
  export type GetAllToolsHandler = () => ToolInfo[];
  export type GetCommandsHandler = () => SlashCommandInfo[];
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
@@ -176,7 +176,7 @@ diff --git a/dist/types/modes/components/extensions/mcp-runtime.d.ts b/dist/type
 diff --git a/dist/types/session/agent-session-types.d.ts b/dist/types/session/agent-session-types.d.ts
 --- a/dist/types/session/agent-session-types.d.ts
 +++ b/dist/types/session/agent-session-types.d.ts
-@@ -379,6 +379,8 @@
+@@ -384,6 +384,8 @@
      advisorConfigWarnings?: string[];
      /** Disconnect the MCP manager owned by this session during disposal. */
      disconnectOwnedMcpManager?: () => Promise<void>;
@@ -188,7 +188,7 @@ diff --git a/dist/types/session/agent-session-types.d.ts b/dist/types/session/ag
 diff --git a/dist/types/session/agent-session.d.ts b/dist/types/session/agent-session.d.ts
 --- a/dist/types/session/agent-session.d.ts
 +++ b/dist/types/session/agent-session.d.ts
-@@ -1019,6 +1019,7 @@
+@@ -1048,6 +1048,7 @@
          selector?: string;
          thinkingLevel?: ThinkingLevel;
          persist?: boolean;
@@ -438,7 +438,7 @@ diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extension
  	/** Calling session's `local://` root mapping for external tool bridges. */
  	localProtocolOptions?: LocalProtocolOptions;
  	/** Current model (may be undefined) */
-@@ -1886,8 +1889,11 @@
+@@ -1891,8 +1894,11 @@
  	/** Get available slash commands in the current session. */
  	getCommands(): SlashCommandInfo[];
  
@@ -452,7 +452,7 @@ diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extension
  
  	/** Get current thinking level. */
  	getThinkingLevel(): ThinkingLevel | undefined;
-@@ -2118,7 +2124,7 @@
+@@ -2123,7 +2129,7 @@
  
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
  
@@ -887,9 +887,9 @@ diff --git a/src/modes/acp/acp-agent.ts b/src/modes/acp/acp-agent.ts
 -import { runExtensionCompact } from "../../extensibility/extensions/compact-handler";
 +import { runExtensionCompact, runExtensionSetModel } from "../../extensibility/extensions/compact-handler";
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
- import { buildSkillPromptMessage, parseSkillInvocation } from "../../extensibility/skills";
- import { MCPManager } from "../../mcp/manager";
-@@ -2989,14 +2989,7 @@
+ import { parseSkillInvocation } from "../../extensibility/skills";
+ import { PYTHON_KERNEL_CANCEL_BUDGET_MS } from "../../eval/py/kernel";
+@@ -2990,14 +2990,7 @@
  				getAllTools: () => record.session.getAllToolInfos(),
  				setActiveTools: toolNames => record.session.setActiveToolsByName(toolNames),
  				getCommands: () => getSessionSlashCommands(record.session),
@@ -1000,7 +1000,7 @@ diff --git a/src/modes/runtime-init.ts b/src/modes/runtime-init.ts
 diff --git a/src/sdk.ts b/src/sdk.ts
 --- a/src/sdk.ts
 +++ b/src/sdk.ts
-@@ -3504,6 +3504,7 @@
+@@ -3528,6 +3528,7 @@
  			}),
  			createAnnotationsAPI,
  		);
@@ -1008,9 +1008,9 @@ diff --git a/src/sdk.ts b/src/sdk.ts
  		// A dialog waits for the user, not the agent: the session lets the display sleep while one is open.
  		const trackUserWait: UserWaitTracker = dialog => (hasSession ? session.waitForUser(dialog) : dialog());
  		extensionRunner.setUserWaitTracker(trackUserWait);
-@@ -4868,6 +4869,7 @@
- 					}
- 				: undefined,
+@@ -4930,6 +4931,7 @@
+ 				hostMcpServerInstructions = source;
+ 			},
  			disconnectOwnedMcpManager: ownedMcpManager ? () => ownedMcpManager.disconnectAll() : undefined,
 +			disconnectMcpAtAgentEnd: ownedMcpManager ? () => ownedMcpManager.stopAgentEndServers() : undefined,
  			ttsrManager,
@@ -1019,7 +1019,7 @@ diff --git a/src/sdk.ts b/src/sdk.ts
 diff --git a/src/session/agent-session-types.ts b/src/session/agent-session-types.ts
 --- a/src/session/agent-session-types.ts
 +++ b/src/session/agent-session-types.ts
-@@ -402,6 +402,8 @@
+@@ -407,6 +407,8 @@
  	advisorConfigWarnings?: string[];
  	/** Disconnect the MCP manager owned by this session during disposal. */
  	disconnectOwnedMcpManager?: () => Promise<void>;
@@ -1031,7 +1031,7 @@ diff --git a/src/session/agent-session-types.ts b/src/session/agent-session-type
 diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
 --- a/src/session/agent-session.ts
 +++ b/src/session/agent-session.ts
-@@ -1106,6 +1106,7 @@
+@@ -1124,6 +1124,7 @@
  	#sideStreamFn: StreamFn;
  	#convertToLlm: (messages: AgentMessage[]) => Message[] | Promise<Message[]>;
  	#disconnectOwnedMcpManager: (() => Promise<void>) | undefined;
@@ -1039,7 +1039,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  
  	readonly #ttsr: TtsrCoordinator;
  	readonly #stats: SessionStatsTracker;
-@@ -2271,6 +2272,7 @@
+@@ -2323,6 +2324,7 @@
  			skillsReloadable: config.skillsReloadable,
  		});
  		this.#disconnectOwnedMcpManager = config.disconnectOwnedMcpManager;
@@ -1047,7 +1047,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  		const ttsrHost: TtsrCoordinatorHost = {
  			agent: this.agent,
  			sessionManager: this.sessionManager,
-@@ -5429,6 +5431,9 @@
+@@ -5551,6 +5553,9 @@
  		// `yielded` alone also covers queued steer/follow-up and IRC continuations,
  		// which `#flushPendingAgentEnd` re-tags non-terminal.
  		const awaitingAsyncWork = options?.willContinue === true && options.awaitingAsyncWork === true;
@@ -1057,7 +1057,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  		await this.#emitSessionEvent({
  			...event,
  			isTerminal: !options?.willContinue,
-@@ -6021,7 +6026,7 @@
+@@ -6143,7 +6148,7 @@
  		try {
  			await withTimeout(
  				this.#disconnectOwnedMcpManager(),
@@ -1066,7 +1066,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  				"Timed out disconnecting owned MCP manager during dispose",
  			);
  		} catch (error) {
-@@ -11021,6 +11026,7 @@
+@@ -11207,6 +11212,7 @@
  			selector?: string;
  			thinkingLevel?: ThinkingLevel;
  			persist?: boolean;

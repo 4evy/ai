@@ -26,7 +26,9 @@ diff --git a/packages/coding-agent/src/ssh/connection-manager.ts b/packages/codi
  	}
  
  	args.push("-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new");
-@@ -824,7 +833,9 @@
+@@ -822,9 +831,11 @@
+ 	const target = buildSshTarget(host.username, host.host);
+ 	const owner = await resolveControlPathOwner(host);
  	// Configured sockets may have been replaced by a user's master since the
 -	// last check. Never exit a socket that omp doesn't own.
 +	// last check, so never stop a socket that OMP doesn't own

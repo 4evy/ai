@@ -1,18 +1,22 @@
 {
   "name": "farstep",
   "version": "1.0.0",
-  "private": true,
-  "packageManager": "bun@1.4.4",
-  "type": "module",
-  "scripts": {
-    "check": "bun run typecheck",
-    "typecheck": "bun x --no-install tsc --noEmit -p tsconfig.json && bun x --no-install tsc --noEmit -p native/desktop/platform/linux/extensions/tsconfig.json",
-    "package:native": "bun packaging/build.ts",
-    "package:windows": "bun packaging/build.ts --format windows",
-    "build:gnome": "bun run build:extensions --desktop gnome",
-    "build:extensions": "bun native/desktop/platform/linux/extensions/build.ts",
-    "build:kde": "bun run build:extensions --desktop kde",
-    "build": "bun --bun x --no-install vite build && bun run build:extensions --bundler vite --out dist/extensions"
+  "exports": {
+    ".": "./farstep.ts",
+    "./client/*": "./client/*.ts",
+    "./packaging/*": "./packaging/*.ts",
+    "./runtime/sky/runtime/pins.json": "./runtime/sky/runtime/pins.json",
+    "./protocol/*": "./protocol/*.ts",
+    "./remote/*": "./remote/*.ts",
+    "./skylight/*": "./skylight/*.ts",
+    "./remote/*.md": "./remote/*.md",
+    "./skylight/*.md": "./skylight/*.md",
+    "./transport/*": "./transport/*.ts",
+    "./runtime/sky/runtime/*": "./runtime/sky/runtime/*.ts",
+    "./cli": "./runtime/main.ts"
+  },
+  "imports": {
+    "#farstep/*": "./*.ts"
   },
   "dependencies": {
     "@ai/core": "workspace:*",
@@ -20,8 +24,8 @@
     "@logtape/logtape": "2.4.2",
     "@logtape/redaction": "2.4.2",
     "@modelcontextprotocol/sdk": "1.32.1",
-    "@oh-my-pi/pi-natives": "18.12.6",
-    "@oh-my-pi/pi-utils": "18.12.6",
+    "@oh-my-pi/pi-natives": "18.13.1",
+    "@oh-my-pi/pi-utils": "18.13.1",
     "@opentelemetry/api": "1.10.0",
     "@opentelemetry/exporter-trace-otlp-http": "0.300.0",
     "@opentelemetry/resources": "3.0.0",
@@ -46,21 +50,17 @@
     "@oai/sky": "file:./sky",
     "vite": "catalog:"
   },
-  "exports": {
-    ".": "./farstep.ts",
-    "./client/*": "./client/*.ts",
-    "./packaging/*": "./packaging/*.ts",
-    "./runtime/sky/runtime/pins.json": "./runtime/sky/runtime/pins.json",
-    "./protocol/*": "./protocol/*.ts",
-    "./remote/*": "./remote/*.ts",
-    "./skylight/*": "./skylight/*.ts",
-    "./remote/*.md": "./remote/*.md",
-    "./skylight/*.md": "./skylight/*.md",
-    "./transport/*": "./transport/*.ts",
-    "./runtime/sky/runtime/*": "./runtime/sky/runtime/*.ts",
-    "./cli": "./runtime/main.ts"
-  },
-  "imports": {
-    "#farstep/*": "./*.ts"
+  "private": true,
+  "packageManager": "bun@1.4.4",
+  "type": "module",
+  "scripts": {
+    "check": "bun run typecheck",
+    "typecheck": "bun x --no-install tsc --noEmit -p tsconfig.json && bun x --no-install tsc --noEmit -p native/desktop/platform/linux/extensions/tsconfig.json",
+    "package:native": "bun packaging/build.ts",
+    "package:windows": "bun packaging/build.ts --format windows",
+    "build:gnome": "bun run build:extensions --desktop gnome",
+    "build:extensions": "bun native/desktop/platform/linux/extensions/build.ts",
+    "build:kde": "bun run build:extensions --desktop kde",
+    "build": "bun --bun x --no-install vite build && bun run build:extensions --bundler vite --out dist/extensions"
   }
 }
