@@ -91,6 +91,7 @@ export default function improve(api: ExtensionAPI) {
   const cancel = () => active?.abort();
   api.on("session_switch", cancel);
   api.on("session_branch", cancel);
+  api.on("session_tree", cancel);
   api.on("session_shutdown", cancel);
 
   async function run(ctx: ExtensionContext, supplied?: string): Promise<void> {

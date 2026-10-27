@@ -39,7 +39,7 @@ export async function requestRewrite(
     disableExtensionDiscovery: true,
     skills: [],
     rules: [],
-    contextFiles: [],
+    noContextFiles: true,
     promptTemplates: [],
     slashCommands: [],
     enableMCP: false,

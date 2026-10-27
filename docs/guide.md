@@ -502,6 +502,9 @@ not run a separate repository-research pass or invent facts about unread
 files. If Luna is unavailable or the request fails, the original draft is
 kept rather than silently falling back to an expensive model.
 
+Switching sessions, branches, or tree positions cancels an open improvement.
+The isolated request does not discover repository instruction files.
+
 You can also use `/improve <prompt>`, or `/improve` to open a draft editor.
 The extension ships with the default OMP extensions. For a checkout-only run,
 load it with `omp -e ./apps/omp/extensions/improve/index.ts`.
