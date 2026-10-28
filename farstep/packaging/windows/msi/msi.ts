@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { readdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { render } from "@ai/core/template/template";
+import { escapeXmlAttribute } from "@oh-my-pi/pi-utils/sanitize-text";
 import { run } from "../../common";
 
 const template = readFileSync(new URL("./msi.wxs", import.meta.url), "utf8");
@@ -14,14 +15,6 @@ function hash(value: string) {
 function guid(value: string) {
   const hex = hash(value).slice(0, 32);
   return `{${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}}`.toUpperCase();
-}
-
-function xml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
 }
 
 export function windowsProductCode(version: string, architecture: string) {
@@ -57,7 +50,7 @@ export async function packageMsi(
       .filter((entry) => entry.isFile())
       .map((entry) => {
         const path = join(payload, relative, entry.name);
-        return `<File Id="F_${hash(`${relative}/${entry.name}`).slice(0, 24)}" Source="${xml(path)}" />`;
+        return `<File Id="F_${hash(`${relative}/${entry.name}`).slice(0, 24)}" Source="${escapeXmlAttribute(path)}" />`;
       })
       .join("\n");
     const children: string[] = [];
@@ -65,7 +58,7 @@ export async function packageMsi(
       const child = `${relative}/${entry.name}`;
       children.push(await directory(child, `D_${hash(child).slice(0, 24)}`));
     }
-    return `<Directory Id="${id}" Name="${xml(basename(relative))}">
+    return `<Directory Id="${id}" Name="${escapeXmlAttribute(basename(relative))}">
       <Component Id="${component}" Guid="${guid(`directory:${version}:${architecture}:${relative}`)}">
         <RegistryValue Root="HKCU" Key="Software\\4evy\\Farstep\\packages\\${version}\\${key}" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
         <RemoveFolder Id="R_${key}" On="uninstall" />
@@ -78,7 +71,7 @@ export async function packageMsi(
   for (const name of ["bin", "lib", "share"])
     directories.push(await directory(name, `D_${name}`));
   const command = (action: string) =>
-    xml(
+    escapeXmlAttribute(
       `"[System64Folder]WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "[INSTALLFOLDER]share\\farstep\\install.ps1" -PackagePath "[INSTALLFOLDER]." -Action ${action} -Manager winget -Owner [UserSID]`,
     );
   // MSI compares three version fields, so check the full build before removal
@@ -95,7 +88,7 @@ if (Test-Path -LiteralPath $path) {
 `,
     "utf16le",
   ).toString("base64");
-  const check = xml(
+  const check = escapeXmlAttribute(
     String.raw`"[System64Folder]WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -EncodedCommand ${versionCheck}`,
   );
   const source = render(template, {
