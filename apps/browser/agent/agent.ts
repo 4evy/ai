@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { attempt, flushObservability, run } from "@ai/core/effect/effect";
 import { executeCommand } from "@ai/core/effect/process/process";
 import { errorCode, errorMessage } from "@ai/core/error/error";
+import { toError } from "@oh-my-pi/pi-utils/type-guards";
 import { object } from "@optique/core/constructs";
 import { formatMessage } from "@optique/core/message";
 import { optional } from "@optique/core/modifiers";
@@ -62,7 +63,7 @@ export function readBrowserPort(
         return port;
     } catch (error) {
       if (!hasErrorCode(error, "ENOENT") && !(error instanceof SyntaxError))
-        throw error instanceof Error ? error : new Error(String(error));
+        throw toError(error);
     }
     throw pending;
   }).pipe(

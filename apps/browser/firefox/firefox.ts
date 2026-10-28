@@ -7,6 +7,7 @@ import { attempt } from "@ai/core/effect/effect";
 import { temporaryDirectory } from "@ai/core/effect/fs/fs";
 import { terminateProcess } from "@ai/core/effect/process/process";
 import { connectSocket } from "@ai/core/effect/socket/socket";
+import { ConcatSink } from "@oh-my-pi/pi-utils";
 import { Effect, Schedule } from "effect";
 import * as v from "valibot";
 import { hasErrorCode, runUserAgent, START_TIMEOUT_MS } from "../agent/agent.ts";
@@ -74,7 +75,7 @@ function readDevToolsUserAgent(socket: Socket) {
       );
       return yield* Effect.callback<string, unknown>((resume) => {
         const fail = (error: unknown) => resume(Effect.fail(error));
-        let buffer: Buffer = Buffer.alloc(0);
+        const buffer = new ConcatSink();
         let stage: "greeting" | "process" | "target" | "evaluation" = "greeting";
         let actor = "root";
         let resultID: string | undefined;
@@ -148,11 +149,15 @@ function readDevToolsUserAgent(socket: Socket) {
         };
         const data = (data: Buffer) => {
           try {
-            buffer = Buffer.concat([buffer, data]);
-            while (buffer.length > 0) {
-              const frame = devToolsPacket(buffer);
+            buffer.append(data);
+            while (!buffer.isEmpty) {
+              const bytes = buffer.flush();
+              if (!bytes) break;
+              const frame = devToolsPacket(
+                Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength),
+              );
               if (!frame) break;
-              buffer = frame.remaining;
+              buffer.consume(bytes.byteLength - frame.remaining.byteLength);
               if (handlePacket(frame.packet)) return;
             }
           } catch (error) {
