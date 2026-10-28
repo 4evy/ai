@@ -1,13 +1,13 @@
-import { lstat, mkdir, rm } from "node:fs/promises";
+import { lstat, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { attempt, run } from "@ai/core/effect/effect";
 import { executeCommand } from "@ai/core/effect/process/process";
 import { errorCode } from "@ai/core/error/error";
 import { processCommand } from "@ai/core/process/launch";
+import { tryAcquireFileLock } from "@oh-my-pi/pi-utils/file-lock";
 import { Effect } from "effect";
 import { bunBinary } from "../binary";
-import { acquireLock } from "../lock/lock";
 
 const packages = {
   codex: "@openai/codex@alpha",
@@ -61,28 +61,18 @@ export async function installUpstream(
         awaitOnInterrupt: true,
       });
       // Bun's global install is shared by every tool and updater process
-      const path = join(directory, "packages.lock");
+      const path = join(directory, "packages");
       yield* Effect.acquireUseRelease(
-        attempt(() => acquireLock(path)),
+        Effect.sync(() => tryAcquireFileLock(path)),
         (lock) =>
           Effect.gen(function* () {
             if (!lock)
               return yield* Effect.fail(
                 new Error("Another AI package update is running. Try again later"),
               );
-            yield* attempt(() => lock.writeFile(String(process.pid)), {
-              awaitOnInterrupt: true,
-            });
             yield* install(tool, update, false, background);
           }),
-        (lock) =>
-          lock
-            ? attempt(() => lock.close()).pipe(
-                Effect.ensuring(
-                  attempt(() => rm(path, { force: true })).pipe(Effect.orDie),
-                ),
-              )
-            : Effect.void,
+        (lock) => Effect.sync(() => lock?.release()),
       );
     }),
   );
