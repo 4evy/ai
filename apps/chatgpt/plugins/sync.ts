@@ -1,7 +1,8 @@
-import { mkdir, readFile, readlink, rm, stat, symlink } from "node:fs/promises";
+import { mkdir, readFile, readlink, rm, symlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { attempt, run } from "@ai/core/effect/effect";
 import { executeCommand } from "@ai/core/effect/process/process";
+import { directoryExists } from "@oh-my-pi/pi-utils/dirs";
 import { writeFile } from "atomically";
 import { Effect } from "effect";
 import * as v from "valibot";
@@ -22,10 +23,7 @@ type Options = {
 };
 
 export const directory = (path: string) =>
-  attempt(() => stat(path)).pipe(
-    Effect.map((info) => info.isDirectory()),
-    Effect.catch(() => Effect.succeed(false)),
-  );
+  attempt(() => directoryExists(path)).pipe(Effect.catch(() => Effect.succeed(false)));
 
 const loadManifest = Effect.fnUntraced(function* (root: string) {
   const path = join(root, ".agents/plugins/marketplace.json");
