@@ -5,11 +5,11 @@ import {
   readFileSync,
   realpathSync,
   statSync,
-  writeFileSync,
 } from "node:fs";
 import { basename, join, sep } from "node:path";
 import { errorCode, errorMessage } from "@ai/core/error/error";
 import { walkSync } from "@nodelib/fs.walk";
+import { writeFileSync } from "atomically";
 import { Struct } from "effect";
 import { POLICY_RULES } from "./decision";
 import {
@@ -165,7 +165,7 @@ function restoreFilePatches(
   const restoreErrors: string[] = [];
   for (const item of written.toReversed()) {
     try {
-      writeFileSync(item.filename, item.original);
+      writeFileSync(item.filename, item.original, { timeout: 0 });
     } catch (error) {
       restoreErrors.push(`${item.filename}: ${errorMessage(error)}`);
     }
@@ -178,11 +178,13 @@ function restoreFilePatches(
 }
 
 function commitFilePatches(planned: readonly PlannedPatch[]): FilePatchResult[] {
+  // Atomic replacement leaves the failing file intact, then restores earlier files
+  // Disable the library's default retries so filesystem failures remain immediate
   const written: { filename: string; original: string }[] = [];
   try {
     for (const item of planned) {
       if (item.status !== "patched") continue;
-      writeFileSync(item.filename, item.next);
+      writeFileSync(item.filename, item.next, { timeout: 0 });
       written.push({ filename: item.filename, original: item.original });
     }
   } catch (error) {

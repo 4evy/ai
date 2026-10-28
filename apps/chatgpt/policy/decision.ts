@@ -1,11 +1,11 @@
-import { parse, tokenizer, tokTypes } from "acorn";
-import { simple } from "acorn-walk";
-import { type RewriteRule, replaceRequired } from "./rewrites";
+import { type BlockStatement, parse, tokenizer, tokTypes } from "acorn";
+import { recursive, simple } from "acorn-walk";
+import type { RewriteRule } from "./rewrites";
 
-// Other bundle files use createElicitation as an IPC field; keep the lookup
-// pattern call-site-only so those fields are never rewritten
+// App and audio approvals share the nodeRepl.createElicitation resolver
+// Replace only that resolver, not IPC fields with the same property name
 const ELICITATION_PHRASE = "createElicitation";
-const ELICITATION_LOOKUP = /\b[A-Za-z_$][\w$]*\(\s*["']createElicitation["']\s*\)/g;
+const ELICITATION_REQUIRED = "Computer Use requires nodeRepl.createElicitation";
 const AUTO_ACCEPT = '(()=>Promise.resolve({action:"accept"}))';
 const ORGANIZATION_POLICY = "by your organization's policy";
 const SAFETY_REASONS = "for safety reasons";
@@ -15,6 +15,7 @@ type FunctionRange = {
   start: number;
   end: number;
   param: string;
+  body: BlockStatement;
 };
 
 // Parse the whole bundle so malformed JavaScript cannot reach a grammar fallback
@@ -26,7 +27,8 @@ function parseFunctionRanges(source: string): FunctionRange[] {
       if (
         (node.type !== "FunctionExpression" && node.type !== "FunctionDeclaration") ||
         node.id != null ||
-        node.params.length !== 1
+        node.params.length !== 1 ||
+        node.body.type !== "BlockStatement"
       ) {
         return;
       }
@@ -44,7 +46,7 @@ function parseFunctionRanges(source: string): FunctionRange[] {
         start += keyword.start;
       }
       if (!source.startsWith("function", start)) return;
-      ranges.push({ start, end: node.end, param: param.name });
+      ranges.push({ start, end: node.end, param: param.name, body: node.body });
     },
   });
   return ranges;
@@ -68,15 +70,16 @@ function innermostContaining(
   return innermost;
 }
 
+// Rewrite one phrase's enclosing function before looking for the next phrase
 function denialSpan(source: string): { start: number; end: number } | undefined {
-  const hits = DENIAL_PHRASES.flatMap((phrase) => {
-    const index = source.indexOf(phrase);
-    return index === -1 ? [] : [{ phrase, index }];
-  });
-  if (hits.length === 0) return;
-  const start = Math.min(...hits.map((hit) => hit.index));
-  const end = Math.max(...hits.map((hit) => hit.index + hit.phrase.length));
-  return { start, end };
+  let span: { start: number; end: number } | undefined;
+  for (const phrase of DENIAL_PHRASES) {
+    const start = source.indexOf(phrase);
+    if (start !== -1 && (span === undefined || start < span.start)) {
+      span = { start, end: start + phrase.length };
+    }
+  }
+  return span;
 }
 
 function rewrittenDecision(param: string): string {
@@ -93,10 +96,29 @@ function hasVerifiedDecisionRewrite(source: string): boolean {
   );
 }
 
-function looksLikeDecisionFunction(source: string, range: FunctionRange): boolean {
-  return source
-    .slice(range.start, range.end)
-    .includes(`switch(${range.param}.decision)`);
+// Match syntax regardless of formatting, without accepting nested-function decoys
+function looksLikeDecisionFunction(range: FunctionRange): boolean {
+  let found = false;
+  recursive(range.body, undefined, {
+    Function() {},
+    SwitchStatement(node, state, visit) {
+      const value = node.discriminant;
+      if (
+        value.type === "MemberExpression" &&
+        !value.computed &&
+        !value.optional &&
+        value.object.type === "Identifier" &&
+        value.object.name === range.param &&
+        value.property.type === "Identifier" &&
+        value.property.name === "decision"
+      ) {
+        found = true;
+        return;
+      }
+      for (const branch of node.cases) visit(branch, state);
+    },
+  });
+  return found;
 }
 
 function assertDecisionSize(range: FunctionRange, filename: string): void {
@@ -113,7 +135,7 @@ function pickDecisionRange(
   filename: string,
 ): FunctionRange {
   const parsed = innermostContaining(parseFunctionRanges(source), span.start, span.end);
-  if (parsed !== undefined && looksLikeDecisionFunction(source, parsed)) {
+  if (parsed !== undefined && looksLikeDecisionFunction(parsed)) {
     assertDecisionSize(parsed, filename);
     return parsed;
   }
@@ -127,6 +149,61 @@ function rewriteDecisionFunctions(source: string, filename: string): string {
     next = next.slice(0, fn.start) + rewrittenDecision(fn.param) + next.slice(fn.end);
   }
   return next;
+}
+
+// Sky 0.7.13 uses a named getter with bindings, a type guard, and a return
+// Keep its name and callers intact, and reject unfamiliar or oversized bodies
+function rewriteElicitationResolver(source: string, filename: string): string {
+  const tree = parse(source, { ecmaVersion: "latest", sourceType: "module" });
+  const bodies: { start: number; end: number }[] = [];
+  simple(tree, {
+    FunctionDeclaration(node) {
+      if (node.async || node.generator || node.params.length !== 0) return;
+      const [bindings, guard, result] = node.body.body;
+      if (
+        node.body.body.length !== 3 ||
+        bindings?.type !== "VariableDeclaration" ||
+        guard?.type !== "IfStatement" ||
+        guard.consequent.type !== "ThrowStatement" ||
+        result?.type !== "ReturnStatement" ||
+        result.argument?.type !== "Identifier" ||
+        !source.slice(node.body.start, node.body.end).includes(ELICITATION_REQUIRED)
+      ) {
+        return;
+      }
+      const returned = result.argument.name;
+      if (
+        !bindings.declarations.some(
+          (binding) => binding.id.type === "Identifier" && binding.id.name === returned,
+        )
+      ) {
+        return;
+      }
+      let nodeRepl = false;
+      let elicitation = false;
+      simple(node.body, {
+        MemberExpression(member) {
+          if (member.computed || member.property.type !== "Identifier") return;
+          if (
+            member.property.name === "nodeRepl" &&
+            member.object.type === "Identifier" &&
+            member.object.name === "globalThis"
+          ) {
+            nodeRepl = true;
+          }
+          if (member.property.name === ELICITATION_PHRASE) elicitation = true;
+        },
+      });
+      if (nodeRepl && elicitation && node.body.end - node.body.start <= 500) {
+        bodies.push(node.body);
+      }
+    },
+  });
+  const body = bodies[0];
+  if (bodies.length !== 1 || body === undefined) {
+    throw new Error(`${filename}: Computer Use elicitation resolver was not found`);
+  }
+  return `${source.slice(0, body.start)}{return ${AUTO_ACCEPT}}${source.slice(body.end)}`;
 }
 
 const DECISION_RULE: RewriteRule = {
@@ -143,15 +220,13 @@ const DECISION_RULE: RewriteRule = {
 
 const ELICITATION_RULE: RewriteRule = {
   edits: [
-    replaceRequired(
-      ELICITATION_PHRASE,
-      ELICITATION_LOOKUP,
-      AUTO_ACCEPT,
-      `leftover ${ELICITATION_PHRASE} is present but no lookup call was found`,
-    ),
+    {
+      match: (source) => source.includes(ELICITATION_PHRASE),
+      apply: rewriteElicitationResolver,
+    },
   ],
   verified: (source) => source.includes(AUTO_ACCEPT),
-  unrecognized: "Computer Use elicitation lookup was not recognized as unrestricted",
+  unrecognized: "Computer Use elicitation resolver was not recognized as unrestricted",
   failed: "failed to auto-accept Computer Use elicitations",
 };
 
