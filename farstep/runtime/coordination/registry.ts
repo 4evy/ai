@@ -14,6 +14,7 @@ import {
   coordinationResultSchema,
 } from "farstep/protocol/coordination";
 import type { JobSnapshot } from "farstep/protocol/jobs/protocol";
+import canonical from "fast-json-stable-stringify";
 import * as v from "valibot";
 import type { ToolRegistrar } from "../jobs/tools";
 import { CoordinationContext, type Session } from "./context";
@@ -179,17 +180,8 @@ export class CoordinationRegistry {
       const session = this.presence.requireSession();
       const project = session.project;
       const requestId = "requestId" in input ? input.requestId : undefined;
-      // Requests contain only scalar values and string arrays, so a property
-      // list preserves the persisted key order without rebuilding the object
-      const fingerprint = hash(
-        "sha256",
-        JSON.stringify(
-          input,
-          Object.keys(input)
-            .filter((key) => key !== "requestId")
-            .sort((a, b) => a.localeCompare(b)),
-        ),
-      );
+      // Schema keys retain their persisted order under canonical serialization
+      const fingerprint = hash("sha256", canonical({ ...input, requestId: undefined }));
       if (requestId) {
         const original = this.store.queries
           .select({

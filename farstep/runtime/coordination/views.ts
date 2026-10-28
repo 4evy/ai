@@ -1,4 +1,4 @@
-import { and, eq, gt, type SQL, sql } from "drizzle-orm";
+import { and, eq, gt, max, type SQL, sql } from "drizzle-orm";
 import {
   type CoordinationRequest,
   type CoordinationResult,
@@ -162,7 +162,7 @@ export class CoordinationViews {
     return {
       cursor:
         store.queries
-          .select({ cursor: sql<number>`coalesce(max(${tables.events.id}), 0)` })
+          .select({ cursor: max(tables.events.id) })
           .from(tables.events)
           .get()?.cursor ?? 0,
       sessions: sessions

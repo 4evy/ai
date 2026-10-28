@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, max } from "drizzle-orm";
 import type {
   coordinationClaimSchema,
   coordinationEventSchema,
@@ -33,11 +33,11 @@ export class CoordinationContext {
 
   cursor(): number {
     const row = this.store.queries
-      .select({ cursor: sql<number>`coalesce(max(${tables.events.id}), 0)` })
+      .select({ cursor: max(tables.events.id) })
       .from(tables.events)
       .get();
     if (!row) throw new Error("Coordination event cursor is unavailable");
-    return row.cursor;
+    return row.cursor ?? 0;
   }
 
   event(
