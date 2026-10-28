@@ -2,7 +2,7 @@ import { mkdir, readdir, rename } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { attempt, run } from "@ai/core/effect/effect";
 import { temporaryDirectory } from "@ai/core/effect/fs/fs";
-import { downloadFile } from "@ai/core/effect/http/http";
+import { type DownloadOptions, downloadFile } from "@ai/core/effect/http/http";
 import { extractArchive as unpack } from "@oh-my-pi/pi-utils/ar";
 import { Effect } from "effect";
 
@@ -57,20 +57,26 @@ export function extractArchive(
   return run(extractArchiveEffect(archive, destination, stripRoot));
 }
 
-export function downloadArchiveEffect(url: string, destination: string) {
-  return downloadFile(url, destination, "Archive download").pipe(
+// Return the streaming SHA-256 digest
+// Expected checksums reject before publication
+export function downloadArchiveEffect(
+  url: string,
+  destination: string,
+  options: DownloadOptions = {},
+) {
+  return downloadFile(url, destination, "Archive download", options).pipe(
     Effect.timeoutOrElse({
       duration: 10 * 60_000,
       orElse: () => Effect.fail(new Error(`Archive download timed out: ${url}`)),
     }),
-    Effect.asVoid,
   );
 }
 
 export function downloadArchive(
   url: string,
   destination: string,
+  options: DownloadOptions = {},
   signal?: AbortSignal,
-): Promise<void> {
-  return run(downloadArchiveEffect(url, destination), signal);
+): Promise<string> {
+  return run(downloadArchiveEffect(url, destination, options), signal);
 }

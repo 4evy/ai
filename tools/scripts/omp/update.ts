@@ -78,10 +78,7 @@ let archiveHash: string;
   await using workspace = await mkdtempDisposable(join(tmpdir(), "omp-update-"));
   const staging = workspace.path;
   const archive = join(staging, "source.tar.gz");
-  await downloadArchive(url, archive);
-  archiveHash = new Bun.CryptoHasher("sha256")
-    .update(await Bun.file(archive).arrayBuffer())
-    .digest("hex");
+  archiveHash = await downloadArchive(url, archive);
   await extractArchive(archive, staging);
   const upstream = v.parse(
     packageJsonSchema,

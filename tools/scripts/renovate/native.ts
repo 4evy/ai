@@ -42,10 +42,7 @@ async function artifact(assets: Asset[], match: (name: string) => boolean) {
   if (!sha256) {
     await using staging = await mkdtempDisposable(join(tmpdir(), "renovate-native-"));
     const archive = join(staging.path, "archive");
-    await downloadArchive(asset.browser_download_url, archive);
-    sha256 = new Bun.CryptoHasher("sha256")
-      .update(await Bun.file(archive).arrayBuffer())
-      .digest("hex");
+    sha256 = await downloadArchive(asset.browser_download_url, archive);
   }
   return { url: asset.browser_download_url, sha256 };
 }

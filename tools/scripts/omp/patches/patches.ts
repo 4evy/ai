@@ -215,14 +215,8 @@ const downloadSource = Effect.fnUntraced(function* (
   yield* download(
     `https://codeload.github.com/can1357/oh-my-pi/tar.gz/refs/tags/v${version}`,
     archive,
+    { sha256: version === pin.version ? pin.sha256 : undefined },
   );
-  if (version === pin.version) {
-    const digest = new Bun.CryptoHasher("sha256")
-      .update(yield* attempt(() => Bun.file(archive).arrayBuffer()))
-      .digest("hex");
-    if (digest !== pin.sha256)
-      return yield* Effect.fail(new Error("OMP source archive checksum mismatch"));
-  }
 });
 
 const syncPatchesEffect = Effect.fnUntraced(function* (options: {

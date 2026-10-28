@@ -88,13 +88,8 @@ async function extract(
   await downloadArchive(
     `https://codeload.github.com/can1357/oh-my-pi/tar.gz/refs/tags/v${version}`,
     archive,
+    { sha256: checksum },
   );
-  if (checksum) {
-    const digest = createHash("sha256")
-      .update(new Uint8Array(await Bun.file(archive).arrayBuffer()))
-      .digest("hex");
-    if (digest !== checksum) throw new Error("OMP source archive checksum mismatch");
-  }
   await extractArchive(archive, tree);
   await rm(archive);
   if (
