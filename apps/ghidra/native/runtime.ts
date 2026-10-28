@@ -1,10 +1,11 @@
 #!/usr/bin/env bun
 import { createHash } from "node:crypto";
 import { closeSync, openSync } from "node:fs";
-import { mkdir, readdir } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { delimiter, dirname, join } from "node:path";
 import { attempt, run } from "@ai/core/effect/effect";
 import { executeCommand, terminateProcess } from "@ai/core/effect/process/process";
+import { walk } from "@nodelib/fs.walk/promises";
 import { writeFile as atomicWrite } from "atomically";
 import { Effect, Schedule } from "effect";
 import {
@@ -16,15 +17,14 @@ import {
   stateHome,
 } from "./common.ts";
 
-// Recursive readdir follows directory symlinks, which must not extend the classpath
+// Directory and file symlinks must not extend the classpath
 async function jars(directory: string): Promise<string[]> {
-  const result: string[] = [];
-  for (const entry of await readdir(directory, { withFileTypes: true })) {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) result.push(...(await jars(path)));
-    else if (entry.isFile() && entry.name.endsWith(".jar")) result.push(path);
-  }
-  return result.sort();
+  const entries = await walk(directory, {
+    concurrency: 1,
+    followSymbolicLinks: false,
+    entryFilter: (entry) => entry.dirent.isFile() && entry.name.endsWith(".jar"),
+  });
+  return entries.map((entry) => entry.path).sort();
 }
 
 async function environment(receipt: Installation): Promise<NodeJS.ProcessEnv> {

@@ -1,6 +1,7 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { isBuiltin } from "node:module";
 import { dirname, relative, resolve } from "node:path";
+import { walkSync } from "@nodelib/fs.walk";
 import { Graph, Option } from "effect";
 import { type Node, parseSync, Visitor } from "oxc-parser";
 import { type ResolveResult, ResolverFactory } from "oxc-resolver";
@@ -181,13 +182,23 @@ function dependencies(source: string): Dependency[] {
 }
 
 const pending = new Set<string>();
+const included = (source: string) =>
+  !excluded.test(`${source}/`) && !nodeModules.test(`${source}/`);
 function gather(path: string): void {
   const source = relative(root, path).replaceAll("\\", "/");
-  if (excluded.test(`${source}/`) || nodeModules.test(`${source}/`)) return;
+  if (!included(source)) return;
   if (statSync(path).isDirectory()) {
-    for (const entry of readdirSync(path, { withFileTypes: true })) {
-      if (entry.isDirectory() || entry.isFile()) gather(resolve(path, entry.name));
-    }
+    for (const entry of walkSync(path, {
+      basePath: source,
+      pathSegmentSeparator: "/",
+      followSymbolicLinks: false,
+      deepFilter: (entry) => included(entry.path),
+      entryFilter: (entry) =>
+        entry.dirent.isFile() &&
+        included(entry.path) &&
+        sourceExtension.test(entry.path),
+    }))
+      pending.add(entry.path);
   } else if (sourceExtension.test(source)) {
     pending.add(source);
   }
