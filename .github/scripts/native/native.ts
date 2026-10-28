@@ -1,12 +1,20 @@
 import { join } from "node:path";
+import * as v from "valibot";
 import { root, run } from "../run/run.ts";
 
 const operation = Bun.argv[2] ?? process.env.TASK;
 switch (operation) {
   case "rust-install": {
     const manifest = await Bun.file(join(root, "Cargo.toml")).text();
-    const version = /^rust-version = "([^"]+)"$/m.exec(manifest)?.[1];
-    if (!version) throw new Error("Cargo.toml has no rust-version");
+    const { workspace } = v.parse(
+      v.object({
+        workspace: v.object({
+          package: v.object({ "rust-version": v.pipe(v.string(), v.nonEmpty()) }),
+        }),
+      }),
+      Bun.TOML.parse(manifest),
+    );
+    const version = workspace.package["rust-version"];
     await run([
       "rustup",
       "toolchain",
