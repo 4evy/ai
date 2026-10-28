@@ -106,10 +106,7 @@ export class JobRecords {
           await using handle = await open(join(staging, file), "r");
           await handle.sync();
         }
-        {
-          await using handle = await open(staging, "r");
-          await handle.sync();
-        }
+        await syncDirectoryAncestors(staging, 1);
         await rename(staging, target);
         await syncDirectoryAncestors(join(this.directory, "jobs"), 3);
       }

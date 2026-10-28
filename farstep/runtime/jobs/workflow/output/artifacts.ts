@@ -2,6 +2,7 @@ import { constants } from "node:fs";
 import { mkdir, open, realpath } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
 import { attempt } from "@ai/core/effect/effect";
+import { syncDirectoryAncestors } from "@ai/core/effect/fs/fs";
 import { Effect } from "effect";
 import { privateDirectoryEffect } from "../../../state";
 import { errorText } from "./parsing";
@@ -47,11 +48,9 @@ export const prepareFiles = Effect.fnUntraced(function* (options: Options) {
       );
       files[stream] = { path, file };
     }
-    yield* Effect.acquireUseRelease(
-      attempt(() => open(directory, "r")),
-      (parent) => attempt(() => parent.sync(), { awaitOnInterrupt: true }),
-      (parent) => attempt(() => parent.close()),
-    );
+    yield* attempt(() => syncDirectoryAncestors(directory, 1), {
+      awaitOnInterrupt: true,
+    });
   }).pipe(
     Effect.catch((error) =>
       Effect.sync(() => {

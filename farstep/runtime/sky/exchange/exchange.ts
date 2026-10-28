@@ -3,7 +3,7 @@ import { constants } from "node:fs";
 import { lstat, realpath, rename } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { attempt, run } from "@ai/core/effect/effect";
-import { openFile, stagedFile } from "@ai/core/effect/fs/fs";
+import { openFile, stagedFile, syncDirectoryAncestors } from "@ai/core/effect/fs/fs";
 import { readText } from "@ai/core/text/text";
 import { withFileLock } from "@oh-my-pi/pi-utils/file-lock";
 import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
@@ -94,11 +94,9 @@ const writeEffect = Effect.fnUntraced(function* (
     );
   yield* Effect.gen(function* () {
     yield* attempt(() => rename(staged.path, path));
-    if (process.platform !== "win32") {
-      const directory = yield* openFile(dirname(path), constants.O_RDONLY);
-      yield* attempt(() => directory.sync());
-    }
-  }).pipe(Effect.scoped, Effect.uninterruptible);
+    if (process.platform !== "win32")
+      yield* attempt(() => syncDirectoryAncestors(dirname(path), 1));
+  }).pipe(Effect.uninterruptible);
   return result(true);
 }, Effect.scoped);
 
