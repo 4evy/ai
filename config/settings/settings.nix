@@ -22,7 +22,7 @@ let
     ".omp/agent/keybindings.yml" = file "yaml" omp.keybindings;
     ".config/opencode/opencode.json" = file "json" opencode.config;
     ".config/opencode/cli.json" = file "json" opencode.cli;
-    ".config/opencode/opencode-quota/quota-toast.json" = file "json" opencode.quota;
+    ".config/opencode/opencode-quota/settings.jsonc" = file "json" opencode.quota;
   };
 in
 # Overrides contain settings keyed by destination path, with lists replaced

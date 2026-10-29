@@ -10,7 +10,7 @@ in
     update = "auto";
     snapshots = true;
     plugins = [
-      "@slkiser/opencode-quota@5.0.3"
+      "@slkiser/opencode-quota@6.0.0"
     ];
     references = {
       opencode = {
@@ -163,7 +163,7 @@ in
     "$schema" = "https://opencode.ai/v2/cli.json";
     theme.name = "catppuccin-custom";
     plugins = [
-      "@slkiser/opencode-quota@5.0.3"
+      "@slkiser/opencode-quota@6.0.0"
     ];
     keybinds = {
       leader = "ctrl+space";
@@ -195,17 +195,18 @@ in
     };
   };
   quota = {
-    enableToast = false;
-    tuiCommandDisplay = "dialog";
-    showSessionTokens = false;
-    sessionTokenScope = "current";
-    formatStyle = "allWindows";
-    percentDisplayMode = "remaining";
-    tuiSidebarPanel = {
-      enabled = true;
+    toast = {
+      show = false;
+      sessionTokens = false;
     };
-    maintainerAnnouncements = {
-      enabled = false;
+    sidebar = {
+      show = true;
+      sessionTokens = false;
+    };
+    statusLine.show = false;
+    words = {
+      sessionTokens = "current";
+      percent = "left";
     };
   };
 }

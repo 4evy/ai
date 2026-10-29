@@ -40,7 +40,7 @@ in
   config = lib.modules.mkIf cfg.opencode.enable {
     programs.ai.opencode = {
       cliSettings = defaults settings.".config/opencode/cli.json".settings;
-      quotaSettings = defaults settings.".config/opencode/opencode-quota/quota-toast.json".settings;
+      quotaSettings = defaults settings.".config/opencode/opencode-quota/settings.jsonc".settings;
     };
     programs.opencode = {
       enable = true;
@@ -56,8 +56,8 @@ in
     xdg.configFile."opencode/cli.json".source =
       (pkgs.formats.json { }).generate "cli.json"
         cfg.opencode.cliSettings;
-    xdg.configFile."opencode/opencode-quota/quota-toast.json".source =
-      (pkgs.formats.json { }).generate "quota-toast.json"
+    xdg.configFile."opencode/opencode-quota/settings.jsonc".source =
+      (pkgs.formats.json { }).generate "settings.jsonc"
         cfg.opencode.quotaSettings;
   };
 }

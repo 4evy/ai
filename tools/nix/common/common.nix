@@ -44,7 +44,7 @@ in
       quotaSettings = lib.options.mkOption {
         inherit (json) type;
         default = { };
-        description = "OpenCode quota plugin settings written to opencode/opencode-quota/quota-toast.json";
+        description = "OpenCode quota plugin settings written to opencode/opencode-quota/settings.jsonc";
       };
     };
     claude = {

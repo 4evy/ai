@@ -361,6 +361,12 @@ settings. See [options](../tools/nix/common/common.nix) and the
 Activation preserves undeclared writable settings. `just config generate` and
 `just config export` stage settings for inspection, not activation.
 
+OpenCode quota v6 reads
+[`opencode-quota/settings.jsonc`](../config/settings/opencode.nix) under the
+OpenCode config directory, replacing `quota-toast.json`. The managed settings
+export and Home Manager module use the new path. V6 no longer supports disabling
+maintainer notices, which are bundled into its Plugin tab.
+
 ### Build Farstep components independently
 
 The [package set](../tools/nix/packages/packages.nix) exposes compilation and
