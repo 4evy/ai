@@ -10,12 +10,12 @@
     "#apps/omp/*": "./*.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.32.1",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@oh-my-pi/pi-utils": "18.13.3",
     "@optique/core": "1.3.6",
     "@tailnet/tailscaled": "0.1.2",
     "valibot": "1.5.0",
-    "effect": "4.0.6",
+    "effect": "4.1.0",
     "@ai/values": "workspace:*",
     "@ai/runtime": "workspace:*",
     "@ai/toolkit": "workspace:*",

@@ -30,7 +30,7 @@
     "@logtape/file": "2.4.2",
     "@logtape/logtape": "2.4.2",
     "@logtape/redaction": "2.4.2",
-    "@modelcontextprotocol/sdk": "1.32.1",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@oh-my-pi/pi-natives": "18.13.3",
     "@oh-my-pi/pi-utils": "18.13.3",
     "@opentelemetry/api": "1.10.0",
@@ -42,7 +42,7 @@
     "@valibot/to-json-schema": "1.8.0",
     "dependency-graph": "1.0.0",
     "drizzle-orm": "0.45.4",
-    "effect": "4.0.6",
+    "effect": "4.1.0",
     "fast-json-stable-stringify": "2.1.0",
     "leven": "4.1.0",
     "plist": "5.0.0",
@@ -52,7 +52,7 @@
   "devDependencies": {
     "@types/bun": "catalog:",
     "typescript": "catalog:",
-    "@girs/gjs": "5.5.0",
+    "@girs/gjs": "5.6.0",
     "@girs/gnome-shell": "50.0.4",
     "@oai/sky": "file:./sky",
     "vite": "catalog:"

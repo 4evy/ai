@@ -2,7 +2,7 @@
   "name": "ai-tools-runtime",
   "version": "1.0.0",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.32.1",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@nodelib/fs.walk": "3.0.1",
     "@oai/sky": "file:../../farstep/sky",
     "@oh-my-pi/pi-utils": "18.13.3",
@@ -14,7 +14,7 @@
     "acorn-walk": "8.3.5",
     "valibot": "1.5.0",
     "vscode-jsonrpc": "10.0.0",
-    "effect": "4.0.6",
+    "effect": "4.1.0",
     "@logtape/logtape": "2.4.2",
     "@logtape/file": "2.4.2",
     "@logtape/redaction": "2.4.2",
