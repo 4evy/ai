@@ -1,25 +1,572 @@
 diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-line/segments.ts
 --- a/packages/tui/src/status-line/segments.ts
 +++ b/packages/tui/src/status-line/segments.ts
-@@ -1166,8 +1166,8 @@
+@@ -19,12 +19,7 @@
+ import { formatMetric } from "../components/metric";
+ import { formatBillingSummary } from "./metrics";
+ import { sanitizeStatusText } from "../chrome/shared";
+-import {
+-	formatContextUsage,
+-	getContextUsageLevel,
+-	getContextUsageThemeColor,
+-	getContextUsageTone,
+-} from "../chrome/context-thresholds";
++import { getContextUsageLevel, getContextUsageThemeColor, getContextUsageTone } from "../chrome/context-thresholds";
+ import type { TspSpan, TspTone } from "@oh-my-pi/pi-wire";
+ import { node, span } from "../native/describe";
+ import { thinkingLevelToken } from "../theme/theme-class";
+@@ -304,11 +299,33 @@
+ 	return state.thinkingLevel ?? ThinkingLevel.Off;
+ }
+ 
++/** Compact effort labels without changing the underlying thinking-level token */
++function thinkingLevelLabel(level: string): string {
++	switch (level) {
++		case "minimal":
++			return "min";
++		case "low":
++			return "lo";
++		case "medium":
++			return "med";
++		case "high":
++			return "hi";
++		case "xhigh":
++			return "xhi";
++		default:
++			return level;
++	}
++}
++
+ /** Thinking-level display ("◉ xhigh", "⟳ auto", …), or "" when hidden or unsupported. */
+ function modelThinkingDisplay(ctx: SegmentContext): string {
+ 	const state = ctx.session.state;
+ 	const opts = ctx.options.model ?? {};
+ 	if (opts.showThinkingLevel === false || !state.model?.thinking) return "";
++	if (!ctx.compactThinkingLevel) {
++		const level = thinkingLevelWord(ctx.session);
++		return level === undefined ? "" : thinkingLevelLabel(level);
++	}
+ 	if (ctx.session.isAutoThinking) {
+ 		// Pending (no turn classified yet / classifying) shows a symbol-theme
+ 		// question-box marker; once resolved it shows `<level>`.
+@@ -397,7 +414,8 @@
+ 		if (advisor) spans.push(span(` ${advisor.icon}`, advisor.color));
+ 		if (ctx.session.isFastModeActive() && theme.icon.fast) spans.push(span(` ${theme.icon.fast}`, token));
+ 		const level = ctx.options.model?.showThinkingLevel === false ? undefined : thinkingLevelWord(ctx.session);
+-		if (level !== undefined) spans.push(span(" · ", "dim"), span(level, thinkingLevelToken(level)));
++		if (level !== undefined)
++			spans.push(span(" · ", "dim"), span(thinkingLevelLabel(level), thinkingLevelToken(level)));
+ 		const slowModeLabel = ctx.session.getAnthropicSlowModeLabel?.();
+ 		if (slowModeLabel) spans.push(span(`${theme.sep.dot}${slowModeLabel}`, "warning"));
+ 		return segView(spans, "model", slowModeLabel ? "warning" : undefined);
+@@ -726,12 +744,12 @@
+ 		if (ctx.subagentCount === 0) {
+ 			return { content: "", visible: false };
+ 		}
+-		const content = withIcon(theme.icon.agents, `${ctx.subagentCount}`);
++		const content = `Agt ${ctx.subagentCount}`;
+ 		return { content: theme.fg("statusLineSubagents", content), visible: true };
+ 	},
+ 	describe(ctx) {
+ 		if (ctx.subagentCount === 0) return null;
+-		return segView([span(`${ctx.subagentCount}`, "statusLineSubagents")], "agents");
++		return segView([span(`Agt ${ctx.subagentCount}`, "statusLineSubagents")]);
+ 	},
+ };
+ 
+@@ -815,6 +833,7 @@
+ 			usingSubscription,
+ 			premiumRequests,
+ 			fractionDigits: 2,
++			hideSubagentCost: ctx.width > 0 && ctx.width < 100,
+ 			pricingPeriod,
+ 			advisor: advisorCost
+ 				? { cost: advisorCost, usingSubscription: ctx.session.isAdvisorUsingSubscription?.() ?? false }
+@@ -848,25 +867,17 @@
+ 		// Async-compaction indicator: pulse the auto icon while a background
+ 		// speculation runs, hold it in accent once a result is armed.
+ 		let autoIcon = "";
+-		if (ctx.autoCompactEnabled && theme.icon.auto) {
++		if (
++			ctx.autoCompactEnabled &&
++			theme.icon.auto &&
++			(ctx.compactionSpeculation === "running" || ctx.compactionSpeculation === "armed")
++		) {
+ 			const speculation = ctx.compactionSpeculation;
+ 			const accentIcon = accentFg(ctx, "accent", theme.icon.auto);
+-			autoIcon = ` ${
+-				speculation === "running"
+-					? ctx.speculationBlinkOn
+-						? accentIcon
+-						: theme.fg("muted", theme.icon.auto)
+-					: speculation === "armed"
+-						? accentIcon
+-						: theme.fg(color, theme.icon.auto)
+-			}`;
++			autoIcon = ` ${speculation === "running" && !ctx.speculationBlinkOn ? theme.fg("muted", theme.icon.auto) : accentIcon}`;
+ 		}
+-		// A known window with unknown usage (startup prepaint) shows the window alone.
+-		const text = theme.fg(
+-			color,
+-			pct === null && window > 0 ? formatNumber(window) : formatContextUsage(pct, window, ctx.contextTokens),
+-		);
+-		const content = withIcon(theme.icon.context, `${text}${autoIcon}`);
++		const text = theme.fg(color, pct === null ? "?" : `${Math.round(pct)}%`);
++		const content = `${theme.fg("muted", "Ctx ")}${text}${autoIcon}`;
+ 
+ 		return { content, visible: true };
+ 	},
+@@ -875,23 +886,22 @@
+ 		const window = ctx.contextWindow;
+ 		const level = getContextUsageLevel(pct ?? 0, window);
+ 		const color = getContextUsageThemeColor(level);
+-		const spans: TspSpan[] = [
+-			span(
+-				pct === null && window > 0 ? formatNumber(window) : formatContextUsage(pct, window, ctx.contextTokens),
+-				color,
+-			),
+-		];
+-		if (ctx.autoCompactEnabled && theme.icon.auto) {
++		const spans: TspSpan[] = [span("Ctx ", "muted"), span(pct === null ? "?" : `${Math.round(pct)}%`, color)];
++		if (
++			ctx.autoCompactEnabled &&
++			theme.icon.auto &&
++			(ctx.compactionSpeculation === "running" || ctx.compactionSpeculation === "armed")
++		) {
+ 			// Async-compaction indicator: the terminal pulses the auto icon while a
+ 			// background speculation runs; an armed result holds it in accent.
+ 			const speculation = ctx.compactionSpeculation;
+ 			if (speculation === "running") {
+ 				spans.push(span(` ${theme.icon.auto}`, accentToken(ctx, "accent"), { fx: "pulse" }));
+ 			} else {
+-				spans.push(span(` ${theme.icon.auto}`, speculation === "armed" ? accentToken(ctx, "accent") : color));
++				spans.push(span(` ${theme.icon.auto}`, accentToken(ctx, "accent")));
+ 			}
+ 		}
+-		return segView(spans, "context", getContextUsageTone(level));
++		return segView(spans, undefined, getContextUsageTone(level));
+ 	},
+ };
+ 
+@@ -1146,30 +1156,28 @@
+ 	},
+ };
+ 
+-function pickUsageColor(percent: number): "muted" | "warning" | "error" {
++function pickUsageColor(percent: number): "text" | "warning" | "error" {
+ 	if (percent >= 80) return "error";
+ 	if (percent >= 50) return "warning";
+-	return "muted";
++	return "text";
+ }
+ 
+ /**
+- * One quota window (`5h`, `1d`, `7d`, `mo`). The integer policy (round vs
+- * floor) and the reset unit (minutes vs hours) stay explicit at each call site:
+- * monthly floors like the Cursor/OpenCode dashboards, the rest round, and
+- * short windows reset in minutes while long windows reset in hours.
++ * Quota percentages are remaining capacity, while provider inputs are usage
++ * Keep labels and reset countdowns compact in the persistent footer
+  */
+ function formatQuotaWindow(
+-	ctx: SegmentContext,
+ 	label: string,
+ 	percent: number,
+ 	reset: number | undefined,
  	resetUnit: "m" | "h",
  	integer: "round" | "floor",
  ): string {
 -	const whole = integer === "floor" ? Math.floor(percent) : Math.round(percent);
--	const pctText = theme.fg(pickUsageColor(percent), `${whole}%`);
 +	const whole = integer === "floor" ? Math.floor(100 - percent) : Math.round(100 - percent);
-+	const pctText = theme.fg(pickUsageColor(percent), `${whole}% left`);
- 	const resetText = reset !== undefined ? theme.fg("muted", ` (${formatUsageReset(reset, resetUnit)})`) : "";
- 	return `${label} ${pctText}${resetText}`;
+ 	const pctText = theme.fg(pickUsageColor(percent), `${whole}%`);
+-	const resetText = reset !== undefined ? theme.fg("muted", ` (${formatUsageReset(reset, resetUnit)})`) : "";
+-	return `${label} ${pctText}${resetText}`;
++	const resetText =
++		reset !== undefined ? theme.fg("muted", `${theme.sep.dot}${formatUsageReset(reset, resetUnit)}`) : "";
++	return `${theme.fg("muted", `${label} `)}${pctText}${resetText}`;
  }
-@@ -1180,8 +1180,8 @@
+ 
+ /** Native twin of {@link formatQuotaWindow}. */
+@@ -1180,9 +1188,9 @@
  	resetUnit: "m" | "h",
  	integer: "round" | "floor",
  ): TspSpan[] {
 -	const whole = integer === "floor" ? Math.floor(percent) : Math.round(percent);
 -	const spans = [span(`${label} `), span(`${whole}%`, pickUsageColor(percent))];
+-	if (reset !== undefined) spans.push(span(` (${formatUsageReset(reset, resetUnit)})`, "muted"));
 +	const whole = integer === "floor" ? Math.floor(100 - percent) : Math.round(100 - percent);
-+	const spans = [span(`${label} `), span(`${whole}% left`, pickUsageColor(percent))];
- 	if (reset !== undefined) spans.push(span(` (${formatUsageReset(reset, resetUnit)})`, "muted"));
++	const spans = [span(`${label} `, "muted"), span(`${whole}%`, pickUsageColor(percent))];
++	if (reset !== undefined) spans.push(span(`${theme.sep.dot}${formatUsageReset(reset, resetUnit)}`, "muted"));
  	return spans;
  }
+ 
+@@ -1204,7 +1212,7 @@
+ /** Expiring saved resets outrank the usable/unusable color: red within 24 hours, yellow within 7 days. */
+ function resetCreditsColor(resets: NonNullable<NonNullable<SegmentContext["usage"]>["resetCredits"]>): ThemeColor {
+ 	if (resets.expiring) return resets.expiring.tier === "imminent" ? "error" : "warning";
+-	return resets.redeemableCount > 0 ? "success" : "warning";
++	return resets.redeemableCount > 0 ? "text" : "warning";
+ }
+ 
+ const usageSegment: StatusLineSegment = {
+@@ -1215,82 +1223,83 @@
+ 			return { content: "", visible: false };
+ 		}
+ 		const parts: string[] = [];
+-		if (u.tier) {
+-			const tier = truncateToWidth(sanitizeStatusText(u.tier), TRUNCATE_LENGTHS.SHORT);
+-			if (tier) parts.push(accentFg(ctx, "accent", tier));
+-		}
+ 		if (u.fiveHour) {
+-			parts.push(formatQuotaWindow(ctx, "5h", u.fiveHour.percent, u.fiveHour.resetMinutes, "m", "round"));
++			parts.push(formatQuotaWindow("5h", u.fiveHour.percent, u.fiveHour.resetMinutes, "m", "round"));
+ 		}
+ 		if (u.daily) {
+-			parts.push(formatQuotaWindow(ctx, "1d", u.daily.percent, u.daily.resetMinutes, "m", "round"));
++			parts.push(formatQuotaWindow("1d", u.daily.percent, u.daily.resetMinutes, "m", "round"));
+ 		}
+ 		if (u.sevenDay) {
+-			parts.push(formatQuotaWindow(ctx, "7d", u.sevenDay.percent, u.sevenDay.resetHours, "h", "round"));
++			parts.push(formatQuotaWindow("Wk", u.sevenDay.percent, u.sevenDay.resetHours, "h", "round"));
+ 		}
+ 		if (u.monthly) {
+ 			// Monthly-subscription providers only (the normalizer gates the class).
+ 			// Cursor and QwenCloud floor used percents upstream (Cursor's dashboard
+ 			// shows 1.88 → "1% used"; OpenCode's endpoint emits floored integers).
+-			parts.push(formatQuotaWindow(ctx, "mo", u.monthly.percent, u.monthly.resetHours, "h", "floor"));
++			parts.push(formatQuotaWindow("mo", u.monthly.percent, u.monthly.resetHours, "h", "floor"));
+ 		}
+ 		if (u.resetCredits) {
+ 			const resets = u.resetCredits;
+-			let resetText = `✦ ${resets.bankedCount}`;
++			let resetText = `${theme.fg("muted", "Rs ")}${theme.fg("text", `${resets.bankedCount}`)}`;
+ 			if (resets.redeemableCount !== resets.bankedCount) {
+-				resetText += ` (${resets.redeemableCount} usable)`;
++				resetText += theme.fg("muted", ` (${resets.redeemableCount} usable)`);
+ 			}
+ 			if (resets.expiryHours !== undefined) {
+-				const expiring = resets.expiring ? `▲ ${resets.expiring.count} ` : "";
+-				resetText += ` ${expiring}exp ${formatUsageReset(resets.expiryHours, "h")}`;
++				const expiring = resets.expiring ? `${resets.expiring.count} ` : "";
++				resetText += theme.fg(
++					resetCreditsColor(resets),
++					`${theme.sep.dot}${expiring}exp ${formatUsageReset(resets.expiryHours, "h")}`,
++				);
+ 			} else if (resets.expired) {
+-				resetText += " expired";
++				resetText += theme.fg("error", " expired");
+ 			}
+ 			if (resets.redeemableCount === 0 && resets.unavailableReason) {
+ 				const reason = truncateToWidth(sanitizeStatusText(resets.unavailableReason), TRUNCATE_LENGTHS.SHORT);
+-				if (reason) resetText += ` ${reason}`;
++				if (reason) resetText += theme.fg("warning", ` ${reason}`);
+ 			}
+-			parts.push(theme.fg(resetCreditsColor(resets), resetText));
++			parts.push(resetText);
+ 		}
+-		const content = withIcon(theme.icon.time, parts.join(theme.sep.dot));
++		const content = parts.join("   ");
+ 		return { content, visible: true };
+ 	},
+ 	describe(ctx) {
+ 		const u = ctx.usage;
+ 		if (!u || (!u.fiveHour && !u.daily && !u.sevenDay && !u.monthly && !u.resetCredits)) return null;
+ 		const parts: TspSpan[][] = [];
+-		if (u.tier) {
+-			const tier = sanitizeStatusText(u.tier);
+-			if (tier) parts.push([span(tier, accentToken(ctx, "accent"))]);
+-		}
+ 		if (u.fiveHour) {
+ 			parts.push(describeQuotaWindow("5h", u.fiveHour.percent, u.fiveHour.resetMinutes, "m", "round"));
+ 		}
+ 		if (u.daily) parts.push(describeQuotaWindow("1d", u.daily.percent, u.daily.resetMinutes, "m", "round"));
+ 		if (u.sevenDay) {
+-			parts.push(describeQuotaWindow("7d", u.sevenDay.percent, u.sevenDay.resetHours, "h", "round"));
++			parts.push(describeQuotaWindow("Wk", u.sevenDay.percent, u.sevenDay.resetHours, "h", "round"));
+ 		}
+ 		if (u.monthly) parts.push(describeQuotaWindow("mo", u.monthly.percent, u.monthly.resetHours, "h", "floor"));
+ 		if (u.resetCredits) {
+ 			const resets = u.resetCredits;
+-			let resetText = `✦ ${resets.bankedCount}`;
+-			if (resets.redeemableCount !== resets.bankedCount) resetText += ` (${resets.redeemableCount} usable)`;
++			const resetSpans = [span("Rs ", "muted"), span(`${resets.bankedCount}`, "text")];
++			if (resets.redeemableCount !== resets.bankedCount)
++				resetSpans.push(span(` (${resets.redeemableCount} usable)`, "muted"));
+ 			if (resets.expiryHours !== undefined) {
+-				const expiring = resets.expiring ? `▲ ${resets.expiring.count} ` : "";
+-				resetText += ` ${expiring}exp ${formatUsageReset(resets.expiryHours, "h")}`;
+-			} else if (resets.expired) resetText += " expired";
++				const expiring = resets.expiring ? `${resets.expiring.count} ` : "";
++				resetSpans.push(
++					span(
++						`${theme.sep.dot}${expiring}exp ${formatUsageReset(resets.expiryHours, "h")}`,
++						resetCreditsColor(resets),
++					),
++				);
++			} else if (resets.expired) resetSpans.push(span(" expired", "error"));
+ 			if (resets.redeemableCount === 0 && resets.unavailableReason) {
+-				const reason = sanitizeStatusText(resets.unavailableReason);
+-				if (reason) resetText += ` ${reason}`;
++				const reason = truncateToWidth(sanitizeStatusText(resets.unavailableReason), TRUNCATE_LENGTHS.SHORT);
++				if (reason) resetSpans.push(span(` ${reason}`, "warning"));
+ 			}
+-			parts.push([span(resetText, resetCreditsColor(resets))]);
++			parts.push(resetSpans);
+ 		}
+ 		const spans: TspSpan[] = [];
+ 		for (const part of parts) {
+-			if (spans.length > 0) spans.push(span(theme.sep.dot, "dim"));
++			if (spans.length > 0) spans.push(span("   "));
+ 			spans.push(...part);
+ 		}
+-		return segView(spans, "time");
++		return segView(spans);
+ 	},
+ };
+ 
+diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status-line/component.ts
+--- a/packages/tui/src/status-line/component.ts
++++ b/packages/tui/src/status-line/component.ts
+@@ -2686,7 +2686,7 @@
+ 
+ 	#subagentBadgeText(): string | undefined {
+ 		if (this.#subagentCount === 0) return undefined;
+-		return theme.fg("statusLineSubagents", `${theme.icon.agents} ${this.#subagentCount}`);
++		return theme.fg("statusLineSubagents", `Agt ${this.#subagentCount}`);
+ 	}
+ 
+ 	/**
+@@ -2955,10 +2955,10 @@
+ 	#separatorMetrics(plain: boolean, style: StatusLineSeparatorStyle): SeparatorMetrics {
+ 		const themeEpoch = getThemeEpoch();
+ 		const memo = plain ? this.#plainSeparatorMetrics : this.#styledSeparatorMetrics;
+-		if (memo && memo.themeRef === theme && memo.themeEpoch === themeEpoch && (plain || memo.style === style)) {
++		if (memo && memo.themeRef === theme && memo.themeEpoch === themeEpoch && memo.style === style) {
+ 			return memo;
+ 		}
+-		const def = plain ? PLAIN_SEPARATOR : getSeparator(style, theme);
++		const def = plain ? (style === "none" ? { left: "", right: "" } : PLAIN_SEPARATOR) : getSeparator(style, theme);
+ 		const metrics: SeparatorMetrics = {
+ 			themeRef: theme,
+ 			themeEpoch,
+@@ -2981,8 +2981,8 @@
+ 	 *   (embedded in the editor's top border).
+ 	 * - `band`: the box layout opened by a soft flush-left cap, for the band
+ 	 *   composer's frameless full-width top row.
+-	 * - `plain-full`: no background, no powerline caps, dot separators, gap is
+-	 *   plain spaces — the standalone bottom bar for pi/borderless composers.
++	 * - `plain-full`: no background or caps, quiet separators, and a flexible
++	 *   space gap — the standalone bottom bar for pi/borderless composers
+ 	 * - `plain-left`: left segments only (claude composer; the right group
+ 	 *   lives in the editor's top rule).
+ 	 * - `plain-right`: right segments only (claude composer's top rule).
+@@ -3076,8 +3076,12 @@
+ 				const glance = widget ? formatJobWidgetGlance(widget.view, theme, JOBS_SEGMENT_SPARK_CELLS) : "";
+ 				const count = theme.fg("statusLineSubagents", `${theme.icon.job} ${runningBackgroundJobs}`);
+ 				rightParts.unshift(glance ? `${count} ${glance}` : count);
++				rightSegIds.unshift("status");
+ 			}
+-			if (subagentBadge) rightParts.unshift(subagentBadge);
++			if (subagentBadge) {
++				rightParts.unshift(subagentBadge);
++				rightSegIds.unshift("subagents");
++			}
+ 		}
+ 		const topFillWidth = Math.max(0, width);
+ 		// These arrays are local to this render; overflow handling can mutate them.
+@@ -3128,14 +3132,20 @@
+ 		const totalWidth = () => leftWidth + rightWidth + minimumGapWidth();
+ 
+ 		if (topFillWidth > 0) {
++			// Activity is secondary to quota, context, and cost
++			const badgeIndex = rightSegIds.indexOf("subagents");
++			if (badgeIndex >= 0 && totalWidth() > topFillWidth) {
++				right.splice(badgeIndex, 1);
++				rightWidths.splice(badgeIndex, 1);
++				rightSegIds.splice(badgeIndex, 1);
++				rightWidth = groupWidth(rightWidths, rightCapWidth, rightSepWidth);
++			}
+ 			// Truncate the session-name segment before dropping right segments —
+ 			// the title is the only elastic one on the right, and dropping it
+ 			// wholesale left narrow bars (and the ≤76-col composer previews)
+ 			// without any title.
+-			const nameSegIdx = rightSegIds.indexOf("session_name");
+-			if (nameSegIdx >= 0 && totalWidth() > topFillWidth) {
+-				// Badge/job parts were unshifted ahead of the tracked segment ids.
+-				const nameIdx = nameSegIdx + (right.length - rightSegIds.length);
++			const nameIdx = rightSegIds.indexOf("session_name");
++			if (nameIdx >= 0 && totalWidth() > topFillWidth) {
+ 				const currentNameVW = rightWidths[nameIdx];
+ 				const minNameVW = 8;
+ 				const shrinkBy = Math.min(Math.max(0, currentNameVW - minNameVW), totalWidth() - topFillWidth);
+@@ -3146,23 +3156,17 @@
+ 					rightWidths[nameIdx] = nameWidth;
+ 				}
+ 			}
+-			while (totalWidth() > topFillWidth && right.length > 0) {
+-				const removedWidth = rightWidths[right.length - 1];
+-				right.pop();
+-				rightWidths.pop();
+-				rightWidth = right.length > 0 ? rightWidth - removedWidth - rightSepWidth - 2 : 0;
+-			}
+ 			// Shrink path before dropping left segments — path is the only elastic segment
+ 			const pathIdx = leftSegIds.indexOf("path");
+ 			if (pathIdx >= 0 && totalWidth() > topFillWidth) {
+ 				const overflow = totalWidth() - topFillWidth;
+ 				const currentPathVW = leftWidths[pathIdx];
+-				const minPathVW = 8; // icon + ellipsis + a few chars
++				const minPathVW = 5;
+ 				const shrinkable = currentPathVW - minPathVW;
+ 				if (shrinkable > 0) {
+ 					const shrinkBy = Math.min(shrinkable, overflow);
+ 					const currentMaxLen = ctx.options.path?.maxLength ?? 40;
+-					let newMaxLen = Math.max(4, Math.min(currentMaxLen, currentPathVW) - shrinkBy);
++					let newMaxLen = Math.max(3, Math.min(currentMaxLen, currentPathVW) - shrinkBy);
+ 					const pathCtx = (maxLen: number): SegmentContext => ({
+ 						...ctx,
+ 						options: { ...ctx.options, path: { ...ctx.options.path, maxLength: maxLen } },
+@@ -3174,7 +3178,7 @@
+ 						for (let i = 0; i < 8; i++) {
+ 							const saved = currentPathVW - pathWidth;
+ 							if (saved >= shrinkBy) break;
+-							const nextMaxLen = Math.max(4, newMaxLen - (shrinkBy - saved));
++							const nextMaxLen = Math.max(3, newMaxLen - (shrinkBy - saved));
+ 							if (nextMaxLen >= newMaxLen) break; // no progress or hit floor
+ 							newMaxLen = nextMaxLen;
+ 							const adjusted = renderSegment("path", pathCtx(newMaxLen));
+@@ -3188,6 +3192,15 @@
+ 					}
+ 				}
+ 			}
++			// Shorten the path before sacrificing useful right-hand metrics
++			while (totalWidth() > topFillWidth && right.length > 1) {
++				const dropIdx = rightSegIds.findIndex(id => id !== "usage" && id !== "cost");
++				if (dropIdx < 0) break;
++				right.splice(dropIdx, 1);
++				rightWidths.splice(dropIdx, 1);
++				rightSegIds.splice(dropIdx, 1);
++				rightWidth = groupWidth(rightWidths, rightCapWidth, rightSepWidth);
++			}
+ 			const leftOverflowDropIndex = (): number => {
+ 				// Preserve the current working directory as long as possible. The
+ 				// previous right-to-left pop could collapse a normal-width bar to
+@@ -3207,6 +3220,14 @@
+ 				leftSegIds.splice(dropIdx, 1);
+ 				leftWidth = left.length > 0 ? leftWidth - removedWidth - leftSepWidth - 2 : 0;
+ 			}
++			while (totalWidth() > topFillWidth && right.length > 0) {
++				const last = rightSegIds.findLastIndex(id => id !== "usage");
++				const dropIdx = last >= 0 ? last : right.length - 1;
++				right.splice(dropIdx, 1);
++				rightWidths.splice(dropIdx, 1);
++				rightSegIds.splice(dropIdx, 1);
++				rightWidth = groupWidth(rightWidths, rightCapWidth, rightSepWidth);
++			}
+ 		}
+ 
+ 		const renderGroup = (parts: string[], direction: "left" | "right"): string => {
+@@ -3840,8 +3861,7 @@
+ 		// the inner edge, so they drop before any configured segment.
+ 		if (subagentBadge) {
+ 			push("subagent-badge", "right", 0, {
+-				spans: [{ t: `${this.#subagentCount}`, s: "statusLineSubagents" }],
+-				icon: "agents",
++				spans: [{ t: `Agt ${this.#subagentCount}`, s: "statusLineSubagents" }],
+ 			});
+ 		}
+ 		const runningBackgroundJobs = this.runningBackgroundJobCount();
+diff --git a/packages/tui/src/status-line/metrics.ts b/packages/tui/src/status-line/metrics.ts
+--- a/packages/tui/src/status-line/metrics.ts
++++ b/packages/tui/src/status-line/metrics.ts
+@@ -12,6 +12,8 @@
+ 	readonly pricingPeriod?: "peak" | "off-peak";
+ 	/** Subagent-tree spend, rendered `(+…)` after the session's own spend; `cost` excludes it. */
+ 	readonly subagentCost?: number;
++	/** Omit the secondary tree amount when the footer needs a compact cost */
++	readonly hideSubagentCost?: boolean;
+ 	readonly advisor?: {
+ 		readonly cost: number;
+ 		readonly usingSubscription: boolean;
+@@ -20,41 +22,22 @@
+ 
+ type BillingUnit = "metered" | "subscription";
+ 
+-/** `showUnit: false` omits the `$`/subscription symbol when the summary already printed it. */
+-function formatSpend(
+-	amount: number,
+-	usingSubscription: boolean,
+-	fractionDigits: number,
+-	uiTheme: Theme,
+-	showUnit: boolean,
+-): string {
++/** `showUnit: false` omits the dollar sign when the summary already printed it */
++function formatSpend(amount: number, fractionDigits: number, showUnit: boolean): string {
+ 	const formatted = amount.toFixed(fractionDigits);
+ 	if (!showUnit) return formatted;
+-	if (!usingSubscription) return `$${formatted}`;
+-	if (uiTheme.getSymbolPreset() === "nerd") {
+-		const icon = uiTheme.icon.subscription;
+-		return icon ? `${icon} ${formatted}` : `S${formatted}`;
+-	}
+-	return `S${formatted}`;
++	return `$${formatted}`;
+ }
+ 
+-function formatAdvisorSpend(
+-	amount: number,
+-	usingSubscription: boolean,
+-	fractionDigits: number,
+-	uiTheme: Theme,
+-	showUnit: boolean,
+-): string {
+-	const spend = formatSpend(amount, usingSubscription, fractionDigits, uiTheme, showUnit);
++function formatAdvisorSpend(amount: number, fractionDigits: number, uiTheme: Theme, showUnit: boolean): string {
++	const spend = formatSpend(amount, fractionDigits, showUnit);
+ 	const icon = uiTheme.icon.advisor;
+ 	return icon && icon !== "(adv)" ? `${icon} ${spend}` : `${spend} (adv)`;
+ }
+ 
+ /**
+- * Shared billing metric presentation. Callers select precision explicitly so
+- * the legacy footer keeps three decimals while current status segments keep two.
+- * A unit symbol (`$` or the subscription mark) is printed at most once; later
+- * amounts billed the same way render bare.
++ * Shared billing presentation uses a plain dollar sign for every billing mode
++ * Callers select precision explicitly, and compact footers omit tree detail
+  */
+ export function formatBillingSummary(options: BillingSummaryOptions, uiTheme: Theme): string | undefined {
+ 	const premiumRequests = normalizePremiumRequests(options.premiumRequests);
+@@ -75,29 +58,21 @@
+ 	let shownUnit: BillingUnit | undefined;
+ 	const primaryUnit: BillingUnit = options.usingSubscription ? "subscription" : "metered";
+ 	if (options.cost || options.pricingPeriod || subagentCost) {
+-		parts.push(formatSpend(options.cost, options.usingSubscription, options.fractionDigits, uiTheme, true));
++		parts.push(formatSpend(options.cost, options.fractionDigits, true));
+ 		shownUnit = primaryUnit;
+ 	} else if (options.usingSubscription) {
+-		parts.push(
+-			uiTheme.getSymbolPreset() === "nerd" && uiTheme.icon.subscription ? uiTheme.icon.subscription : "(sub)",
+-		);
++		parts.push(formatSpend(0, options.fractionDigits, true));
+ 		shownUnit = primaryUnit;
+ 	}
+ 	// Always follows the primary spend, which already carries the unit.
+-	if (subagentCost) parts.push(`(+${subagentCost.toFixed(options.fractionDigits)})`);
++	if (subagentCost && !options.hideSubagentCost) parts.push(`(+${subagentCost.toFixed(options.fractionDigits)})`);
+ 	if (options.pricingPeriod) parts.push(options.pricingPeriod === "peak" ? "↑" : "↓");
+ 	if (premiumRequests) parts.push(`★ ${formatNumber(premiumRequests)}`);
+ 	if (advisorCost && options.advisor) {
+ 		const prefix = parts.length > 0 ? "+ " : "";
+ 		const advisorUnit: BillingUnit = options.advisor.usingSubscription ? "subscription" : "metered";
+ 		parts.push(
+-			`${prefix}${formatAdvisorSpend(
+-				advisorCost,
+-				options.advisor.usingSubscription,
+-				options.fractionDigits,
+-				uiTheme,
+-				shownUnit !== advisorUnit,
+-			)}`,
++			`${prefix}${formatAdvisorSpend(advisorCost, options.fractionDigits, uiTheme, shownUnit !== advisorUnit)}`,
+ 		);
+ 	}
+ 	return parts.length > 0 ? parts.join(" ") : undefined;
