@@ -3,10 +3,8 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { packageJsonSchema } from "@ai/core/schema/package";
 import * as v from "valibot";
-import manifest from "../../../package.json" with { type: "json" };
 
 export const repo = fileURLToPath(new URL("../../../", import.meta.url));
-export { manifest };
 
 type Selection = { include: string[]; exclude?: string[] };
 type Copy = { from: string; to: string; optional?: boolean };
@@ -16,6 +14,14 @@ type Settings = {
   exclude?: string[];
   copies?: Copy[];
   remove?: string[];
+};
+
+export type Project = {
+  directory: string;
+  roots: string[];
+  entries: Selection;
+  resources: Selection;
+  install: { modules: Copy[]; resources: Copy[]; remove: string[] };
 };
 
 const ignored = [
@@ -93,58 +99,62 @@ function targets(value: unknown): string[] {
   return [];
 }
 
-export const projects = [".", ...manifest.workspaces.packages].map((directory) => {
-  const metadata = v.parse(
-    packageJsonSchema,
-    directory === "."
-      ? manifest
-      : JSON.parse(readFileSync(join(repo, directory, "package.json"), "utf8")),
-  );
-  const config = settings[directory] ?? {};
-  const roots = config.roots ?? [directory];
-  return {
-    directory,
-    roots,
-    entries: {
-      include: [
-        ...targets(metadata.exports)
-          .filter((target) => target.endsWith(".ts") && !target.endsWith(".d.ts"))
-          .map((target) => join(directory, target.replaceAll("*", "**/*"))),
-        ...targets(metadata.bin).map((target) => join(directory, target)),
-        ...(config.entries ?? []),
-      ],
-      exclude: [
-        ...ignored,
-        "**/*.d.ts",
-        "**/vite.config.ts",
-        ...(config.exclude ?? []),
-      ],
-    },
-    // Keep sources for overlays, fingerprints, and native packaging
-    resources: {
-      include: roots.map((root) => `${root}/**/*`),
-      exclude: [...ignored, "**/vite.config.ts", "tools/scripts/vite/**"],
-    },
-    install: {
-      copies: [
-        { from: join(directory, "dist", directory), to: directory },
-        ...(directory === "."
-          ? []
-          : [
-              {
-                from: join(directory, "dist/_virtual"),
-                to: "_virtual",
-                optional: true,
-              },
-            ]),
-        ...(config.copies ?? []),
-      ] satisfies Copy[],
-      remove: config.remove ?? [],
-    },
-  };
-});
-
-export type Project = (typeof projects)[number];
+export function projects(
+  directories = process.env.AI_BUILD_PROJECTS?.split(","),
+): Project[] {
+  const selected: string[] = directories ?? [
+    ".",
+    ...JSON.parse(readFileSync(join(repo, "package.json"), "utf8")).workspaces.packages,
+  ];
+  return selected.map((directory) => {
+    const metadata = v.parse(
+      packageJsonSchema,
+      JSON.parse(readFileSync(join(repo, directory, "package.json"), "utf8")),
+    );
+    const config = settings[directory] ?? {};
+    const roots = config.roots ?? [directory];
+    return {
+      directory,
+      roots,
+      entries: {
+        include: [
+          ...targets(metadata.exports)
+            .filter((target) => target.endsWith(".ts") && !target.endsWith(".d.ts"))
+            .map((target) => join(directory, target.replaceAll("*", "**/*"))),
+          ...targets(metadata.bin).map((target) => join(directory, target)),
+          ...(config.entries ?? []),
+        ],
+        exclude: [
+          ...ignored,
+          "**/*.d.ts",
+          "**/vite.config.ts",
+          ...(config.exclude ?? []),
+        ],
+      },
+      // Keep sources for overlays, fingerprints, and native packaging
+      resources: {
+        include: roots.map((root) => `${root}/**/*`),
+        exclude: [...ignored, "**/vite.config.ts", "tools/scripts/vite/**"],
+      },
+      install: {
+        modules: [
+          { from: join(directory, "dist", directory), to: directory },
+          ...(directory === "."
+            ? []
+            : [
+                {
+                  from: join(directory, "dist/_virtual"),
+                  to: "_virtual",
+                  optional: true,
+                },
+              ]),
+        ] satisfies Copy[],
+        resources: config.copies ?? [],
+        remove: config.remove ?? [],
+      },
+    };
+  });
+}
 
 export function files(selection: Selection, cwd = repo): string[] {
   return [

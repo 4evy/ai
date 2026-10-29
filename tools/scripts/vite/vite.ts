@@ -4,14 +4,14 @@ import { mergeConfig, type Plugin, type UserConfig } from "vite";
 import { modes } from "./options.ts";
 import { files, type Project, projects, repo } from "./projects.ts";
 
-function resources(project: Project): Plugin {
+function resources(project: Project, selected: Project[]): Plugin {
   return {
     name: "runtime-resources",
     async generateBundle(_options, bundle) {
       const modules = Object.values(bundle).flatMap((output) =>
         output.type === "chunk" ? Object.keys(output.modules) : [],
       );
-      const owners = projects.filter(
+      const owners = selected.filter(
         (owner) =>
           owner === project ||
           modules.some((id) =>
@@ -33,14 +33,15 @@ function resources(project: Project): Plugin {
 }
 
 export function runtimeConfig(directory = "."): UserConfig {
-  const project = projects.find((project) => project.directory === directory);
+  const selected = projects();
+  const project = selected.find((project) => project.directory === directory);
   if (!project) throw new Error(`Unknown Vite project: ${directory}`);
   const entries = files(project.entries);
   if (!entries.length) throw new Error(`No Vite entries for ${directory}`);
   const config: UserConfig = {
     root: repo,
     publicDir: false,
-    plugins: [resources(project)],
+    plugins: [resources(project, selected)],
     build: {
       ssr: true,
       target: "esnext",

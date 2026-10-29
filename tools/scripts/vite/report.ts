@@ -99,7 +99,7 @@ const parsed = parseSync(object({ json: multiple(flag("--json")) }), Bun.argv.sl
 if (!parsed.success) throw new Error(formatMessage(parsed.error));
 
 const groups = [
-  ...projects.map((project) => ({
+  ...projects().map((project) => ({
     name: project.directory === "." ? "root" : project.directory,
     configs: [runtimeConfig(project.directory)],
   })),

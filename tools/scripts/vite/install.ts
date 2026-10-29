@@ -3,18 +3,25 @@ import { cp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { packageJsonSchema } from "@ai/core/schema/package";
 import { isRecord } from "@ai/core/value/value";
+import { object } from "@optique/core/constructs";
 import { formatMessage } from "@optique/core/message";
+import { withDefault } from "@optique/core/modifiers";
 import { parseSync } from "@optique/core/parser";
-import { argument } from "@optique/core/primitives";
+import { argument, flag } from "@optique/core/primitives";
 import { string } from "@optique/core/valueparser";
 import * as Records from "effect/Record";
 import * as v from "valibot";
-import { files, manifest, projects, repo } from "./projects.ts";
+import { files, projects, repo } from "./projects.ts";
 
-const parsed = parseSync(argument(string({ metavar: "DIRECTORY" })), Bun.argv.slice(2));
+const parsed = parseSync(
+  object({
+    destination: argument(string({ metavar: "DIRECTORY" })),
+    modulesOnly: withDefault(flag("--modules-only"), false),
+  }),
+  Bun.argv.slice(2),
+);
 if (!parsed.success) throw new Error(formatMessage(parsed.error));
-const destination = parsed.value;
-if (!destination) throw new Error("Usage: bun tools/scripts/vite/install.ts DIRECTORY");
+const { destination, modulesOnly } = parsed.value;
 const output = resolve(destination);
 
 function compiled(value: unknown): unknown {
@@ -24,18 +31,23 @@ function compiled(value: unknown): unknown {
   return value;
 }
 
-for (const project of projects) {
-  for (const copy of project.install.copies) {
+const selected = projects();
+for (const project of selected) {
+  const copies = [
+    ...project.install.modules,
+    ...(modulesOnly ? [] : project.install.resources),
+  ];
+  for (const copy of copies) {
     const source = join(repo, copy.from);
     if (copy.optional && !existsSync(source)) continue;
     await cp(source, join(output, copy.to), { recursive: true });
   }
 }
-for (const project of projects) {
+for (const project of selected) {
   const path = join(output, project.directory, "package.json");
   const metadata = v.parse(
     packageJsonSchema,
-    project.directory === "." ? manifest : JSON.parse(await readFile(path, "utf8")),
+    JSON.parse(await readFile(join(repo, project.directory, "package.json"), "utf8")),
   );
   for (const field of ["exports", "imports", "bin"] as const)
     if (metadata[field]) metadata[field] = compiled(metadata[field]);

@@ -1,9 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { type InlineConfig, mergeConfig } from "vite";
 import type { Bundle } from "../../../farstep/native/desktop/platform/linux/extensions/bundles.ts";
 import { modes } from "./options.ts";
-import { repo } from "./projects.ts";
+
+const repo = fileURLToPath(new URL("../../../", import.meta.url));
 
 export function bundleConfig({ entry, qml }: Bundle): InlineConfig {
   const config: InlineConfig = {
