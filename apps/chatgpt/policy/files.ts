@@ -7,7 +7,7 @@ import {
   statSync,
 } from "node:fs";
 import { basename, join, sep } from "node:path";
-import { errorCode, errorMessage } from "@ai/core/error/error";
+import { errorCode, errorMessage } from "@ai/values/error/error";
 import { walkSync } from "@nodelib/fs.walk";
 import { writeFileSync } from "atomically";
 import { Struct } from "effect";

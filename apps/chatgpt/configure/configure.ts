@@ -2,9 +2,9 @@
 import { accessSync, constants, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
-import { run } from "@ai/core/effect/effect";
-import { executeCommand } from "@ai/core/effect/process/process";
-import { errorMessage } from "@ai/core/error/error";
+import { run } from "@ai/runtime/effect/effect";
+import { executeCommand } from "@ai/runtime/effect/process/process";
+import { errorMessage } from "@ai/values/error/error";
 import { object } from "@optique/core/constructs";
 import { formatMessage } from "@optique/core/message";
 import { parseSync } from "@optique/core/parser";

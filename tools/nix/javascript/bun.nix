@@ -27,7 +27,9 @@
     url = "https://registry.npmjs.org/@actions/io/-/io-3.0.2.tgz";
     hash = "sha512-nRBchcMM+QK1pdjO7/idu86rbJI5YHUKCvKs0KxnSYbVe3F51UfGxuZX4Qy/fWlp6l7gWFwIkrOzN+oUK03kfw==";
   };
-  "@ai/core" = copyPathToStore ../../../packages/core;
+  "@ai/runtime" = copyPathToStore ../../../packages/runtime;
+  "@ai/toolkit" = copyPathToStore ../../../packages/toolkit;
+  "@ai/values" = copyPathToStore ../../../packages/values;
   "@babel/helper-string-parser@7.29.7" = fetchurl {
     url = "https://registry.npmjs.org/@babel/helper-string-parser/-/helper-string-parser-7.29.7.tgz";
     hash = "sha512-Pb5ijPrZ89GDH8223L4UP8i6QApWxs04RbPQJTeWDV0/keR2E36MeKnyr6LYmUUvqRRI+Iv87SuF1W6ErINzYw==";

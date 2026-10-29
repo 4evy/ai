@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { attempt, Lifetime, run } from "@ai/core/effect/effect";
+import { attempt, Lifetime, run } from "@ai/runtime/effect/effect";
 import { Effect } from "effect";
 import * as v from "valibot";
 import type {

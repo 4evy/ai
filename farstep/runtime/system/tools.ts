@@ -1,5 +1,5 @@
-import { attempt, Lifetime, run } from "@ai/core/effect/effect";
-import { readText } from "@ai/core/text/text";
+import { attempt, Lifetime, run } from "@ai/runtime/effect/effect";
+import { readText } from "@ai/toolkit/text/text";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { Deferred, Effect, Scope } from "effect";
 import {

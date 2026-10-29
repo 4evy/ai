@@ -74,7 +74,8 @@ job interface works locally too**
 
 It also handles remote file reading and editing, desktop capture and input,
 and coordinating shared work. Right now the extension is for OMP, with the
-shared interfaces in [packages/core/](packages/core/) and [Farstep](farstep/)
+shared interfaces in [packages/toolkit/](packages/toolkit/) and
+[Farstep](farstep/)
 
 ## Sky / Skylight
 

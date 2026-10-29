@@ -1,4 +1,4 @@
-import { attempt, run } from "@ai/core/effect/effect";
+import { attempt, run } from "@ai/runtime/effect/effect";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import {
   buildRemoteCommand,

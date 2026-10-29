@@ -1,4 +1,4 @@
-import { operationEffect } from "@ai/core/effect/effect";
+import { operationEffect } from "@ai/runtime/effect/effect";
 import { Effect } from "effect";
 import type { HelperConnection } from "#farstep/transport/connection/bun";
 

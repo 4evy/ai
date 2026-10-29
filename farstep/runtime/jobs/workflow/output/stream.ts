@@ -1,4 +1,4 @@
-import { attempt } from "@ai/core/effect/effect";
+import { attempt } from "@ai/runtime/effect/effect";
 import { Deferred, Effect, Stream } from "effect";
 import type { WorkflowOutputPolicy } from "#farstep/protocol/workflow/workflow";
 import { errorText } from "./parsing";

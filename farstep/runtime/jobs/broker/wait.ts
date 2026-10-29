@@ -1,4 +1,4 @@
-import { run } from "@ai/core/effect/effect";
+import { run } from "@ai/runtime/effect/effect";
 import { Effect, Schedule } from "effect";
 
 export function until(condition: () => boolean, timeoutMs: number): Promise<boolean> {

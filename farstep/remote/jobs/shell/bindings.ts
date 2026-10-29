@@ -1,5 +1,5 @@
-import { recordSchema } from "@ai/core/schema/input";
-import { quotePosixArgument } from "@ai/core/shell/shell";
+import { recordSchema } from "@ai/values/schema/input";
+import { quotePosixArgument } from "@ai/values/shell/shell";
 import * as v from "valibot";
 import { identifierSchema, textSchema } from "./values";
 

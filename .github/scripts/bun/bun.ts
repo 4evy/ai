@@ -30,10 +30,20 @@ if (parsed.value === "install") {
     "build",
     "test",
   ]);
-  const workspace = choice("WORKSPACE", ["root", "core", "chatgpt", "omp", "farstep"]);
+  const workspace = choice("WORKSPACE", [
+    "root",
+    "values",
+    "runtime",
+    "toolkit",
+    "chatgpt",
+    "omp",
+    "farstep",
+  ]);
   const directories = {
     root: ".",
-    core: "packages/core",
+    values: "packages/values",
+    runtime: "packages/runtime",
+    toolkit: "packages/toolkit",
     chatgpt: "apps/chatgpt",
     omp: "apps/omp",
     farstep: "farstep",

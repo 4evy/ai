@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { type Lifetime, run } from "@ai/core/effect/effect";
+import { type Lifetime, run } from "@ai/runtime/effect/effect";
 import { toError } from "@oh-my-pi/pi-utils/type-guards";
 import { Cause, Effect, Fiber, Schedule } from "effect";
 import * as v from "valibot";

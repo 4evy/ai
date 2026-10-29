@@ -1,4 +1,4 @@
-import { run } from "@ai/core/effect/effect";
+import { run } from "@ai/runtime/effect/effect";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { Deferred, Effect } from "effect";
 import type { JobCompletionNotification } from "farstep/protocol/jobs/protocol";

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, rename, rm, symlink } from "node:fs/promises";
 import { join } from "node:path";
-import { attempt, run } from "@ai/core/effect/effect";
+import { attempt, run } from "@ai/runtime/effect/effect";
 import { Effect, Exit } from "effect";
 import { uuidSchema } from "farstep/protocol/identity";
 import * as v from "valibot";

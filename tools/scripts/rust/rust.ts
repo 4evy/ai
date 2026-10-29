@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
-import { run } from "@ai/core/effect/effect";
-import { executeCommand } from "@ai/core/effect/process/process";
+import { run } from "@ai/runtime/effect/effect";
+import { executeCommand } from "@ai/runtime/effect/process/process";
 
 const root = resolve(import.meta.dir, "../../..");
 const configurations = [

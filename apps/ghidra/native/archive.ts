@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { run } from "@ai/core/effect/effect";
-import { downloadFile } from "@ai/core/effect/http/http";
+import { run } from "@ai/runtime/effect/effect";
+import { downloadFile } from "@ai/runtime/effect/http/http";
 
 type Artifact = { url: string; sha256?: string };
 

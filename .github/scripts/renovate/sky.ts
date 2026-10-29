@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { info } from "@actions/core";
-import { run } from "@ai/core/effect/effect";
-import { get } from "@ai/core/effect/http/http";
+import { run } from "@ai/runtime/effect/effect";
+import { get } from "@ai/runtime/effect/http/http";
 import { Effect, Stream } from "effect";
 import pins from "../../../farstep/runtime/sky/runtime/pins.json";
 

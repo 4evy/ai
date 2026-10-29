@@ -1,7 +1,7 @@
 import type { Socket } from "node:net";
 import { pipeline } from "node:stream";
-import { attempt, Lifetime, run } from "@ai/core/effect/effect";
-import { scopedSocket } from "@ai/core/effect/socket/socket";
+import { attempt, Lifetime, run } from "@ai/runtime/effect/effect";
+import { scopedSocket } from "@ai/runtime/effect/socket/socket";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import {
   ReadBuffer,

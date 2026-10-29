@@ -2,7 +2,7 @@
   lib,
   callPackage,
   runCommand,
-  ai-core,
+  ai-shared,
   ai-javascript-dependencies,
 }:
 let
@@ -52,10 +52,14 @@ runCommand "farstep-javascript-${metadata.version}"
     cp -R ${modules}/. "$out/"
     chmod -R u+w "$out/farstep"
     ln -s ${skyTypes}/farstep/sky "$out/farstep/sky"
-    ln -s ${ai-core}/packages/core "$out/packages/core"
+    for package in values runtime toolkit; do
+      ln -s ${ai-shared}/packages/"$package" "$out/packages/$package"
+    done
     bash ${../../tools/nix/javascript/link-dependencies.sh} ${ai-javascript-dependencies.production} "$out/node_modules"
     mkdir -p "$out/node_modules/@ai" "$out/node_modules/@oai"
-    ln -s ${ai-core}/packages/core "$out/node_modules/@ai/core"
+    for package in values runtime toolkit; do
+      ln -s ${ai-shared}/packages/"$package" "$out/node_modules/@ai/$package"
+    done
     ln -s ../../farstep/sky "$out/node_modules/@oai/sky"
     ln -s ../farstep "$out/node_modules/farstep"
   ''

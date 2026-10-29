@@ -1,6 +1,6 @@
+import { boundedText } from "@ai/values/text/utf8";
+import { assertTimerDelay } from "@ai/values/time/time";
 import { Deferred, Effect, Fiber, Option, Stream } from "effect";
-import { boundedText } from "../../text/utf8";
-import { assertTimerDelay } from "../../time/time";
 import { attempt } from "../effect";
 
 type Output = "pipe" | "inherit" | "ignore" | number;

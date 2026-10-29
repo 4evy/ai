@@ -1,15 +1,15 @@
-import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
-import { Effect, Exit, Scope } from "effect";
 import {
   attempt,
   Lifetime,
   operationEffect,
   run,
   traceCarrier,
-} from "../../effect/effect";
-import { assertTimerDelay, MAX_TIMER_DELAY } from "../../time/time";
+} from "@ai/runtime/effect/effect";
+import { assertTimerDelay, MAX_TIMER_DELAY } from "@ai/values/time/time";
+import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import { Effect, Exit, Scope } from "effect";
 
 interface SessionOptions {
   closedMessage: string;

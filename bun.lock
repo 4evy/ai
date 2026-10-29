@@ -5,7 +5,9 @@
     "": {
       "name": "ai-tools",
       "dependencies": {
-        "@ai/core": "workspace:*",
+        "@ai/runtime": "workspace:*",
+        "@ai/toolkit": "workspace:*",
+        "@ai/values": "workspace:*",
         "@nodelib/fs.walk": "3.0.1",
         "@oh-my-pi/pi-utils": "18.13.1",
         "@optique/core": "1.3.6",
@@ -31,7 +33,8 @@
     "apps/chatgpt": {
       "name": "chatgpt",
       "dependencies": {
-        "@ai/core": "workspace:*",
+        "@ai/runtime": "workspace:*",
+        "@ai/values": "workspace:*",
         "@nodelib/fs.walk": "3.0.1",
         "@oh-my-pi/pi-utils": "18.13.1",
         "@optique/core": "1.3.6",
@@ -50,7 +53,9 @@
       "name": "omp-agent-runtime",
       "version": "1.0.0",
       "dependencies": {
-        "@ai/core": "workspace:*",
+        "@ai/runtime": "workspace:*",
+        "@ai/toolkit": "workspace:*",
+        "@ai/values": "workspace:*",
         "@modelcontextprotocol/sdk": "1.32.1",
         "@oh-my-pi/pi-utils": "18.13.1",
         "@optique/core": "1.3.6",
@@ -78,7 +83,9 @@
         "farstep-tools": "./integration/cli.ts",
       },
       "dependencies": {
-        "@ai/core": "workspace:*",
+        "@ai/runtime": "workspace:*",
+        "@ai/toolkit": "workspace:*",
+        "@ai/values": "workspace:*",
         "@logtape/file": "2.4.2",
         "@logtape/logtape": "2.4.2",
         "@logtape/redaction": "2.4.2",
@@ -110,22 +117,52 @@
         "vite": "catalog:",
       },
     },
-    "packages/core": {
-      "name": "@ai/core",
+    "packages/runtime": {
+      "name": "@ai/runtime",
       "version": "1.0.0",
       "dependencies": {
+        "@ai/values": "workspace:*",
         "@logtape/file": "2.4.2",
         "@logtape/logtape": "2.4.2",
         "@logtape/redaction": "2.4.2",
-        "@modelcontextprotocol/sdk": "1.32.1",
         "@opentelemetry/api": "1.10.0",
         "@opentelemetry/core": "3.0.0",
         "@opentelemetry/exporter-trace-otlp-http": "0.300.0",
         "@opentelemetry/resources": "3.0.0",
         "@opentelemetry/sdk-trace": "3.0.0",
+        "effect": "4.0.6",
+        "valibot": "1.5.0",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+        "vite": "catalog:",
+      },
+    },
+    "packages/toolkit": {
+      "name": "@ai/toolkit",
+      "version": "1.0.0",
+      "dependencies": {
+        "@ai/runtime": "workspace:*",
+        "@ai/values": "workspace:*",
+        "@modelcontextprotocol/sdk": "1.32.1",
         "@valibot/to-json-schema": "1.8.0",
         "effect": "4.0.6",
         "mdast-util-from-markdown": "2.1.0",
+        "valibot": "1.5.0",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+        "vite": "catalog:",
+      },
+    },
+    "packages/values": {
+      "name": "@ai/values",
+      "version": "1.0.0",
+      "dependencies": {
+        "@valibot/to-json-schema": "1.8.0",
+        "effect": "4.0.6",
         "valibot": "1.5.0",
       },
       "devDependencies": {
@@ -153,7 +190,11 @@
 
     "@actions/io": ["@actions/io@3.0.2", "", {}, "sha512-nRBchcMM+QK1pdjO7/idu86rbJI5YHUKCvKs0KxnSYbVe3F51UfGxuZX4Qy/fWlp6l7gWFwIkrOzN+oUK03kfw=="],
 
-    "@ai/core": ["@ai/core@workspace:packages/core"],
+    "@ai/runtime": ["@ai/runtime@workspace:packages/runtime"],
+
+    "@ai/toolkit": ["@ai/toolkit@workspace:packages/toolkit"],
+
+    "@ai/values": ["@ai/values@workspace:packages/values"],
 
     "@babel/helper-string-parser": ["@babel/helper-string-parser@7.29.7", "", {}, "sha512-Pb5ijPrZ89GDH8223L4UP8i6QApWxs04RbPQJTeWDV0/keR2E36MeKnyr6LYmUUvqRRI+Iv87SuF1W6ErINzYw=="],
 

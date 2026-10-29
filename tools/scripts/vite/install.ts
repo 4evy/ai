@@ -1,8 +1,8 @@
 import { existsSync } from "node:fs";
 import { cp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { packageJsonSchema } from "@ai/core/schema/package";
-import { isRecord } from "@ai/core/value/value";
+import { packageJsonSchema } from "@ai/values/schema/package";
+import { isRecord } from "@ai/values/value/value";
 import { object } from "@optique/core/constructs";
 import { formatMessage } from "@optique/core/message";
 import { withDefault } from "@optique/core/modifiers";

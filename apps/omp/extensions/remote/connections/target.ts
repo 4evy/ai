@@ -12,7 +12,7 @@ import { createHash } from "node:crypto";
 import { isIP } from "node:net";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
-import { attempt, run } from "@ai/core/effect/effect";
+import { attempt, run } from "@ai/runtime/effect/effect";
 import { loadCapability } from "@oh-my-pi/pi-coding-agent/capability";
 import { type SSHHost, sshCapability } from "@oh-my-pi/pi-coding-agent/capability/ssh";
 import type { SSHConnectionTarget } from "@oh-my-pi/pi-coding-agent/ssh/connection-manager";

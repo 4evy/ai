@@ -1,4 +1,4 @@
-import { recordSchema } from "@ai/core/schema/input";
+import { recordSchema } from "@ai/values/schema/input";
 import { Effect } from "effect";
 import * as v from "valibot";
 import { COORDINATION_CAPABILITY } from "#farstep/protocol/coordination";

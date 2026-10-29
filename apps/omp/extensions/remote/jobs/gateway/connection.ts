@@ -1,4 +1,4 @@
-import { quotePosixArgument } from "@ai/core/shell/shell";
+import { quotePosixArgument } from "@ai/values/shell/shell";
 import { Effect } from "effect";
 import { localHelperEffect } from "farstep/client/execution/local";
 import type { GatewayConnection } from "farstep/client/jobs/gateway";

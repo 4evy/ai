@@ -1,4 +1,4 @@
-import { guideExample } from "@ai/core/guide/guide";
+import { guideExample } from "@ai/toolkit/guide/guide";
 import { createSkylightParameters } from "../schemas";
 
 const { guideParameters, parameters } = createSkylightParameters();

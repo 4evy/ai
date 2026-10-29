@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { Queue } from "@ai/core/effect/queue/queue";
+import { Queue } from "@ai/runtime/effect/queue/queue";
 import type { SkyClient } from "@oai/sky";
 import type {
   SkyServiceConfiguration,

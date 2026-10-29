@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { readGuide } from "@ai/core/guide/guide";
+import { readGuide } from "@ai/toolkit/guide/guide";
 import { waylandReference } from "../../../protocol/sky/desktop";
 import { SKYLIGHT_TOOLS } from "../../names";
 import { SKYLIGHT_EXAMPLES } from "../examples";

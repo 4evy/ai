@@ -1,5 +1,5 @@
-import { readGuide } from "@ai/core/guide/guide";
-import { readText } from "@ai/core/text/text";
+import { readGuide } from "@ai/toolkit/guide/guide";
+import { readText } from "@ai/toolkit/text/text";
 import type { SkyBackend } from "../../protocol/sky/execution";
 import { SKYLIGHT_TOOLS } from "../names";
 import { SKYLIGHT_EXAMPLES } from "./examples";

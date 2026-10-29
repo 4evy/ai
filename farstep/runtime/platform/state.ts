@@ -1,4 +1,4 @@
-import * as fs from "@ai/core/effect/fs/fs";
+import * as fs from "@ai/runtime/effect/fs/fs";
 import * as posix from "./posix/state";
 import * as windows from "./windows/state/state";
 

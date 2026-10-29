@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { delimiter, dirname, join, resolve } from "node:path";
-import { isRecord } from "@ai/core/value/value";
+import { isRecord } from "@ai/values/value/value";
 import { tuple } from "@optique/core/constructs";
 import { formatMessage } from "@optique/core/message";
 import { withDefault } from "@optique/core/modifiers";

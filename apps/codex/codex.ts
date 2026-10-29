@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
-import { flushObservability } from "@ai/core/effect/effect";
-import { errorMessage } from "@ai/core/error/error";
+import { flushObservability } from "@ai/runtime/effect/effect";
+import { errorMessage } from "@ai/values/error/error";
 import { scheduleCodexUpdate } from "../../tools/scripts/setup/automatic.ts";
 import { findBinary } from "../../tools/scripts/setup/binary.ts";
 import { execProcess, prepareLaunch } from "./lib/codex.ts";

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { attempt, run as runEffect } from "@ai/core/effect/effect";
+import { attempt, run as runEffect } from "@ai/runtime/effect/effect";
 import { isEacces, isEnoent } from "@oh-my-pi/pi-utils/fs-error";
 import { Effect, Schedule } from "effect";
 import { systemStatus } from "./client";

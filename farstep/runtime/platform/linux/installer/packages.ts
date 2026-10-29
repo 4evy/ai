@@ -1,6 +1,6 @@
 import { lstat, readFile, realpath } from "node:fs/promises";
 import { join } from "node:path";
-import { errorMessage } from "@ai/core/error/error";
+import { errorMessage } from "@ai/values/error/error";
 import * as v from "valibot";
 import { command } from "./command";
 import { type Generation, manifestSchema, storePath } from "./schemas";

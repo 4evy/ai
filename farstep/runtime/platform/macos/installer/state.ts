@@ -1,7 +1,7 @@
 import { lstat, readlink } from "node:fs/promises";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
-import { errorMessage } from "@ai/core/error/error";
+import { errorMessage } from "@ai/values/error/error";
 import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
 import { uuidSchema } from "farstep/protocol/identity";
 import * as v from "valibot";

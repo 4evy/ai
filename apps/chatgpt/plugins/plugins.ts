@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { errorMessage } from "@ai/core/error/error";
+import { errorMessage } from "@ai/values/error/error";
 import { object } from "@optique/core/constructs";
 import { formatMessage } from "@optique/core/message";
 import { multiple } from "@optique/core/modifiers";

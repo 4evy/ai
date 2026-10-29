@@ -1,4 +1,4 @@
-import type { ToolResult } from "@ai/core/tool/tool";
+import type { ToolResult } from "@ai/toolkit/tool/tool";
 import type { SkyBackend } from "#farstep/protocol/sky/execution";
 
 export { MAX_SYNC_BYTES, PROVISION_TIMEOUT_MS } from "#farstep/protocol/sky/limits";

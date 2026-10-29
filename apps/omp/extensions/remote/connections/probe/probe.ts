@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync as readResource } from "node:fs";
-import { attempt, run } from "@ai/core/effect/effect";
-import { render } from "@ai/core/template/template";
+import { attempt, run } from "@ai/runtime/effect/effect";
+import { render } from "@ai/values/template/template";
 import type {
   SSHConnectionTarget,
   SSHHostInfo,

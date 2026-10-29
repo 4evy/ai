@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { errorMessage } from "@ai/core/error/error";
+import { errorMessage } from "@ai/values/error/error";
 import { claimUpgradeOperation } from "#farstep/runtime/installer/shared";
 import { atomicWrite, loadIdentity, privateDirectory } from "#farstep/runtime/state";
 import { healthyDesktop } from "./activation";

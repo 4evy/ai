@@ -1,6 +1,6 @@
 export { helperCommand } from "farstep/client/execution/helper";
 
-import { attempt, run } from "@ai/core/effect/effect";
+import { attempt, run } from "@ai/runtime/effect/effect";
 import {
   buildRemoteCommand,
   ensureConnection,

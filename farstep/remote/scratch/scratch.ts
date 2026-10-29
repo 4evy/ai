@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync as readResource } from "node:fs";
-import { run } from "@ai/core/effect/effect";
-import { quotePosixArgument as quote } from "@ai/core/shell/shell";
-import { render } from "@ai/core/template/template";
+import { run } from "@ai/runtime/effect/effect";
+import { quotePosixArgument as quote } from "@ai/values/shell/shell";
+import { render } from "@ai/values/template/template";
 import { Effect } from "effect";
 import * as v from "valibot";
 import {

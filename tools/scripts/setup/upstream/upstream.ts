@@ -1,10 +1,10 @@
 import { lstat, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { attempt, run } from "@ai/core/effect/effect";
-import { executeCommand } from "@ai/core/effect/process/process";
-import { errorCode } from "@ai/core/error/error";
-import { processCommand } from "@ai/core/process/launch";
+import { attempt, run } from "@ai/runtime/effect/effect";
+import { executeCommand } from "@ai/runtime/effect/process/process";
+import { processCommand } from "@ai/runtime/process/launch";
+import { errorCode } from "@ai/values/error/error";
 import { tryAcquireFileLock } from "@oh-my-pi/pi-utils/file-lock";
 import { Effect } from "effect";
 import { bunBinary } from "../binary";

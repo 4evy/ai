@@ -12,8 +12,8 @@ import {
 } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { run } from "@ai/core/effect/effect";
-import { executeCommand } from "@ai/core/effect/process/process";
+import { run } from "@ai/runtime/effect/effect";
+import { executeCommand } from "@ai/runtime/effect/process/process";
 import { object } from "@optique/core/constructs";
 import { formatMessage } from "@optique/core/message";
 import { optional } from "@optique/core/modifiers";

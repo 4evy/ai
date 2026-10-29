@@ -1,5 +1,5 @@
-import { run } from "@ai/core/effect/effect";
-import { boundedText } from "@ai/core/text/utf8";
+import { run } from "@ai/runtime/effect/effect";
+import { boundedText } from "@ai/values/text/utf8";
 import { Deferred, Effect } from "effect";
 import * as v from "valibot";
 import {

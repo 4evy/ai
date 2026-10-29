@@ -74,7 +74,7 @@ switch (task) {
   case "package": {
     const name = choice("PACKAGE", [
       "ai-javascript",
-      "ai-core",
+      "ai-shared",
       "farstep-modules",
       "farstep-javascript",
       "farstep-desktop",

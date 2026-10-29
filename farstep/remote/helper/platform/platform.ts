@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync as readResource } from "node:fs";
-import { run } from "@ai/core/effect/effect";
-import { render } from "@ai/core/template/template";
+import { run } from "@ai/runtime/effect/effect";
+import { render } from "@ai/values/template/template";
 import { Effect } from "effect";
 import * as v from "valibot";
 import {

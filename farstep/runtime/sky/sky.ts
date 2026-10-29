@@ -1,8 +1,8 @@
 import { readFile, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { attempt, Lifetime, run } from "@ai/core/effect/effect";
-import { Queue } from "@ai/core/effect/queue/queue";
-import { readText } from "@ai/core/text/text";
+import { attempt, Lifetime, run } from "@ai/runtime/effect/effect";
+import { Queue } from "@ai/runtime/effect/queue/queue";
+import { readText } from "@ai/toolkit/text/text";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { Deferred, Effect } from "effect";
 import { PROVISION_TIMEOUT_MS } from "farstep/protocol/sky/limits";

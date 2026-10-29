@@ -1,7 +1,7 @@
 import { lstat } from "node:fs/promises";
-import { errorMessage as describeError, errorCode } from "@ai/core/error/error";
+import { errorMessage as describeError, errorCode } from "@ai/values/error/error";
 
-export { errorCode } from "@ai/core/error/error";
+export { errorCode } from "@ai/values/error/error";
 
 export interface ReadinessContext {
   cwd: string;

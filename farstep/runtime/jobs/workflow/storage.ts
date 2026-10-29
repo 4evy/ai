@@ -1,7 +1,7 @@
 import { hash } from "node:crypto";
 import { link, realpath } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { stageFile, syncDirectoryAncestors } from "@ai/core/effect/fs/fs";
+import { stageFile, syncDirectoryAncestors } from "@ai/runtime/effect/fs/fs";
 import { durableJsonWriter, privateDirectory } from "../../state";
 import { withFileLock } from "../lock/lock";
 

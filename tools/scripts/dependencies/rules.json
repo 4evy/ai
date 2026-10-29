@@ -1,12 +1,30 @@
 {
   "forbidden": [
     {
-      "name": "core-does-not-depend-on-agent-hosts",
+      "name": "shared-packages-do-not-depend-on-agent-hosts",
       "from": {
-        "path": "^packages/core/"
+        "path": "^packages/(?:values|runtime|toolkit)/"
       },
       "to": {
         "path": "^apps/|^farstep/|omp-agent-runtime(?:/|$)|@oh-my-pi/"
+      }
+    },
+    {
+      "name": "values-do-not-depend-on-runtime-or-toolkit",
+      "from": { "path": "^packages/values/" },
+      "to": { "path": "^packages/(?:runtime|toolkit)/" }
+    },
+    {
+      "name": "runtime-does-not-depend-on-toolkit",
+      "from": { "path": "^packages/runtime/" },
+      "to": { "path": "^packages/toolkit/" }
+    },
+    {
+      "name": "values-do-not-own-io",
+      "from": { "path": "^packages/values/" },
+      "to": {
+        "path": "^(?:node:|bun(?::|$)|@ai/runtime|@ai/toolkit)",
+        "dependencyTypesNot": ["type-only"]
       }
     },
     {
@@ -78,7 +96,7 @@
     {
       "name": "shared-code-does-not-depend-on-installers",
       "from": {
-        "path": "^packages/core/|^farstep/(?:protocol|transport|client|remote|skylight)/|^apps/omp/lib/"
+        "path": "^packages/(?:values|runtime|toolkit)/|^farstep/(?:protocol|transport|client|remote|skylight)/|^apps/omp/lib/"
       },
       "to": {
         "path": "^farstep/runtime/platform/"

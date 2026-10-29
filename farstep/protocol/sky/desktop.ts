@@ -1,4 +1,4 @@
-import { schemaJsonSchema } from "@ai/core/schema/json";
+import { schemaJsonSchema } from "@ai/values/schema/json";
 import * as v from "valibot";
 import {
   authorizeRequestSchema,

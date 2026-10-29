@@ -1,6 +1,6 @@
 import { lstat, realpath } from "node:fs/promises";
 import { join } from "node:path";
-import { errorMessage } from "@ai/core/error/error";
+import { errorMessage } from "@ai/values/error/error";
 import type { CoordinationJob } from "farstep/protocol/coordination";
 import { uuidSchema } from "farstep/protocol/identity";
 import { jobSnapshotSchema, parseJobWireMessage } from "farstep/protocol/jobs/protocol";

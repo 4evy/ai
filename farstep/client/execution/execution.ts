@@ -1,5 +1,5 @@
 import { posix, resolve } from "node:path";
-import { attempt } from "@ai/core/effect/effect";
+import { attempt } from "@ai/runtime/effect/effect";
 import { ptree } from "@oh-my-pi/pi-utils";
 import { Effect } from "effect";
 import type { HelperConfig } from "../../transport/connection/bun";

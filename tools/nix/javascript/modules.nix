@@ -23,11 +23,11 @@ stdenvNoCC.mkDerivation {
       ../../scripts/vite/vite.ts
       ../../scripts/vite/options.ts
       ../../scripts/vite/install.ts
-      # These are build tools, not the runtime core dependency
-      ../../../packages/core/package.json
-      ../../../packages/core/schema/package.ts
-      ../../../packages/core/schema/input.ts
-      ../../../packages/core/value/value.ts
+      # These are build tools, not the compiled shared packages
+      ../../../packages/values/package.json
+      ../../../packages/values/schema/package.ts
+      ../../../packages/values/schema/input.ts
+      ../../../packages/values/value/value.ts
     ]
   );
   nativeBuildInputs = [ bun ];
@@ -39,7 +39,7 @@ stdenvNoCC.mkDerivation {
     runHook preBuild
     bash ${./link-dependencies.sh} ${ai-javascript-dependencies} node_modules
     mkdir -p node_modules/@ai
-    ln -s "$PWD/packages/core" node_modules/@ai/core
+    ln -s "$PWD/packages/values" node_modules/@ai/values
     ${lib.strings.concatMapStringsSep "\n" (project: ''
       bun ${ai-javascript-dependencies}/node_modules/vite/bin/vite.js build \
         --config ${

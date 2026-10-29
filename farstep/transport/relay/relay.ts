@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { pipeline } from "node:stream";
-import { Lifetime, run } from "@ai/core/effect/effect";
+import { Lifetime, run } from "@ai/runtime/effect/effect";
 import { seq } from "@optique/core/constructs";
 import { formatMessage } from "@optique/core/message";
 import { optional, withDefault } from "@optique/core/modifiers";

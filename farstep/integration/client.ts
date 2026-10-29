@@ -2,7 +2,7 @@ import { hash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, mkdir, open } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { atomicWrite, syncDirectoryAncestors } from "@ai/core/effect/fs/fs";
+import { atomicWrite, syncDirectoryAncestors } from "@ai/runtime/effect/fs/fs";
 import { Effect } from "effect";
 import * as v from "valibot";
 import type { Gateway } from "../client/jobs/gateway";

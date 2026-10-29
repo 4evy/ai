@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import { isRecord } from "../value/value.ts";
+import { isRecord } from "../value/value";
 
 // Native object and record schemas also accept arrays without an input guard
 export const objectInputSchema = v.custom<Record<string, unknown>>(

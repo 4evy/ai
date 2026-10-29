@@ -1,4 +1,4 @@
-import { readText } from "@ai/core/text/text";
+import { readText } from "@ai/toolkit/text/text";
 export interface SudoDetails {
   timeoutSeconds: number;
   wallTimeMs?: number;

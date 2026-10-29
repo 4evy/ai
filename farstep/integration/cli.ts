@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
-import { flushObservability } from "@ai/core/effect/effect";
-import { errorMessage } from "@ai/core/error/error";
-import { schemaJsonSchema } from "@ai/core/schema/json";
+import { flushObservability } from "@ai/runtime/effect/effect";
+import { errorMessage } from "@ai/values/error/error";
+import { schemaJsonSchema } from "@ai/values/schema/json";
 import { object } from "@optique/core/constructs";
 import { formatMessage } from "@optique/core/message";
 import { optional, withDefault } from "@optique/core/modifiers";

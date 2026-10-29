@@ -3,7 +3,7 @@ import { access } from "node:fs/promises";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { attempt, run } from "@ai/core/effect/effect";
+import { attempt, run } from "@ai/runtime/effect/effect";
 import { Effect } from "effect";
 import { MODULES } from "./paths";
 

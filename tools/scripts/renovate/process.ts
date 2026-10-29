@@ -1,6 +1,6 @@
 import { join } from "node:path";
-import { run as runEffect } from "@ai/core/effect/effect";
-import { executeCommand } from "@ai/core/effect/process/process";
+import { run as runEffect } from "@ai/runtime/effect/effect";
+import { executeCommand } from "@ai/runtime/effect/process/process";
 import { writeFile } from "atomically";
 
 export const root = join(import.meta.dir, "../../..");

@@ -26,7 +26,7 @@ jobs:
       fail-fast: false
       matrix:
         task: [typecheck, build]
-        workspace: [root, core, chatgpt, omp, farstep]
+        workspace: [root, values, runtime, toolkit, chatgpt, omp, farstep]
     uses: $/.github/workflows/bun-check.yml
     permissions:
       contents: read
@@ -81,7 +81,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [ai-javascript, ai-core, farstep-modules, farstep-javascript, farstep-desktop, farstep-service, ai-configs, farstep]
+        package:
+          [
+            ai-javascript,
+            ai-shared,
+            farstep-modules,
+            farstep-javascript,
+            farstep-desktop,
+            farstep-service,
+            ai-configs,
+            farstep,
+          ]
         platform:
           - runner: ubuntu-26.04
             system: x86_64-linux

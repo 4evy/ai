@@ -1,9 +1,9 @@
 import { hash as digest } from "node:crypto";
 import { link, lstat, readFile, rename } from "node:fs/promises";
 import { resolve } from "node:path";
-import { run } from "@ai/core/effect/effect";
-import { stageFile } from "@ai/core/effect/fs/fs";
-import { quotePosixArgument as quote } from "@ai/core/shell/shell";
+import { run } from "@ai/runtime/effect/effect";
+import { stageFile } from "@ai/runtime/effect/fs/fs";
+import { quotePosixArgument as quote } from "@ai/values/shell/shell";
 import * as v from "valibot";
 import { scriptCommandEffect } from "../client/execution/execution";
 import { MAX_FILE_BYTES } from "../protocol/files/files";

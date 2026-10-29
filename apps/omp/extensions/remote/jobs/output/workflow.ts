@@ -1,4 +1,4 @@
-import { readText } from "@ai/core/text/text";
+import { readText } from "@ai/toolkit/text/text";
 import { sanitizeText } from "@oh-my-pi/pi-utils";
 import type { WorkflowResult } from "farstep/protocol/workflow/workflow";
 

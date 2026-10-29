@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { readdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { render } from "@ai/core/template/template";
+import { render } from "@ai/values/template/template";
 import { escapeXmlAttribute } from "@oh-my-pi/pi-utils/sanitize-text";
 import { tuple } from "@optique/core/constructs";
 import { formatMessage } from "@optique/core/message";

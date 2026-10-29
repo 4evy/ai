@@ -1,4 +1,4 @@
-import { objectSchema, recordSchema } from "@ai/core/schema/input";
+import { objectSchema, recordSchema } from "@ai/values/schema/input";
 import * as v from "valibot";
 import { urlSchema } from "../identity";
 import { terminalSizeSchema } from "../jobs/jobs";

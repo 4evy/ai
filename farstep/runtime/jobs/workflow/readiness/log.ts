@@ -1,6 +1,6 @@
 import { readFileSync as readResource } from "node:fs";
 import { Worker } from "node:worker_threads";
-import { attempt } from "@ai/core/effect/effect";
+import { attempt } from "@ai/runtime/effect/effect";
 import { toError } from "@oh-my-pi/pi-utils/type-guards";
 import { Effect } from "effect";
 import type { WorkflowReady } from "#farstep/protocol/workflow/workflow";

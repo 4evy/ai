@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
-import { attempt, run } from "@ai/core/effect/effect";
-import { Queue } from "@ai/core/effect/queue/queue";
+import { attempt, run } from "@ai/runtime/effect/effect";
+import { Queue } from "@ai/runtime/effect/queue/queue";
 import { Cause, Effect, Exit } from "effect";
 import type { CoordinationOpen } from "../../protocol/coordination";
 import type {

@@ -1,7 +1,7 @@
 import { mkdir, readFile, readlink, rm, symlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { attempt, run } from "@ai/core/effect/effect";
-import { executeCommand } from "@ai/core/effect/process/process";
+import { attempt, run } from "@ai/runtime/effect/effect";
+import { executeCommand } from "@ai/runtime/effect/process/process";
 import { directoryExists } from "@oh-my-pi/pi-utils/dirs";
 import { writeFile } from "atomically";
 import { Effect } from "effect";

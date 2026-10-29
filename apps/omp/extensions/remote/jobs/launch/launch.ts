@@ -1,4 +1,4 @@
-import { readText } from "@ai/core/text/text";
+import { readText } from "@ai/toolkit/text/text";
 import type {
   AgentToolUpdateCallback,
   ExtensionContext,

@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { attempt, operationEffect, run } from "@ai/core/effect/effect";
+import { attempt, operationEffect, run } from "@ai/runtime/effect/effect";
 import { Semaphore } from "effect";
 import * as v from "valibot";
 import {

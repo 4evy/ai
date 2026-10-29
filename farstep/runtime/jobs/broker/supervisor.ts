@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { constants } from "node:os";
-import { attempt, type Lifetime, run } from "@ai/core/effect/effect";
-import { scopedSocket } from "@ai/core/effect/socket/socket";
+import { attempt, type Lifetime, run } from "@ai/runtime/effect/effect";
+import { scopedSocket } from "@ai/runtime/effect/socket/socket";
 import { Process, PtySession } from "@oh-my-pi/pi-natives";
 import { sanitizeText } from "@oh-my-pi/pi-utils";
 import { TerminalQueryResponder } from "@oh-my-pi/pi-utils/vterm";

@@ -1,9 +1,9 @@
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
-import { run } from "@ai/core/effect/effect";
-import { errorMessage } from "@ai/core/error/error";
-import { isRecord } from "@ai/core/value/value";
+import { run } from "@ai/runtime/effect/effect";
+import { errorMessage } from "@ai/values/error/error";
+import { isRecord } from "@ai/values/value/value";
 import { object, or } from "@optique/core/constructs";
 import { formatMessage } from "@optique/core/message";
 import { map, multiple } from "@optique/core/modifiers";
@@ -213,4 +213,4 @@ export async function prepareLaunch(real: string, args: string[]): Promise<boole
   return interactive;
 }
 
-export { launchProcess as execProcess } from "@ai/core/process/launch";
+export { launchProcess as execProcess } from "@ai/runtime/process/launch";

@@ -1,5 +1,5 @@
-import { run } from "@ai/core/effect/effect";
-import { scopedSocket } from "@ai/core/effect/socket/socket";
+import { run } from "@ai/runtime/effect/effect";
+import { scopedSocket } from "@ai/runtime/effect/socket/socket";
 import { ConcatSink } from "@oh-my-pi/pi-utils/stream";
 import { toError } from "@oh-my-pi/pi-utils/type-guards";
 import { Effect } from "effect";

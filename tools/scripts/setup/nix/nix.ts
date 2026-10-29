@@ -1,9 +1,9 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { run } from "@ai/core/effect/effect";
-import { executeCommand } from "@ai/core/effect/process/process";
-import { objectSchema, recordSchema } from "@ai/core/schema/input";
+import { run } from "@ai/runtime/effect/effect";
+import { executeCommand } from "@ai/runtime/effect/process/process";
+import { objectSchema, recordSchema } from "@ai/values/schema/input";
 import * as v from "valibot";
 
 const profileSchema = v.pipe(

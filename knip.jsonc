@@ -43,8 +43,14 @@
       ],
       "project": ["**/*.ts"]
     },
-    "packages/core": {
-      "entry": ["core.ts"],
+    // Shared package entry points come from their explicit package exports
+    "packages/values": {
+      "project": ["**/*.ts"]
+    },
+    "packages/runtime": {
+      "project": ["**/*.ts"]
+    },
+    "packages/toolkit": {
       "project": ["**/*.ts"]
     },
     "apps/omp": {

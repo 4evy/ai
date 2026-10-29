@@ -1,7 +1,7 @@
 import { lstat, readFile, realpath } from "node:fs/promises";
 import { join } from "node:path";
-import { run } from "@ai/core/effect/effect";
-import { executeCommand } from "@ai/core/effect/process/process";
+import { run } from "@ai/runtime/effect/effect";
+import { executeCommand } from "@ai/runtime/effect/process/process";
 import * as v from "valibot";
 import { PROTOCOL_MAJOR } from "#farstep/runtime/state";
 

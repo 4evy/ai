@@ -1,5 +1,5 @@
-import { quotePosixArgument as quote } from "@ai/core/shell/shell";
-import { readText } from "@ai/core/text/text";
+import { readText } from "@ai/toolkit/text/text";
+import { quotePosixArgument as quote } from "@ai/values/shell/shell";
 import {
   type Manager,
   type Platform,

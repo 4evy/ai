@@ -1,4 +1,4 @@
-import { run } from "@ai/core/effect/effect";
+import { run } from "@ai/runtime/effect/effect";
 import { Effect } from "effect";
 import { ensureRuntimeEffect } from "./install";
 import {

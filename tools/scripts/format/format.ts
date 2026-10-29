@@ -1,10 +1,10 @@
 import { isUtf8 } from "node:buffer";
 import { randomUUID } from "node:crypto";
 import { readFile, stat, writeFile } from "node:fs/promises";
-import { run } from "@ai/core/effect/effect";
-import { executeCommand } from "@ai/core/effect/process/process";
-import { errorMessage } from "@ai/core/error/error";
-import { readText } from "@ai/core/text/text";
+import { run } from "@ai/runtime/effect/effect";
+import { executeCommand } from "@ai/runtime/effect/process/process";
+import { readText } from "@ai/toolkit/text/text";
+import { errorMessage } from "@ai/values/error/error";
 import { object } from "@optique/core/constructs";
 import { formatMessage } from "@optique/core/message";
 import { parseSync } from "@optique/core/parser";

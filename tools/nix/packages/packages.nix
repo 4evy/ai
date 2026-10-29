@@ -27,7 +27,7 @@ let
       };
       bun2nix = bunTools;
       ai-javascript-dependencies = self.callPackage ../javascript/dependencies.nix { };
-      ai-core = self.callPackage ../javascript/core.nix { };
+      ai-shared = self.callPackage ../javascript/shared.nix { };
       ai-javascript = self.callPackage ../javascript/javascript.nix { };
       ghidra-bin = (pkgs.ghidra-bin.override { openjdk21 = pkgs.openjdk25; }).overrideAttrs (old: {
         inherit (ghidraNative.ghidra) version;

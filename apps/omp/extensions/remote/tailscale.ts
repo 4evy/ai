@@ -1,5 +1,5 @@
 import { isIP } from "node:net";
-import { attempt, run } from "@ai/core/effect/effect";
+import { attempt, run } from "@ai/runtime/effect/effect";
 import {
   AccessDeniedError,
   DaemonUnreachableError,

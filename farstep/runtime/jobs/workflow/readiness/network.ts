@@ -1,5 +1,5 @@
-import { get } from "@ai/core/effect/http/http";
-import { scopedSocket } from "@ai/core/effect/socket/socket";
+import { get } from "@ai/runtime/effect/http/http";
+import { scopedSocket } from "@ai/runtime/effect/socket/socket";
 import { Effect, Stream } from "effect";
 import type { WorkflowReady } from "#farstep/protocol/workflow/workflow";
 

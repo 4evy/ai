@@ -37,25 +37,30 @@ lockfiles.
 ## Choose where a change belongs
 
 Keep machine behavior in Farstep, harness policy and presentation in the app
-adapter, and reusable utilities in core. Runtime imports flow from apps to
-Farstep to core. Apps can also import core directly.
+adapter, deterministic transforms in values, resource ownership in runtime,
+and shared tool/MCP semantics in toolkit. Runtime imports values. Toolkit
+imports runtime and values. Apps and Farstep may import all three through
+their explicit package exports. Shared packages import neither apps nor
+Farstep.
 
-| Path                                    | Owns                                                                   |
-| --------------------------------------- | ---------------------------------------------------------------------- |
-| `packages/core/`                        | Generic contracts, Effect lifetimes, processes, observability          |
-| `apps/omp/extensions/`, `apps/omp/lib/` | OMP tools, session policy, UI, adapters                                |
-| `apps/omp/runtime/`                     | Upstream pin, maintained patches, overlays, generated npm patches      |
-| `apps/chatgpt/`                         | App integration, plugins, REPL, computer-use policy                    |
-| Other `apps/` directories               | CLI launchers, browser utilities, Ghidra integration                   |
-| `config/settings/`                      | Declared settings, host discovery, exports                             |
-| `tools/`                                | Recipes, maintenance scripts, Nix builds, distribution dependencies    |
-| `farstep/protocol/`                     | Shared wire contracts, schemas, limits, receipts                       |
-| `farstep/transport/`                    | Framing, connections, desktop RPC, relay                               |
-| `farstep/client/`                       | Discovery, jobs, terminals, files, desktop and Sky clients             |
-| `farstep/remote/`, `farstep/skylight/`  | Harness-independent tools and agent guides                             |
-| `farstep/runtime/`                      | Machine entry points, jobs, coordination, activation, Sky provisioning |
-| `farstep/native/`                       | Rust protocol, desktop backends, privileged service                    |
-| `farstep/packaging/`, `farstep/sky/`    | Platform payloads and generated Sky declarations                       |
+| Path                                    | Owns                                                                      |
+| --------------------------------------- | ------------------------------------------------------------------------- |
+| `packages/values/`                      | Deterministic schemas, error formatting, quoting, templates, UTF-8 bounds |
+| `packages/runtime/`                     | Effect lifetimes, OS resources, observability, generic JSONL framing      |
+| `packages/toolkit/`                     | Tool contracts and compilation, MCP sessions/serving, guide loading       |
+| `apps/omp/extensions/`, `apps/omp/lib/` | OMP tools, session policy, UI, adapters                                   |
+| `apps/omp/runtime/`                     | Upstream pin, maintained patches, overlays, generated npm patches         |
+| `apps/chatgpt/`                         | App integration, plugins, REPL, computer-use policy                       |
+| Other `apps/` directories               | CLI launchers, browser utilities, Ghidra integration                      |
+| `config/settings/`                      | Declared settings, host discovery, exports                                |
+| `tools/`                                | Recipes, maintenance scripts, Nix builds, distribution dependencies       |
+| `farstep/protocol/`                     | Shared wire contracts, schemas, limits, receipts                          |
+| `farstep/transport/`                    | Framing, connections, desktop RPC, relay                                  |
+| `farstep/client/`                       | Discovery, jobs, terminals, files, desktop and Sky clients                |
+| `farstep/remote/`, `farstep/skylight/`  | Harness-independent tools and agent guides                                |
+| `farstep/runtime/`                      | Machine entry points, jobs, coordination, activation, Sky provisioning    |
+| `farstep/native/`                       | Rust protocol, desktop backends, privileged service                       |
+| `farstep/packaging/`, `farstep/sky/`    | Platform payloads and generated Sky declarations                          |
 
 Protocol code imports neither clients nor implementations. Clients and runtime
 may use transport but do not import each other. Use workspace package exports
@@ -234,7 +239,7 @@ Use the installed Effect version's source and examples under
 transformations, schemas, and host-specific callbacks in their native form.
 
 Compose internal operations before crossing a Promise boundary. Use the shared
-[`run`, `attempt`, and `Lifetime`](../packages/core/effect/effect.ts)
+[`run`, `attempt`, and `Lifetime`](../packages/runtime/effect/effect.ts)
 integration to preserve native errors, cancellation, and tracing. Use
 `awaitOnInterrupt` when a native operation must settle before releasing its
 resources or reporting cancellation. Keep operation spans sanitized through
@@ -248,8 +253,8 @@ operations that must not revoke the owner on failure.
 Let scopes own resources with `Effect.acquireRelease` or
 `Effect.acquireDisposable`, and scoped fibers own background work. Prefer
 Effect's existing stream operators and the shared
-[process](../packages/core/effect/process/process.ts) and
-[file](../packages/core/effect/fs/fs.ts) resources over hand-written cleanup.
+[process](../packages/runtime/effect/process/process.ts) and
+[file](../packages/runtime/effect/fs/fs.ts) resources over hand-written cleanup.
 Choose concurrency explicitly with `Effect.all` or `Effect.forEach`. Do not
 add retries around commands, file writes, or desktop input whose outcome may
 already have taken effect.
@@ -270,15 +275,15 @@ private atomic publication and then flushes directory entries nearest-first.
 Immutable workflow reservations still use exclusive hard-link publication.
 
 Acquire MCP clients with
-[`McpSession.acquireEffect`](../packages/core/mcp/session/session.ts).
+[`McpSession.acquireEffect`](../packages/toolkit/mcp/session/session.ts).
 The caller supplies protocol negotiation, while the acquisition scope owns
 startup, immediate rollback, and the negotiated session's lifetime.
 
 Compile tool definitions with
-[`compileSchemaTool` or `compileEffectTool`](../packages/core/tool/tool.ts).
+[`compileSchemaTool` or `compileEffectTool`](../packages/toolkit/tool/tool.ts).
 Host adapters register compiled tools instead of projecting and parsing schemas
 again. Name a handler's result type when its progress callback makes inference
-circular. Core carries that result type through progress and completion, so
+circular. Toolkit carries that result type through progress and completion, so
 adapters must explicitly map content their host cannot represent.
 
 ## Check and format changes
@@ -323,8 +328,8 @@ the tracked repository.
 
 Keep agent guides in Markdown and render changing facts from their owning
 implementation with `{{name}}` placeholders. Use
-[`readGuide`](../packages/core/guide/guide.ts) for full guides and
-[`readText`](../packages/core/text/text.ts) for named text sections. Keep
+[`readGuide`](../packages/toolkit/guide/guide.ts) for full guides and
+[`readText`](../packages/toolkit/text/text.ts) for named text sections. Keep
 `readText` section headings unchanged because callers use them as keys.
 Generate request examples with `guideExample` so schemas validate them before
 rendering. Derive limits, tool names, and action lists from their source
@@ -340,7 +345,7 @@ runtime in the user cache. Use `ai update TOOL` for one tool and `--dry-run` to
 preview package changes. See [setup.ts](../tools/scripts/setup/setup.ts).
 
 Build without installing with `just nix build OUTPUT --no-link`. Outputs include
-`ai-tools`, `ai-javascript`, `ai-core`, `farstep`, `farstep-modules`,
+`ai-tools`, `ai-javascript`, `ai-shared`, `farstep`, `farstep-modules`,
 `farstep-javascript`, `farstep-desktop`, `farstep-service`, `farstep-sky`,
 `ai-configs`, `chatgpt`, and `ghidra-mcp`. Linux also exposes
 `farstep-extensions` and `farstep-kde-bridge`.
@@ -364,16 +369,16 @@ assembly separately:
 | Output                       | Owns                                                                                  |
 | ---------------------------- | ------------------------------------------------------------------------------------- |
 | `ai-javascript-dependencies` | Frozen external dependency installs, with separate development and production outputs |
-| `ai-core`                    | Compiled core utilities and their runtime dependency links                            |
+| `ai-shared`                  | Compiled values, runtime, toolkit, and their runtime dependency links                 |
 | `farstep-modules`            | Farstep TypeScript compilation and adjacent runtime resources                         |
-| `farstep-javascript`         | Runtime assembly of Farstep modules, core, and external dependencies                  |
+| `farstep-javascript`         | Runtime assembly of Farstep modules, shared packages, and external dependencies       |
 | `farstep-desktop`            | Native desktop executable, desktop runtime, and Rust protocol                         |
 | `farstep-service`            | Privileged service executable without desktop implementations                         |
 | `farstep-extensions`         | Linux desktop JavaScript extensions, excluding the KDE C++ bridge                     |
 | `farstep-kde-bridge`         | Independently compiled KWin QML plugin                                                |
 | `farstep`                    | Platform launchers, native executables, desktop assets, and optional Sky payload      |
-| `ai-app-modules`             | Root tooling and app compilation, without recompiling core or Farstep                 |
-| `ai-javascript`              | Aggregate distribution assembled from app, core, and Farstep outputs                  |
+| `ai-app-modules`             | Root tooling and app compilation, without recompiling shared packages or Farstep      |
+| `ai-javascript`              | Aggregate distribution assembled from app, shared, and Farstep outputs                |
 
 For example, `just nix build farstep-service --no-link` builds the service
 without compiling desktop or JavaScript code. Build `farstep-javascript` to

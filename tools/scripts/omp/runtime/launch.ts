@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
-import { errorMessage } from "@ai/core/error/error";
-import { launchProcess } from "@ai/core/process/launch";
+import { launchProcess } from "@ai/runtime/process/launch";
+import { errorMessage } from "@ai/values/error/error";
 import { formatMessage } from "@optique/core/message";
 import { withDefault } from "@optique/core/modifiers";
 import { parseSync } from "@optique/core/parser";

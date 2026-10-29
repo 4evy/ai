@@ -9,7 +9,6 @@
     "apps/claude/claude.ts",
     "apps/ghidra/macos/macos.ts",
     "apps/chatgpt/{launcher,configure/configure,plugins/plugins,policy/policy,repl/repl}.ts",
-    "packages/core/core.ts",
     "farstep/transport/relay/relay.ts",
     "farstep/runtime/main.ts",
     "farstep/runtime/sky/linux/service.ts",
@@ -154,15 +153,15 @@
     "require": "best-effort",
     "projects": [
       "tsconfig.json",
-      "packages/core/tsconfig.json",
+      "packages/values/tsconfig.json",
+      "packages/runtime/tsconfig.json",
+      "packages/toolkit/tsconfig.json",
       "apps/chatgpt/tsconfig.json",
       "apps/omp/tsconfig.json",
       "farstep/tsconfig.json",
       "farstep/native/desktop/platform/linux/extensions/tsconfig.json"
     ]
   },
-  // Keep the adapter type facade alongside concrete subpath imports
-  "ignoreExports": [{ "file": "packages/core/core.ts", "exports": ["*"] }],
   // Native streams and JSON-RPC invoke these hooks through their base contracts
   "usedClassMembers": [
     { "extends": "Transform", "members": ["_transform"] },
@@ -226,12 +225,20 @@
     "unused-dependency-overrides": "error",
     "misconfigured-dependency-overrides": "error"
   },
-  // Preserve the core and Farstep dependency direction from dependency-cruiser
+  // Preserve shared package layering and the Farstep dependency direction
   "boundaries": {
     "zones": [
       {
-        "name": "core",
-        "patterns": ["packages/core/**"]
+        "name": "values",
+        "patterns": ["packages/values/**"]
+      },
+      {
+        "name": "runtime",
+        "patterns": ["packages/runtime/**"]
+      },
+      {
+        "name": "toolkit",
+        "patterns": ["packages/toolkit/**"]
       },
       {
         "name": "farstep",
@@ -256,12 +263,20 @@
     ],
     "rules": [
       {
-        "from": "core",
-        "allow": ["core"]
+        "from": "values",
+        "allow": ["values"]
+      },
+      {
+        "from": "runtime",
+        "allow": ["runtime", "values"]
+      },
+      {
+        "from": "toolkit",
+        "allow": ["toolkit", "runtime", "values"]
       },
       {
         "from": "farstep",
-        "allow": ["farstep", "core"]
+        "allow": ["farstep", "values", "runtime", "toolkit"]
       }
     ]
   },

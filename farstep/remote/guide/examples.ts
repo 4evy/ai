@@ -1,5 +1,5 @@
 // biome-ignore-all lint/suspicious/noTemplateCurlyInString: Script examples contain target-side template literals
-import { guideExample } from "@ai/core/guide/guide";
+import { guideExample } from "@ai/toolkit/guide/guide";
 import * as v from "valibot";
 import { coordinationRequestSchema } from "../../protocol/coordination";
 import { createWorkflowSchemas } from "../../protocol/workflow/schemas";

@@ -14,10 +14,10 @@ import {
 } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
-import { run as runEffect } from "@ai/core/effect/effect";
-import { executeCommand } from "@ai/core/effect/process/process";
-import { errorCode } from "@ai/core/error/error";
-import { packageJsonSchema } from "@ai/core/schema/package";
+import { run as runEffect } from "@ai/runtime/effect/effect";
+import { executeCommand } from "@ai/runtime/effect/process/process";
+import { errorCode } from "@ai/values/error/error";
+import { packageJsonSchema } from "@ai/values/schema/package";
 import { object, or } from "@optique/core/constructs";
 import { formatMessage } from "@optique/core/message";
 import { optional, withDefault } from "@optique/core/modifiers";

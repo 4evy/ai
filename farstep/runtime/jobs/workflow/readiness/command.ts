@@ -1,7 +1,7 @@
 import { constants } from "node:fs";
 import { access, stat } from "node:fs/promises";
 import { resolve } from "node:path";
-import { attempt } from "@ai/core/effect/effect";
+import { attempt } from "@ai/runtime/effect/effect";
 import { type ChildProcess, spawn } from "@oh-my-pi/pi-utils/ptree";
 import { Effect, Record as Records, Schedule, Stream } from "effect";
 import type { WorkflowReady } from "#farstep/protocol/workflow/workflow";

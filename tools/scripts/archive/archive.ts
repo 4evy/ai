@@ -1,8 +1,8 @@
 import { mkdir, readdir, rename } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { attempt, run } from "@ai/core/effect/effect";
-import { temporaryDirectory } from "@ai/core/effect/fs/fs";
-import { type DownloadOptions, downloadFile } from "@ai/core/effect/http/http";
+import { attempt, run } from "@ai/runtime/effect/effect";
+import { temporaryDirectory } from "@ai/runtime/effect/fs/fs";
+import { type DownloadOptions, downloadFile } from "@ai/runtime/effect/http/http";
 import { extractArchive as unpack } from "@oh-my-pi/pi-utils/ar";
 import { Effect } from "effect";
 

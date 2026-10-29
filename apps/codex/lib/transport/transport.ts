@@ -1,8 +1,8 @@
 import { createInterface, type Interface } from "node:readline";
 import { Readable } from "node:stream";
-import { Queue } from "@ai/core/effect/queue/queue";
-import { BoundedFrames } from "@ai/core/mcp/frames/frames";
-import { isRecord } from "@ai/core/value/value";
+import { Queue } from "@ai/runtime/effect/queue/queue";
+import { BoundedFrames } from "@ai/runtime/stream/frames";
+import { isRecord } from "@ai/values/value/value";
 import {
   AbstractMessageReader,
   AbstractMessageWriter,

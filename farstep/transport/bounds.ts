@@ -1,4 +1,4 @@
-export { BoundedFrames } from "@ai/core/mcp/frames/frames";
+export { BoundedFrames } from "@ai/runtime/stream/frames";
 
 import { MAX_REQUEST_BYTES } from "../protocol/desktop/desktop";
 

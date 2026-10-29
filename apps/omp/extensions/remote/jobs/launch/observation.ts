@@ -1,4 +1,4 @@
-import { attempt, run } from "@ai/core/effect/effect";
+import { attempt, run } from "@ai/runtime/effect/effect";
 import type { AgentToolUpdateCallback } from "@oh-my-pi/pi-coding-agent";
 import { Effect, Schedule } from "effect";
 import type { Gateway } from "farstep/client/jobs/gateway";

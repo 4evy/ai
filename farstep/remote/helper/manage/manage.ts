@@ -1,5 +1,5 @@
-import { run } from "@ai/core/effect/effect";
-import { readText } from "@ai/core/text/text";
+import { run } from "@ai/runtime/effect/effect";
+import { readText } from "@ai/toolkit/text/text";
 import { toError } from "@oh-my-pi/pi-utils/type-guards";
 import * as v from "valibot";
 import {

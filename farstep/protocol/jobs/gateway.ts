@@ -1,5 +1,5 @@
-import { objectSchema, recordSchema } from "@ai/core/schema/input";
-import { readText } from "@ai/core/text/text";
+import { readText } from "@ai/toolkit/text/text";
+import { objectSchema, recordSchema } from "@ai/values/schema/input";
 import { objectInputSchema } from "farstep/protocol/identity";
 import type { JobRpcResult } from "farstep/protocol/jobs/protocol";
 import { jobSnapshotSchema, parseJobRpcResult } from "farstep/protocol/jobs/protocol";

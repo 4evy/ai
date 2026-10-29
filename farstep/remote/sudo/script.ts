@@ -1,6 +1,6 @@
 import { readFileSync as readResource } from "node:fs";
-import { quotePosixArgument } from "@ai/core/shell/shell";
-import { render } from "@ai/core/template/template";
+import { quotePosixArgument } from "@ai/values/shell/shell";
+import { render } from "@ai/values/template/template";
 import type * as v from "valibot";
 import {
   type ExecutionTarget,

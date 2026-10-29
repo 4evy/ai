@@ -3,7 +3,7 @@ import { constants } from "node:fs";
 import { access, lstat, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { errorMessage } from "@ai/core/error/error";
+import { errorMessage } from "@ai/values/error/error";
 import { CoordinationStore } from "../coordination/store/store";
 import { brokerRoot } from "../platform/processes";
 import { PROTOCOL_MAJOR, paths, privateRead, VERSION } from "../state";

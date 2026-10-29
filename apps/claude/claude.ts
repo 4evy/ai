@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
-import { launchProcess } from "@ai/core/process/launch";
+import { launchProcess } from "@ai/runtime/process/launch";
 import * as v from "valibot";
 import { scheduleClaudeUpdate } from "../../tools/scripts/setup/automatic.ts";
 import { findBinary } from "../../tools/scripts/setup/binary.ts";

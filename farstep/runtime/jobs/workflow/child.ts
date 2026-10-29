@@ -1,4 +1,4 @@
-import { attempt, run } from "@ai/core/effect/effect";
+import { attempt, run } from "@ai/runtime/effect/effect";
 import { Process } from "@oh-my-pi/pi-natives";
 import { Deferred, Effect, Option } from "effect";
 import type { WorkflowOutput } from "#farstep/protocol/workflow/workflow";

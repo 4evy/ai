@@ -1,6 +1,6 @@
 import { hash, randomUUID } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
-import { attempt, run } from "@ai/core/effect/effect";
+import { attempt, run } from "@ai/runtime/effect/effect";
 import { Process } from "@oh-my-pi/pi-natives";
 import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
 import { seq, tuple } from "@optique/core/constructs";

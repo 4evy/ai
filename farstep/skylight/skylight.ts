@@ -1,9 +1,10 @@
-import { readText } from "@ai/core/text/text";
+import { readText } from "@ai/toolkit/text/text";
+import type { Invocation } from "@ai/toolkit/tool/tool";
 import {
   compileSchemaTool,
   type ToolContext,
   type ToolResult,
-} from "@ai/core/tool/tool";
+} from "@ai/toolkit/tool/tool";
 import { guideText, INSTRUCTIONS } from "./guides/guides";
 import { SKYLIGHT_TOOLS } from "./names";
 import {
@@ -42,7 +43,7 @@ export function createSkylight<C extends ToolContext = ToolContext>(
     approval: "read",
     async execute(
       { topic, target, cwd },
-      { signal, context: ctx }: import("@ai/core/tool/tool").Invocation<C>,
+      { signal, context: ctx }: Invocation<C>,
     ): Promise<ToolResult> {
       const selected = targetOptions(target, cwd, ctx.cwd);
       const identity = await runtime.withChannel(
@@ -99,10 +100,7 @@ export function createSkylight<C extends ToolContext = ToolContext>(
     strict: false,
     mcpServerName: "skylight",
     mcpToolName: "js",
-    async execute(
-      args,
-      { signal, context: ctx }: import("@ai/core/tool/tool").Invocation<C>,
-    ): Promise<ToolResult> {
+    async execute(args, { signal, context: ctx }: Invocation<C>): Promise<ToolResult> {
       return runtime.execute(
         targetOptions(args.target, args.cwd, ctx.cwd),
         args.code,
@@ -125,10 +123,7 @@ export function createSkylight<C extends ToolContext = ToolContext>(
     label: "Synchronize Sky file",
     loadMode: "essential",
     approval: "exec",
-    async execute(
-      args,
-      { signal, context: ctx }: import("@ai/core/tool/tool").Invocation<C>,
-    ): Promise<ToolResult> {
+    async execute(args, { signal, context: ctx }: Invocation<C>): Promise<ToolResult> {
       const selected = (endpoint: typeof args.from) => ({
         ...endpoint,
         ...targetOptions(endpoint.target, endpoint.cwd, ctx.cwd),

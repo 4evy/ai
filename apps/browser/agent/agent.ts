@@ -1,9 +1,9 @@
 import { mkdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { attempt, flushObservability, run } from "@ai/core/effect/effect";
-import { executeCommand } from "@ai/core/effect/process/process";
-import { errorCode, errorMessage } from "@ai/core/error/error";
+import { attempt, flushObservability, run } from "@ai/runtime/effect/effect";
+import { executeCommand } from "@ai/runtime/effect/process/process";
+import { errorCode, errorMessage } from "@ai/values/error/error";
 import { toError } from "@oh-my-pi/pi-utils/type-guards";
 import { or } from "@optique/core/constructs";
 import { formatMessage } from "@optique/core/message";

@@ -1,6 +1,6 @@
 import * as v from "valibot";
 
-export { objectInputSchema } from "@ai/core/schema/input";
+export { objectInputSchema } from "@ai/values/schema/input";
 
 export const uuidSchema = v.pipe(
   v.string(),

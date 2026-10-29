@@ -1,6 +1,6 @@
 import { hash } from "node:crypto";
 import { join } from "node:path";
-import { syncDirectoryAncestors } from "@ai/core/effect/fs/fs";
+import { syncDirectoryAncestors } from "@ai/runtime/effect/fs/fs";
 import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
 import * as v from "valibot";
 import {

@@ -1,7 +1,7 @@
-import { attempt, Lifetime, operationEffect } from "@ai/core/effect/effect";
-import { terminateProcess } from "@ai/core/effect/process/process";
-import { errorMessage } from "@ai/core/error/error";
-import { processCommand } from "@ai/core/process/launch";
+import { attempt, Lifetime, operationEffect } from "@ai/runtime/effect/effect";
+import { terminateProcess } from "@ai/runtime/effect/process/process";
+import { processCommand } from "@ai/runtime/process/launch";
+import { errorMessage } from "@ai/values/error/error";
 import { Effect, Scope } from "effect";
 import { createMessageConnection, type MessageConnection } from "vscode-jsonrpc/node";
 import { AppServerReader, AppServerWriter } from "./transport/transport.ts";

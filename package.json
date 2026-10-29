@@ -7,7 +7,9 @@
     "valibot": "1.5.0",
     "vscode-jsonrpc": "10.0.0",
     "effect": "4.0.6",
-    "@ai/core": "workspace:*",
+    "@ai/values": "workspace:*",
+    "@ai/runtime": "workspace:*",
+    "@ai/toolkit": "workspace:*",
     "diff": "9.0.0",
     "atomically": "2.1.1",
     "@oh-my-pi/pi-utils": "18.13.1"
@@ -31,7 +33,9 @@
   "packageManager": "bun@1.4.4",
   "workspaces": {
     "packages": [
-      "packages/core",
+      "packages/values",
+      "packages/runtime",
+      "packages/toolkit",
       "apps/chatgpt",
       "apps/omp",
       "farstep"
@@ -44,7 +48,7 @@
   },
   "scripts": {
     "farstep:tools": "bun farstep/integration/cli.ts",
-    "test": "bun test ./packages/core",
+    "test": "bun test ./packages/runtime",
     "check": "bun run check:biome && bun run check:github && bun run check:rust && bun run check:sky && bun run check:patches && bun run typecheck && bun run test && bun run check:dependencies && bun run check:architecture && bun run build",
     "check:biome": "bun x --no-install biome check .",
     "check:github": "bun .github/scripts/check/check.ts",
@@ -61,7 +65,7 @@
     "sky:verify": "bun tools/scripts/sky/update.ts --check",
     "check:dependencies": "bun x --no-install knip --include dependencies,unlisted,unresolved",
     "dependencies:report": "bun x --no-install knip --no-exit-code",
-    "check:architecture": "bun x --no-install tsc -p tools/scripts/dependencies/tsconfig.json && bun tools/scripts/dependencies/check.ts packages/core farstep apps/codex apps/claude apps/chatgpt apps/omp/lib apps/omp/extensions",
+    "check:architecture": "bun x --no-install tsc -p tools/scripts/dependencies/tsconfig.json && bun tools/scripts/dependencies/check.ts packages/values packages/runtime packages/toolkit farstep apps/codex apps/claude apps/chatgpt apps/omp/lib apps/omp/extensions",
     "build": "bun run build:root && bun run --sequential --workspaces build",
     "build:root": "bun --bun x --no-install vite build",
     "build:report": "bun tools/scripts/vite/report.ts"

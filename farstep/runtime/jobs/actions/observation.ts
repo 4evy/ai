@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import { attempt, run } from "@ai/core/effect/effect";
+import { attempt, run } from "@ai/runtime/effect/effect";
 import { Effect } from "effect";
 import type { JobSnapshot } from "farstep/protocol/jobs/protocol";
 import { isJobTerminal } from "farstep/protocol/jobs/states";

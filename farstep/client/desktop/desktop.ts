@@ -1,6 +1,6 @@
-import { Lifetime, run as runEffect } from "@ai/core/effect/effect";
-import { Queue } from "@ai/core/effect/queue/queue";
-import type { ToolResult } from "@ai/core/tool/tool";
+import { Lifetime, run as runEffect } from "@ai/runtime/effect/effect";
+import { Queue } from "@ai/runtime/effect/queue/queue";
+import type { ToolResult } from "@ai/toolkit/tool/tool";
 import { Effect, Exit } from "effect";
 import type { DesktopInputRequest } from "../../protocol/desktop/desktop";
 import type { HelperConfig, HelperConnection } from "../../transport/connection/bun";

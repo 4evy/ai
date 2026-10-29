@@ -1,5 +1,5 @@
-import { readGuide } from "@ai/core/guide/guide";
-import { readText } from "@ai/core/text/text";
+import { readGuide } from "@ai/toolkit/guide/guide";
+import { readText } from "@ai/toolkit/text/text";
 import type { AgentToolResult, ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { localRunContext } from "farstep/remote/guide/examples";
 import { TOPICS } from "farstep/remote/guide/topics";

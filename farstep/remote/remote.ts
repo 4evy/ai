@@ -1,7 +1,7 @@
-import { objectSchema } from "@ai/core/schema/input";
-import { readText } from "@ai/core/text/text";
-import type { ToolContext, ToolExecution, ToolMetadata } from "@ai/core/tool/tool";
-import { isRecord } from "@ai/core/value/value";
+import { readText } from "@ai/toolkit/text/text";
+import type { ToolContext, ToolExecution, ToolMetadata } from "@ai/toolkit/tool/tool";
+import { objectSchema } from "@ai/values/schema/input";
+import { isRecord } from "@ai/values/value/value";
 import * as v from "valibot";
 import {
   COORDINATION_ACTIONS,

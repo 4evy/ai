@@ -1,9 +1,9 @@
 import { readFileSync as readResource } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { temporaryDirectory } from "@ai/core/effect/fs/fs";
-import { get } from "@ai/core/effect/http/http";
-import { terminateProcess } from "@ai/core/effect/process/process";
+import { temporaryDirectory } from "@ai/runtime/effect/fs/fs";
+import { get } from "@ai/runtime/effect/http/http";
+import { terminateProcess } from "@ai/runtime/effect/process/process";
 import { Effect } from "effect";
 import * as v from "valibot";
 import { readBrowserPort, runUserAgent, START_TIMEOUT_MS } from "../agent/agent.ts";

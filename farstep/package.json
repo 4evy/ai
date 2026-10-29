@@ -24,7 +24,9 @@
     "farstep-tools": "./integration/cli.ts"
   },
   "dependencies": {
-    "@ai/core": "workspace:*",
+    "@ai/values": "workspace:*",
+    "@ai/runtime": "workspace:*",
+    "@ai/toolkit": "workspace:*",
     "@logtape/file": "2.4.2",
     "@logtape/logtape": "2.4.2",
     "@logtape/redaction": "2.4.2",

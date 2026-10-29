@@ -1,6 +1,6 @@
 import { isIP } from "node:net";
-import { run } from "@ai/core/effect/effect";
-import { quotePosixArgument as quote } from "@ai/core/shell/shell";
+import { run } from "@ai/runtime/effect/effect";
+import { quotePosixArgument as quote } from "@ai/values/shell/shell";
 import * as v from "valibot";
 import {
   type ExecutionTarget,

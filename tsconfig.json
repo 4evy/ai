@@ -47,7 +47,9 @@
     ".zig-cache/**",
     "apps/omp/**",
     "tools/scripts/dependencies/**",
-    "packages/core/**",
+    "packages/values/**",
+    "packages/runtime/**",
+    "packages/toolkit/**",
     "apps/chatgpt/**"
   ]
 }

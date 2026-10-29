@@ -1,4 +1,4 @@
-import { readText } from "@ai/core/text/text";
+import { readText } from "@ai/toolkit/text/text";
 import type { AgentToolResult, ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { remoteDefinitions } from "farstep/remote/remote";
 import { compileTool, registerCompiledTool } from "#apps/omp/lib/schema/tool";

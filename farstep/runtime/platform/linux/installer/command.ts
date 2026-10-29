@@ -1,5 +1,5 @@
 import { dirname, join } from "node:path";
-import { attempt, run } from "@ai/core/effect/effect";
+import { attempt, run } from "@ai/runtime/effect/effect";
 import { exec } from "@oh-my-pi/pi-utils/ptree";
 import { Effect } from "effect";
 import { paths } from "#farstep/runtime/state";

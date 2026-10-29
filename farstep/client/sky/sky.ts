@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { attempt, run } from "@ai/core/effect/effect";
-import { Queue } from "@ai/core/effect/queue/queue";
+import { attempt, run } from "@ai/runtime/effect/effect";
+import { Queue } from "@ai/runtime/effect/queue/queue";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { Effect, Exit } from "effect";

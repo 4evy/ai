@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite";
 import { constants, lstatSync, readFileSync as readResource } from "node:fs";
 import { open, realpath } from "node:fs/promises";
 import { join } from "node:path";
-import { attempt, run } from "@ai/core/effect/effect";
+import { attempt, run } from "@ai/runtime/effect/effect";
 import { isEexist, isEnoent } from "@oh-my-pi/pi-utils/fs-error";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { Effect } from "effect";

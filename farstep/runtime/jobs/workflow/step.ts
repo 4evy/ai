@@ -1,8 +1,8 @@
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { attempt, type Lifetime, run } from "@ai/core/effect/effect";
-import { errorMessage } from "@ai/core/error/error";
+import { attempt, type Lifetime, run } from "@ai/runtime/effect/effect";
+import { errorMessage } from "@ai/values/error/error";
 import { Process } from "@oh-my-pi/pi-natives";
 import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
 import { Deferred, Effect, Fiber } from "effect";

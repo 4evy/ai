@@ -1,6 +1,6 @@
 import { open, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { Queue } from "@ai/core/effect/queue/queue";
+import { Queue } from "@ai/runtime/effect/queue/queue";
 import { sanitizeText } from "@oh-my-pi/pi-utils";
 import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
 import {

@@ -1,7 +1,7 @@
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import { join } from "node:path";
-import { attempt, run } from "@ai/core/effect/effect";
+import { attempt, run } from "@ai/runtime/effect/effect";
 import { acquireFileLock } from "@oh-my-pi/pi-utils/file-lock";
 import { Effect, RcMap, Scope, Semaphore } from "effect";
 import { privateDirectory } from "../../state";

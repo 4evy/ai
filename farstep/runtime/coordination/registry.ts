@@ -1,5 +1,5 @@
 import { hash } from "node:crypto";
-import { attempt, Lifetime, run } from "@ai/core/effect/effect";
+import { attempt, Lifetime, run } from "@ai/runtime/effect/effect";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { and, eq } from "drizzle-orm";
 import { Effect, Match } from "effect";

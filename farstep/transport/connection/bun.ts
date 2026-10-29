@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
-import { Lifetime } from "@ai/core/effect/effect";
-import { McpSession } from "@ai/core/mcp/session/session";
+import { Lifetime } from "@ai/runtime/effect/effect";
+import { McpSession } from "@ai/toolkit/mcp/session/session";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";

@@ -1,6 +1,6 @@
-import { recordSchema } from "@ai/core/schema/input";
-import { readText } from "@ai/core/text/text";
-import { isRecord } from "@ai/core/value/value";
+import { readText } from "@ai/toolkit/text/text";
+import { recordSchema } from "@ai/values/schema/input";
+import { isRecord } from "@ai/values/value/value";
 import * as v from "valibot";
 import { jsonValueSchema } from "#farstep/protocol/workflow/schemas";
 

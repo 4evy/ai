@@ -1,7 +1,7 @@
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
-import { quotePosixArgument as quote } from "@ai/core/shell/shell";
+import { quotePosixArgument as quote } from "@ai/values/shell/shell";
 import type * as v from "valibot";
 import { verifyBrokerRuntime } from "../../../jobs/jobs";
 import { atomicWrite, loadIdentity, privateDirectory } from "../../../state";

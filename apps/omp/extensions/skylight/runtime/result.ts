@@ -1,4 +1,4 @@
-import { isRecord } from "@ai/core/value/value";
+import { isRecord } from "@ai/values/value/value";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { AgentToolResult } from "@oh-my-pi/pi-coding-agent";
 import { buildMCPToolResult } from "@oh-my-pi/pi-coding-agent/mcp/tool-bridge";

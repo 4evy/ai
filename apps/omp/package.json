@@ -16,7 +16,9 @@
     "@tailnet/tailscaled": "0.1.2",
     "valibot": "1.5.0",
     "effect": "4.0.6",
-    "@ai/core": "workspace:*",
+    "@ai/values": "workspace:*",
+    "@ai/runtime": "workspace:*",
+    "@ai/toolkit": "workspace:*",
     "farstep": "workspace:*",
     "ipaddr.js": "2.5.0"
   },

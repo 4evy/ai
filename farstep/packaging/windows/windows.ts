@@ -116,10 +116,12 @@ export async function packageWindows(output: string, release = "1") {
   await rm(dependencies, { recursive: true });
   await rm(join(payload, "lib/farstep/omp"), { recursive: true });
   await mkdir(join(target, "node_modules/@ai"), { recursive: true });
-  await cp(join(repo, "packages/core"), join(target, "node_modules/@ai/core"), {
-    recursive: true,
-    filter: (source) => !source.split(/[\\/]/u).includes("node_modules"),
-  });
+  for (const name of ["values", "runtime", "toolkit"]) {
+    await cp(join(repo, "packages", name), join(target, "node_modules/@ai", name), {
+      recursive: true,
+      filter: (source) => !source.split(/[\\/]/u).includes("node_modules"),
+    });
+  }
   await writeFile(join(payload, "bin/farstep.cmd"), launcher);
   await run(
     [join(payload, "bin/bun.exe"), join(target, "runtime/main.ts"), "--help"],

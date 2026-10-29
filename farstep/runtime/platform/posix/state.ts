@@ -2,8 +2,8 @@ import { constants } from "node:fs";
 import { lstat, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
-import { attempt, run } from "@ai/core/effect/effect";
-import { openFile } from "@ai/core/effect/fs/fs";
+import { attempt, run } from "@ai/runtime/effect/effect";
+import { openFile } from "@ai/runtime/effect/fs/fs";
 import { Effect } from "effect";
 
 // Windows needs an ACL-based storage adapter before it can share this lifecycle

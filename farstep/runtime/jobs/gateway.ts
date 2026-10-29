@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readText } from "@ai/core/text/text";
+import { readText } from "@ai/toolkit/text/text";
 import { COORDINATION_CAPABILITY } from "farstep/protocol/coordination";
 import { type JobOperation, jobOperationSchema } from "farstep/protocol/jobs/protocol";
 import { SYSTEM_CAPABILITY } from "farstep/protocol/system";

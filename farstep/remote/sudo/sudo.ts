@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
-import { attempt, Lifetime, run } from "@ai/core/effect/effect";
+import { attempt, Lifetime, run } from "@ai/runtime/effect/effect";
 import { Effect, Fiber } from "effect";
 import {
   type ExecutionTarget,

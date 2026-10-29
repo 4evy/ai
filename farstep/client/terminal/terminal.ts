@@ -1,4 +1,4 @@
-import { readText } from "@ai/core/text/text";
+import { readText } from "@ai/toolkit/text/text";
 import {
   JOB_PTY_COLUMNS,
   JOB_PTY_ROWS,

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { join } from "node:path";
-import { flushObservability, operation } from "@ai/core/effect/effect";
-import { errorMessage } from "@ai/core/error/error";
+import { flushObservability, operation } from "@ai/runtime/effect/effect";
+import { errorMessage } from "@ai/values/error/error";
 import { Match } from "effect";
 import { type Command, parseCommand } from "./cli/cli";
 import { doctor } from "./cli/doctor";

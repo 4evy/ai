@@ -1,4 +1,4 @@
-import { run } from "@ai/core/effect/effect";
+import { run } from "@ai/runtime/effect/effect";
 import { Effect } from "effect";
 import * as v from "valibot";
 import { uuidSchema } from "../../protocol/identity";

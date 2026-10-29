@@ -3,7 +3,7 @@ import { closeSync, existsSync, openSync } from "node:fs";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { errorCode, errorMessage } from "@ai/core/error/error";
+import { errorCode, errorMessage } from "@ai/values/error/error";
 import { tryAcquireFileLock } from "@oh-my-pi/pi-utils/file-lock";
 import { formatMessage } from "@optique/core/message";
 import { withDefault } from "@optique/core/modifiers";

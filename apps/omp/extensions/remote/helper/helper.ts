@@ -1,4 +1,4 @@
-import { run } from "@ai/core/effect/effect";
+import { run } from "@ai/runtime/effect/effect";
 import { helperStatusEffect as inspect } from "farstep/client/execution/status";
 import { scriptTransport } from "../connections/execution";
 import type { Connection } from "../connections/types";

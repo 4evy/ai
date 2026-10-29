@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { copyFile, mkdir, readdir, readFile } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
-import { attempt, run as runEffect } from "@ai/core/effect/effect";
-import { executeCommand } from "@ai/core/effect/process/process";
+import { attempt, run as runEffect } from "@ai/runtime/effect/effect";
+import { executeCommand } from "@ai/runtime/effect/process/process";
 import { object, or } from "@optique/core/constructs";
 import { formatMessage } from "@optique/core/message";
 import { optional, withDefault } from "@optique/core/modifiers";

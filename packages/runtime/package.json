@@ -1,0 +1,38 @@
+{
+  "name": "@ai/runtime",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./effect/effect": "./effect/effect.ts",
+    "./effect/fs/fs": "./effect/fs/fs.ts",
+    "./effect/http/http": "./effect/http/http.ts",
+    "./effect/process/process": "./effect/process/process.ts",
+    "./effect/queue/queue": "./effect/queue/queue.ts",
+    "./effect/socket/socket": "./effect/socket/socket.ts",
+    "./process/launch": "./process/launch.ts",
+    "./stream/frames": "./stream/frames.ts"
+  },
+  "dependencies": {
+    "@ai/values": "workspace:*",
+    "effect": "4.0.6",
+    "valibot": "1.5.0",
+    "@logtape/file": "2.4.2",
+    "@logtape/logtape": "2.4.2",
+    "@logtape/redaction": "2.4.2",
+    "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/core": "3.0.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.300.0",
+    "@opentelemetry/resources": "3.0.0",
+    "@opentelemetry/sdk-trace": "3.0.0"
+  },
+  "scripts": {
+    "typecheck": "bun x --no-install tsc -p tsconfig.json",
+    "build": "bun --bun x --no-install vite build"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

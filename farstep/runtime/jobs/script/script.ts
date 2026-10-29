@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { type Readable, Transform } from "node:stream";
 import { pathToFileURL } from "node:url";
-import { shellFlags } from "@ai/core/shell/flags";
+import { shellFlags } from "@ai/values/shell/flags";
 import { Process } from "@oh-my-pi/pi-natives";
 import { tuple } from "@optique/core/constructs";
 import { formatMessage } from "@optique/core/message";

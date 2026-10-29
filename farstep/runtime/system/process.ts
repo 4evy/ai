@@ -1,5 +1,5 @@
-import { run as runEffect } from "@ai/core/effect/effect";
-import { executeBoundedCommand } from "@ai/core/effect/process/process";
+import { run as runEffect } from "@ai/runtime/effect/effect";
+import { executeBoundedCommand } from "@ai/runtime/effect/process/process";
 import { SYSTEM_OUTPUT_BYTES } from "farstep/protocol/system";
 
 export async function run(

@@ -17,9 +17,9 @@ stdenvNoCC.mkDerivation {
     ../../tools/scripts/vite/desktop.ts
     ../../tools/scripts/vite/options.ts
     # The builder's Effect runtime is independent of compiled workspace code
-    ../../packages/core/package.json
-    ../../packages/core/effect/effect.ts
-    ../../packages/core/effect/observability/observability.ts
+    ../../packages/runtime/package.json
+    ../../packages/runtime/effect/effect.ts
+    ../../packages/runtime/effect/observability/observability.ts
   ];
   nativeBuildInputs = [ bun ];
   strictDeps = true;
@@ -29,7 +29,7 @@ stdenvNoCC.mkDerivation {
     bash ${../../tools/nix/javascript/link-dependencies.sh} \
       ${ai-javascript-dependencies} "$PWD/node_modules"
     mkdir -p node_modules/@ai
-    ln -s ../../packages/core node_modules/@ai/core
+    ln -s ../../packages/runtime node_modules/@ai/runtime
   '';
   buildPhase = ''
     runHook preBuild

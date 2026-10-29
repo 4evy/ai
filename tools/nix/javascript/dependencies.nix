@@ -63,7 +63,7 @@ assert lib.asserts.assertMsg (manifest.packageManager == "bun@${bun.version}")
   "The JavaScript workspace requires ${manifest.packageManager}, but Nix supplies bun@${bun.version}";
 stdenv.mkDerivation {
   pname = "ai-javascript-dependencies";
-  inherit (lib.trivial.importJSON ../../../packages/core/package.json) version;
+  inherit (lib.trivial.importJSON ../../../packages/values/package.json) version;
   outputs = [
     "out"
     "production"

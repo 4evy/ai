@@ -1,7 +1,7 @@
 import { globSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { packageJsonSchema } from "@ai/core/schema/package";
+import { packageJsonSchema } from "@ai/values/schema/package";
 import * as v from "valibot";
 
 export const repo = fileURLToPath(new URL("../../../", import.meta.url));

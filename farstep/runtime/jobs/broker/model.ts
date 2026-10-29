@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { isAbsolute } from "node:path";
-import { Queue } from "@ai/core/effect/queue/queue";
+import { Queue } from "@ai/runtime/effect/queue/queue";
 import type { Process, PtySession } from "@oh-my-pi/pi-natives";
 import type {
   JobCompletionNotification,

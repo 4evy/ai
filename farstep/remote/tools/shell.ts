@@ -1,4 +1,4 @@
-import { isRecord } from "@ai/core/value/value";
+import { isRecord } from "@ai/values/value/value";
 import * as v from "valibot";
 
 export const scriptArguments = {

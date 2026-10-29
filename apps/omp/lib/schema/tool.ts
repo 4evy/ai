@@ -3,7 +3,7 @@ import {
   compileSchemaTool,
   type SchemaToolCompiler,
   type ToolResult,
-} from "@ai/core/tool/tool";
+} from "@ai/toolkit/tool/tool";
 import type {
   AgentToolResult,
   ExtensionAPI,

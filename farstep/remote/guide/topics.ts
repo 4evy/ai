@@ -1,4 +1,4 @@
-import { readGuide } from "@ai/core/guide/guide";
+import { readGuide } from "@ai/toolkit/guide/guide";
 import { TERMINAL_KEYS } from "../../client/terminal/keys/keys";
 import { MAX_FILE_BYTES } from "../../protocol/files/files";
 import { DEFAULT_CAPTURE_BYTES } from "../../protocol/script/script";

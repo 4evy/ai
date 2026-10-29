@@ -1,5 +1,5 @@
 import { dirname, join } from "node:path";
-import { attempt, Lifetime, operation, run } from "@ai/core/effect/effect";
+import { attempt, Lifetime, operation, run } from "@ai/runtime/effect/effect";
 import { postmortem } from "@oh-my-pi/pi-utils";
 import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
 import { formatMessage } from "@optique/core/message";

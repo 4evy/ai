@@ -1,6 +1,6 @@
 export const currentHelper = `"\${XDG_DATA_HOME:-$HOME/.local/share}/farstep/current/bin/farstep"`;
 
-import { quotePosixArgument } from "@ai/core/shell/shell";
+import { quotePosixArgument } from "@ai/values/shell/shell";
 
 export function helperCommand(connection: { info: { os: string } }, args: string[]) {
   if (connection.info.os === "windows") {

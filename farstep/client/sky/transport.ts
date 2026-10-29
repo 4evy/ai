@@ -1,4 +1,4 @@
-import { quotePosixArgument as quote } from "@ai/core/shell/shell";
+import { quotePosixArgument as quote } from "@ai/values/shell/shell";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { Record as Records } from "effect";
 import { MAX_FRAME } from "../../protocol/sky/execution";

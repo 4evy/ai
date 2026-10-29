@@ -2,12 +2,12 @@
   lib,
   callPackage,
   runCommand,
-  ai-core,
+  ai-shared,
   ai-javascript-dependencies,
   farstep-javascript,
 }:
 let
-  metadata = lib.trivial.importJSON ../../../packages/core/package.json;
+  metadata = lib.trivial.importJSON ../../../packages/values/package.json;
   source = import ../source/source.nix { inherit lib; };
   modules = (callPackage ./modules.nix { }) {
     pname = "ai-app-modules";
@@ -59,11 +59,15 @@ runCommand "ai-javascript-${metadata.version}"
     cp -R ${modules}/. "$out/"
     chmod -R u+w "$out"
     cp -R ${upstream}/apps/omp/runtime/upstream "$out/apps/omp/runtime/"
-    ln -s ${ai-core}/packages/core "$out/packages/core"
+    for package in values runtime toolkit; do
+      ln -s ${ai-shared}/packages/"$package" "$out/packages/$package"
+    done
     ln -s ${farstep-javascript}/farstep "$out/farstep"
     bash ${./link-dependencies.sh} ${ai-javascript-dependencies.production} "$out/node_modules"
     mkdir -p "$out/node_modules/@ai" "$out/node_modules/@oai"
-    ln -s ${ai-core}/packages/core "$out/node_modules/@ai/core"
+    for package in values runtime toolkit; do
+      ln -s ${ai-shared}/packages/"$package" "$out/node_modules/@ai/$package"
+    done
     ln -s ${farstep-javascript}/farstep "$out/node_modules/farstep"
     ln -s ${farstep-javascript}/farstep/sky "$out/node_modules/@oai/sky"
     ln -s ../apps/omp "$out/node_modules/omp-agent-runtime"

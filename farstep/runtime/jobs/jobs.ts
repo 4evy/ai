@@ -2,7 +2,7 @@ import { hash, randomUUID } from "node:crypto";
 import type { Dirent } from "node:fs";
 import { link, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { attempt, Lifetime } from "@ai/core/effect/effect";
+import { attempt, Lifetime } from "@ai/runtime/effect/effect";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { isEexist, isEnoent } from "@oh-my-pi/pi-utils/fs-error";
 import { Effect } from "effect";

@@ -1,6 +1,6 @@
 import { createConnection, type NetConnectOpts, type Socket } from "node:net";
+import { errorMessage } from "@ai/values/error/error";
 import { Effect } from "effect";
-import { errorMessage } from "../../error/error";
 
 // Ownership transfers to the caller only after connection succeeds
 export function connectSocket(options: NetConnectOpts): Effect.Effect<Socket, Error> {

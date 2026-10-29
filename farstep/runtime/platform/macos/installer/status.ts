@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { errorMessage } from "@ai/core/error/error";
+import { errorMessage } from "@ai/values/error/error";
 import { uuidSchema } from "farstep/protocol/identity";
 import * as v from "valibot";
 import { desktopHealth } from "../../../desktop";

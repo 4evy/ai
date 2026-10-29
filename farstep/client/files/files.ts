@@ -1,7 +1,7 @@
 import { isUtf8 } from "node:buffer";
 import { hash as digest } from "node:crypto";
-import { attempt, run } from "@ai/core/effect/effect";
-import { quotePosixArgument } from "@ai/core/shell/shell";
+import { attempt, run } from "@ai/runtime/effect/effect";
+import { quotePosixArgument } from "@ai/values/shell/shell";
 import { Effect } from "effect";
 import { MAX_FILE_BYTES } from "../../protocol/files/files";
 import { type ScriptTransport, scriptCommandEffect } from "../execution/execution";

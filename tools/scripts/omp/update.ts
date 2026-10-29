@@ -1,9 +1,9 @@
 import { mkdtempDisposable, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { run as runEffect } from "@ai/core/effect/effect";
-import { executeCommand } from "@ai/core/effect/process/process";
-import { packageJsonSchema } from "@ai/core/schema/package";
+import { run as runEffect } from "@ai/runtime/effect/effect";
+import { executeCommand } from "@ai/runtime/effect/process/process";
+import { packageJsonSchema } from "@ai/values/schema/package";
 import { formatMessage } from "@optique/core/message";
 import { optional } from "@optique/core/modifiers";
 import { parseSync } from "@optique/core/parser";

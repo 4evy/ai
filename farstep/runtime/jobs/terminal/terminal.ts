@@ -1,4 +1,4 @@
-import { run } from "@ai/core/effect/effect";
+import { run } from "@ai/runtime/effect/effect";
 import { sanitizeText } from "@oh-my-pi/pi-utils";
 import xterm, { type BufferCell, type Terminal } from "@oh-my-pi/pi-utils/vterm";
 import { Effect } from "effect";

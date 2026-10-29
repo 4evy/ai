@@ -1,10 +1,10 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { attempt, Lifetime, run } from "@ai/core/effect/effect";
-import { temporaryDirectory } from "@ai/core/effect/fs/fs";
-import { Queue } from "@ai/core/effect/queue/queue";
-import { McpSession } from "@ai/core/mcp/session/session";
+import { attempt, Lifetime, run } from "@ai/runtime/effect/effect";
+import { temporaryDirectory } from "@ai/runtime/effect/fs/fs";
+import { Queue } from "@ai/runtime/effect/queue/queue";
+import { McpSession } from "@ai/toolkit/mcp/session/session";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import {
