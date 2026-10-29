@@ -22,8 +22,10 @@ export function referencePaths(platform: string) {
   const api = Object.hasOwn(REFERENCE_APIS, platform)
     ? REFERENCE_APIS[platform]
     : "full-desktop";
+  const repl =
+    platform === "darwin" ? "mac" : platform === "win32" ? "windows" : "linux";
   return [
-    "@oai/cua/docs/tinysky-alt-core-cua-repl.md",
+    `@oai/cua/docs/tinysky-alt-core-cua-repl-${repl}.md`,
     `@oai/sky/docs/sky-${api}-api.md`,
   ];
 }
