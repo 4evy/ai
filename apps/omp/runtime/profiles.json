@@ -10,14 +10,16 @@
       "schema/schema.patch",
       "ui/compact.patch",
       "ui/goal.patch",
-      "ui/session-model.patch"
+      "ui/session-model.patch",
+      "ui/ribbon.patch"
     ],
     "sdk": [
       "ssh/ssh.patch",
       "compression/compression.patch",
       "mcp/mcp.patch",
       "ui/todo.patch",
-      "ui/session-model.patch"
+      "ui/session-model.patch",
+      "ui/ribbon.patch"
     ]
   },
   "dependencies": {},

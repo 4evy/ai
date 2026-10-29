@@ -1,3 +1,32 @@
+diff --git a/dist/types/theme/schema.d.ts b/dist/types/theme/schema.d.ts
+--- a/dist/types/theme/schema.d.ts
++++ b/dist/types/theme/schema.d.ts
+@@ -13,6 +13,8 @@
+     $schema?: string;
+     name: string;
+     vars?: Record<string, ColorValue>;
++    /** Five foreground stripes for decorative rules, never background fills */
++    ribbon?: [ColorValue, ColorValue, ColorValue, ColorValue, ColorValue];
+     colors: Omit<Record<ThemeColor | ThemeBg, ColorValue>, "thinkingMax" | keyof typeof OPTIONAL_THEME_COLOR_RECORD> & Partial<Record<keyof typeof OPTIONAL_THEME_COLOR_RECORD, ColorValue>> & {
+         thinkingMax?: ColorValue;
+     };
+diff --git a/dist/types/theme/theme-class.d.ts b/dist/types/theme/theme-class.d.ts
+--- a/dist/types/theme/theme-class.d.ts
++++ b/dist/types/theme/theme-class.d.ts
+@@ -15,7 +15,12 @@
+      * otherwise-light theme.
+      */
+     readonly statusLineLuminance: number | undefined;
+-    constructor(fgColors: Record<ThemeColor, string | number>, bgColors: Record<ThemeBg, string | number>, mode: ColorMode, symbolPreset: SymbolPreset, symbolOverrides: Partial<Record<SymbolKey, string>>, spinnerFramesOverrides?: Partial<Record<SpinnerType, string[]>>);
++    constructor(fgColors: Record<ThemeColor, string | number>, bgColors: Record<ThemeBg, string | number>, mode: ColorMode, symbolPreset: SymbolPreset, symbolOverrides: Partial<Record<SymbolKey, string>>, spinnerFramesOverrides?: Partial<Record<SpinnerType, string[]>>, ribbonColors?: readonly (string | number)[], terminalBackground?: string | number);
++    /**
++     * Paint a one-cell rule in five stripes, preserving the terminal background
++     * Offset and total width keep stripes aligned across embedded labels
++     */
++    ribbonRule(glyph: string, width: number, offset?: number, totalWidth?: number): string | undefined;
+     /** True when the active theme has a light status-line background. */
+     get isLight(): boolean;
+     /**
 diff --git a/dist/types/tools/todo.d.ts b/dist/types/tools/todo.d.ts
 --- a/dist/types/tools/todo.d.ts
 +++ b/dist/types/tools/todo.d.ts
@@ -10,6 +39,229 @@ diff --git a/dist/types/tools/todo.d.ts b/dist/types/tools/todo.d.ts
  /**
   * Checklist phases for native terminals: plain phase titles (no roman
   * numerals — the terminal numbers nothing), completed phases folded.
+diff --git a/src/chrome/dynamic-border.ts b/src/chrome/dynamic-border.ts
+--- a/src/chrome/dynamic-border.ts
++++ b/src/chrome/dynamic-border.ts
+@@ -13,11 +13,13 @@
+  */
+ export class DynamicBorder implements Component {
+ 	#color: (str: string) => string;
++	readonly #ribbon: boolean;
+ 	#cachedWidth = -1;
+ 	#cachedLines: string[] | undefined;
+ 
+-	constructor(color: (str: string) => string = str => fgOrPlain("border", str)) {
+-		this.#color = color;
++	constructor(color?: (str: string) => string) {
++		this.#ribbon = color === undefined;
++		this.#color = color ?? (str => fgOrPlain("border", str));
+ 	}
+ 
+ 	invalidate(): void {
+@@ -35,7 +37,9 @@
+ 			return this.#cachedLines;
+ 		}
+ 		const horizontal = typeof theme === "undefined" ? "─" : theme.boxRound.horizontal;
+-		const lines = [this.#color(horizontal.repeat(Math.max(1, width)))];
++		const ribbon =
++			this.#ribbon && typeof theme !== "undefined" ? theme.ribbonRule(horizontal, Math.max(1, width)) : undefined;
++		const lines = [ribbon ?? this.#color(horizontal.repeat(Math.max(1, width)))];
+ 		this.#cachedWidth = width;
+ 		this.#cachedLines = lines;
+ 		return lines;
+diff --git a/src/components/composer/pi.ts b/src/components/composer/pi.ts
+--- a/src/components/composer/pi.ts
++++ b/src/components/composer/pi.ts
+@@ -4,6 +4,7 @@
+  * a plain standalone bottom bar with both segment groups.
+  */
+ import { padding } from "../../utils";
++import { theme } from "../../theme";
+ import type { ComposerChromeContext, ComposerRowContext, ComposerStyle } from "./types";
+ 
+ export const piComposerStyle: ComposerStyle = {
+@@ -24,7 +25,8 @@
+ 	},
+ 
+ 	renderTop(ctx: ComposerChromeContext): string {
+-		return ctx.borderColor(ctx.box.horizontal.repeat(ctx.width));
++		const ribbon = typeof theme === "undefined" ? undefined : theme.ribbonRule(ctx.box.horizontal, ctx.width);
++		return ribbon ?? ctx.borderColor(ctx.box.horizontal.repeat(ctx.width));
+ 	},
+ 
+ 	renderRow(ctx: ComposerRowContext): string[] {
+diff --git a/src/render/output-block.ts b/src/render/output-block.ts
+--- a/src/render/output-block.ts
++++ b/src/render/output-block.ts
+@@ -182,6 +182,14 @@
+ 
+ 	const H = rows.length;
+ 
++	const fillRule = (count: number, offset: number): string => {
++		if (state !== "error" && state !== "warning" && options.borderColor === undefined) {
++			const ribbon = theme.ribbonRule(h, count, offset, lineWidth);
++			if (ribbon !== undefined) return ribbon;
++		}
++		return border(h.repeat(count));
++	};
++
+ 	const renderBar = (row: { leftChar: string; rightChar: string; label?: string; meta?: string }): string => {
+ 		const leftGlyphs = `${row.leftChar}${cap}`;
+ 		const rightGlyph = row.rightChar;
+@@ -190,7 +198,7 @@
+ 		if (!labelText) {
+ 			// No header: draw a clean, continuous top/separator bar (no 1-col gap).
+ 			const fillCount = Math.max(0, lineWidth - visibleWidth(leftGlyphs) - visibleWidth(rightGlyph));
+-			return `${border(leftGlyphs)}${border(h.repeat(fillCount))}${border(rightGlyph)}`;
++			return `${border(leftGlyphs)}${fillRule(fillCount, visibleWidth(leftGlyphs))}${border(rightGlyph)}`;
+ 		}
+ 		const rawLabel = ` ${labelText} `;
+ 		const leftWidth = visibleWidth(leftGlyphs);
+@@ -199,8 +207,7 @@
+ 		const trimmedLabel = truncateToWidth(rawLabel, maxLabelWidth);
+ 		const labelWidth = visibleWidth(trimmedLabel);
+ 		const fillCount = Math.max(0, lineWidth - leftWidth - labelWidth - rightWidth);
+-		const fillGlyphs = h.repeat(fillCount);
+-		return `${border(leftGlyphs)}${trimmedLabel}${border(fillGlyphs)}${border(rightGlyph)}`;
++		return `${border(leftGlyphs)}${trimmedLabel}${fillRule(fillCount, leftWidth + labelWidth)}${border(rightGlyph)}`;
+ 	};
+ 
+ 	const renderContent = (inner: string): string =>
+diff --git a/src/theme/loader.ts b/src/theme/loader.ts
+--- a/src/theme/loader.ts
++++ b/src/theme/loader.ts
+@@ -3,7 +3,7 @@
+ import { adjustHsv } from "@oh-my-pi/pi-utils/color";
+ import { getCustomThemesDir } from "@oh-my-pi/pi-utils/dirs";
+ import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
+-import { detectColorMode, resolveThemeColors } from "./color";
++import { detectColorMode, resolveThemeColors, resolveVarRefs } from "./color";
+ import darkThemeJson from "./dark.json" with { type: "json" };
+ import { defaultThemes } from "./defaults";
+ import lightThemeJson from "./light.json" with { type: "json" };
+@@ -179,7 +179,18 @@
+ 	const symbolPreset: SymbolPreset = symbolPresetOverride ?? themeJson.symbols?.preset ?? "unicode";
+ 	const symbolOverrides = themeJson.symbols?.overrides ?? {};
+ 	const spinnerFramesOverrides = normalizeSpinnerFramesOverride(themeJson.symbols?.spinnerFrames);
+-	return new Theme(fgColors, bgColors, colorMode, symbolPreset, symbolOverrides, spinnerFramesOverrides);
++	const ribbonColors = themeJson.ribbon?.map(color => resolveVarRefs(color, themeJson.vars ?? {}));
++	const terminalBackground = themeJson.terminal?.background;
++	return new Theme(
++		fgColors,
++		bgColors,
++		colorMode,
++		symbolPreset,
++		symbolOverrides,
++		spinnerFramesOverrides,
++		ribbonColors,
++		terminalBackground === undefined ? undefined : resolveVarRefs(terminalBackground, themeJson.vars ?? {}),
++	);
+ }
+ 
+ export async function loadTheme(name: string, options: CreateThemeOptions = {}): Promise<Theme> {
+diff --git a/src/theme/schema-validation.ts b/src/theme/schema-validation.ts
+--- a/src/theme/schema-validation.ts
++++ b/src/theme/schema-validation.ts
+@@ -99,6 +99,7 @@
+ 	"$schema?": "string",
+ 	name: "string",
+ 	"vars?": { "[string]": "string | number" },
++	"ribbon?": "(string | number)[] == 5",
+ 	colors: themeColorsSchema,
+ 	"export?": {
+ 		"pageBg?": "string | number",
+diff --git a/src/theme/schema.ts b/src/theme/schema.ts
+--- a/src/theme/schema.ts
++++ b/src/theme/schema.ts
+@@ -20,6 +20,8 @@
+ 	$schema?: string;
+ 	name: string;
+ 	vars?: Record<string, ColorValue>;
++	/** Five foreground stripes for decorative rules, never background fills */
++	ribbon?: [ColorValue, ColorValue, ColorValue, ColorValue, ColorValue];
+ 	colors: Omit<Record<ThemeColor | ThemeBg, ColorValue>, "thinkingMax" | keyof typeof OPTIONAL_THEME_COLOR_RECORD> &
+ 		Partial<Record<keyof typeof OPTIONAL_THEME_COLOR_RECORD, ColorValue>> & { thinkingMax?: ColorValue };
+ 	export?: {
+diff --git a/src/theme/theme-class.ts b/src/theme/theme-class.ts
+--- a/src/theme/theme-class.ts
++++ b/src/theme/theme-class.ts
+@@ -179,6 +179,7 @@
+ 	#sessionAccentInputs: SessionAccentTheme | undefined;
+ 	#symbols: SymbolMap;
+ 	#spinnerFramesOverrides: Partial<Record<SpinnerType, string[]>>;
++	readonly #ribbon: readonly string[] | undefined;
+ 	/**
+ 	 * Perceptual luma (0..1) of the status-line background — used to classify the
+ 	 * theme light/dark. Undefined when it can't be resolved. Classified against the
+@@ -196,9 +197,12 @@
+ 		private readonly symbolPreset: SymbolPreset,
+ 		symbolOverrides: Partial<Record<SymbolKey, string>>,
+ 		spinnerFramesOverrides: Partial<Record<SpinnerType, string[]>> = {},
++		ribbonColors?: readonly (string | number)[],
++		terminalBackground?: string | number,
+ 	) {
+-		this.statusLineLuminance = colorLuma(bgColors.statusLineBg);
+-		this.#statusLineContrastLuminance = relativeLuminance(bgColors.statusLineBg);
++		const statusBackground = bgColors.statusLineBg === "" ? (terminalBackground ?? "") : bgColors.statusLineBg;
++		this.statusLineLuminance = colorLuma(statusBackground);
++		this.#statusLineContrastLuminance = relativeLuminance(statusBackground);
+ 		const slIsLight = this.statusLineLuminance !== undefined && this.statusLineLuminance > 0.5;
+ 
+ 		this.#fgColors = {} as Record<ThemeColor, string>;
+@@ -235,8 +239,24 @@
+ 			}
+ 		}
+ 		this.#spinnerFramesOverrides = spinnerFramesOverrides;
++		this.#ribbon = ribbonColors?.map(color => fgAnsi(color, mode));
+ 	}
+ 
++	/**
++	 * Paint a one-cell rule in five stripes, preserving the terminal background
++	 * Offset and total width keep stripes aligned across embedded labels
++	 */
++	ribbonRule(glyph: string, width: number, offset = 0, totalWidth = width): string | undefined {
++		if (!this.#ribbon) return undefined;
++		let result = "";
++		for (let index = 0; index < this.#ribbon.length; index++) {
++			const start = Math.max(offset, Math.floor((index * totalWidth) / this.#ribbon.length));
++			const end = Math.min(offset + width, Math.floor(((index + 1) * totalWidth) / this.#ribbon.length));
++			if (end > start) result += this.#ribbon[index] + glyph.repeat(end - start);
++		}
++		return result ? result + "\x1b[39m" : "";
++	}
++
+ 	/** True when the active theme has a light status-line background. */
+ 	get isLight(): boolean {
+ 		return this.statusLineLuminance !== undefined && this.statusLineLuminance > 0.5;
+diff --git a/src/theme/theme-schema.json b/src/theme/theme-schema.json
+--- a/src/theme/theme-schema.json
++++ b/src/theme/theme-schema.json
+@@ -31,6 +31,13 @@
+ 				]
+ 			}
+ 		},
++		"ribbon": {
++			"type": "array",
++			"description": "Five foreground stripes for decorative rules, preserving terminal backgrounds",
++			"minItems": 5,
++			"maxItems": 5,
++			"items": { "type": ["string", "integer"] }
++		},
+ 		"colors": {
+ 			"type": "object",
+ 			"description": "Theme color definitions (all required except thinkingMax and assistantMessageText)",
+@@ -466,10 +473,7 @@
+ 								}
+ 							},
+ 							"additionalProperties": false,
+-							"anyOf": [
+-								{ "required": ["status"] },
+-								{ "required": ["activity"] }
+-							]
++							"anyOf": [{ "required": ["status"] }, { "required": ["activity"] }]
+ 						}
+ 					]
+ 				}
 diff --git a/src/tools/todo.ts b/src/tools/todo.ts
 --- a/src/tools/todo.ts
 +++ b/src/tools/todo.ts
