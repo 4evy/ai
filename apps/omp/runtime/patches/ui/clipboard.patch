@@ -1,0 +1,74 @@
+diff --git a/packages/coding-agent/src/modes/controllers/input-controller.ts b/packages/coding-agent/src/modes/controllers/input-controller.ts
+--- a/packages/coding-agent/src/modes/controllers/input-controller.ts
++++ b/packages/coding-agent/src/modes/controllers/input-controller.ts
+@@ -411,6 +411,11 @@
+ 					this.ctx.toggleThinkingBlockVisibility();
+ 					return { consume: true };
+ 				}
++				if (this.ctx.keybindings.matches(data, "app.clipboard.copyResponse")) {
++					if (this.ctx.ui.hasOverlay() || this.ctx.ui.getFocused() instanceof TreeSelectorComponent) return undefined;
++					void this.#copyAgentResponse();
++					return { consume: true };
++				}
+ 				if (this.ctx.keybindings.matches(data, "app.history.search")) {
+ 					if (this.ctx.ui.hasOverlay() || this.ctx.ui.getFocused() instanceof HistorySearchComponent) {
+ 						return undefined;
+@@ -2821,6 +2826,25 @@
+ 		}
+ 	}
+ 
++	/** Copy viewed-agent prose without reasoning or tool output */
++	async #copyAgentResponse(): Promise<void> {
++		const messages = this.ctx.viewSession.messages;
++		for (let index = messages.length - 1; index >= 0; index--) {
++			const message = messages[index]!;
++			if (message.role !== "assistant") continue;
++			const text = this.ctx.extractAssistantText(message);
++			if (!text) continue;
++			try {
++				await copyToClipboard(text);
++				this.ctx.showStatus("Copied agent response to clipboard");
++			} catch {
++				this.ctx.showWarning("Failed to copy agent response to clipboard");
++			}
++			return;
++		}
++		this.ctx.showStatus("No agent response to copy");
++	}
++
+ 	/** Copy current prompt text to system clipboard. */
+ 	handleCopyPrompt(): void {
+ 		const text = this.ctx.editor.getText();
+diff --git a/packages/tui/src/app-keybindings.ts b/packages/tui/src/app-keybindings.ts
+--- a/packages/tui/src/app-keybindings.ts
++++ b/packages/tui/src/app-keybindings.ts
+@@ -48,6 +48,7 @@
+ 	"app.clipboard.pasteTextRaw": true;
+ 	"app.clipboard.copyLine": true;
+ 	"app.clipboard.copyPrompt": true;
++	"app.clipboard.copyResponse": true;
+ 	"app.agents.hub": true;
+ 	"app.session.new": true;
+ 	"app.session.tree": true;
+@@ -195,6 +196,10 @@
+ 		defaultKeys: "alt+shift+c",
+ 		description: "Copy prompt",
+ 	},
++	"app.clipboard.copyResponse": {
++		defaultKeys: [],
++		description: "Copy latest visible agent response",
++	},
+ 	"app.session.new": {
+ 		defaultKeys: [],
+ 		description: "Create new session",
+diff --git a/packages/tui/src/hotkeys-markdown.ts b/packages/tui/src/hotkeys-markdown.ts
+--- a/packages/tui/src/hotkeys-markdown.ts
++++ b/packages/tui/src/hotkeys-markdown.ts
+@@ -115,6 +115,7 @@
+ 				{ keys: [hints(["ctrl+k"])], action: "Delete to end of line" },
+ 				{ keys: [act("app.clipboard.copyLine")], action: "Copy current line" },
+ 				{ keys: [act("app.clipboard.copyPrompt")], action: "Copy whole prompt" },
++				{ keys: [act("app.clipboard.copyResponse")], action: "Copy latest visible agent response" },
+ 			],
+ 		},
+ 		{

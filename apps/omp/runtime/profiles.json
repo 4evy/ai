@@ -8,7 +8,11 @@
       "ui/todo.patch",
       "quota/quota.patch",
       "schema/schema.patch",
-      "ui/compact.patch",
+      "ui/hud.patch",
+      "ui/tool-cards.patch",
+      "ui/clipboard.patch",
+      "ui/keybinding-tips.patch",
+      "ui/terminal-colors.patch",
       "ui/goal.patch",
       "ui/session-model.patch",
       "ui/ribbon.patch"

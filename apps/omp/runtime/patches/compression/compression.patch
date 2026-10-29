@@ -1,15 +1,15 @@
 diff --git a/packages/coding-agent/src/ssh/file-transfer.ts b/packages/coding-agent/src/ssh/file-transfer.ts
 --- a/packages/coding-agent/src/ssh/file-transfer.ts
 +++ b/packages/coding-agent/src/ssh/file-transfer.ts
-@@ -6,6 +6,7 @@
-  * `ssh://` reads/writes round-trip exactly — leading/trailing whitespace, tabs,
-  * and final newlines are preserved.
+@@ -8,6 +8,7 @@
   */
+ import { type ShellFsDirEntry, ShellFsFileType } from "@oh-my-pi/pi-natives";
+ import { ConcatSink, ptree } from "@oh-my-pi/pi-utils";
 +import { createFileTransfer } from "./transfer-compression";
- import { ptree } from "@oh-my-pi/pi-utils";
  import { buildRemoteCommand, ensureConnection, ensureHostInfo, type SSHConnectionTarget } from "./connection-manager";
  import { quotePosixArgument } from "../utils/shell-quote";
-@@ -73,15 +74,13 @@
+ import { wrapInPosixShell } from "./utils";
+@@ -104,15 +105,13 @@
  	remotePath: string,
  	opts: RemoteFileReadOptions,
  ): Promise<RemoteFileReadResult> {
@@ -30,7 +30,7 @@ diff --git a/packages/coding-agent/src/ssh/file-transfer.ts b/packages/coding-ag
  	const truncated = raw.length > opts.maxBytes;
  	return { bytes: truncated ? raw.subarray(0, opts.maxBytes) : raw, truncated };
  }
-@@ -120,6 +119,7 @@
+@@ -151,6 +150,7 @@
  	if (remotePath.endsWith("/")) {
  		throw new Error("ssh://: destination is a directory path (trailing '/'); ssh:// write requires a file path");
  	}
@@ -38,7 +38,7 @@ diff --git a/packages/coding-agent/src/ssh/file-transfer.ts b/packages/coding-ag
  	const dest = quotePosixArgument(remotePath);
  	const tmp = quotePosixArgument(`${remotePath}.omp-tmp.${crypto.randomUUID()}`);
  	// Stage stdin into the temp first (so the remote never blocks on an unread
-@@ -135,18 +135,13 @@
+@@ -166,18 +166,13 @@
  	const command =
  		`t=${tmp}; trap 'rm -f -- "$t"' 0; ` +
  		`mkdir -p -- "$(dirname "$t")" && ` +

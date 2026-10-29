@@ -23,8 +23,10 @@ export function remoteFiles(connection: Connection): RemoteFiles {
       }),
     write: (path, bytes, signal) =>
       writeRemoteFile(connection.target, path, bytes, signal ? { signal } : {}),
-    list: (path, signal) =>
-      listRemoteDir(connection.target, path, signal ? { signal } : {}),
+    list: async (path, signal) =>
+      (await listRemoteDir(connection.target, path, signal ? { signal } : {})).map(
+        ({ name, fileType }) => ({ name, isDirectory: fileType === "dir" }),
+      ),
     command: scriptTransport(connection),
   });
 }

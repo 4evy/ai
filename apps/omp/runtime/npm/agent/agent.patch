@@ -48,15 +48,15 @@ diff --git a/dist/types/extensibility/extensions/runner.d.ts b/dist/types/extens
 diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensibility/extensions/types.d.ts
 --- a/dist/types/extensibility/extensions/types.d.ts
 +++ b/dist/types/extensibility/extensions/types.d.ts
-@@ -32,6 +32,7 @@
- import type * as PiCodingAgent from "../../index.js";
+@@ -34,6 +34,7 @@
  import type { LocalProtocolOptions } from "../../internal-urls/local-protocol.js";
+ import type { LoopLimitConfig } from "../../modes/loop-limit.js";
  import type { MemoryRuntimeContext } from "../../memory-backend/index.js";
 +import type { MCPManager } from "../../mcp/manager.js";
  import type { CustomEditor } from "@oh-my-pi/pi-tui/prompt/custom-editor";
  import type { Theme } from "@oh-my-pi/pi-tui/theme";
  import type { NativeToolView } from "@oh-my-pi/pi-tui/tools/renderer";
-@@ -485,6 +486,8 @@
+@@ -494,6 +495,8 @@
      sessionManager: ReadonlySessionManager;
      /** Model registry for API key resolution */
      modelRegistry: ModelRegistry;
@@ -65,7 +65,7 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
      /** Calling session's `local://` root mapping for external tool bridges. */
      localProtocolOptions?: LocalProtocolOptions;
      /** Current model (may be undefined) */
-@@ -1356,8 +1359,13 @@
+@@ -1453,8 +1456,13 @@
      setActiveTools(toolNames: string[]): Promise<void>;
      /** Get available slash commands in the current session. */
      getCommands(): SlashCommandInfo[];
@@ -81,7 +81,7 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
      /** Get current thinking level. */
      getThinkingLevel(): ThinkingLevel | undefined;
      /** Set thinking level for the current session. */
-@@ -1551,7 +1559,7 @@
+@@ -1648,7 +1656,7 @@
  export type GetAllToolsHandler = () => ToolInfo[];
  export type GetCommandsHandler = () => SlashCommandInfo[];
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
@@ -176,7 +176,7 @@ diff --git a/dist/types/modes/components/extensions/mcp-runtime.d.ts b/dist/type
 diff --git a/dist/types/session/agent-session-types.d.ts b/dist/types/session/agent-session-types.d.ts
 --- a/dist/types/session/agent-session-types.d.ts
 +++ b/dist/types/session/agent-session-types.d.ts
-@@ -384,6 +384,8 @@
+@@ -390,6 +390,8 @@
      advisorConfigWarnings?: string[];
      /** Disconnect the MCP manager owned by this session during disposal. */
      disconnectOwnedMcpManager?: () => Promise<void>;
@@ -188,7 +188,7 @@ diff --git a/dist/types/session/agent-session-types.d.ts b/dist/types/session/ag
 diff --git a/dist/types/session/agent-session.d.ts b/dist/types/session/agent-session.d.ts
 --- a/dist/types/session/agent-session.d.ts
 +++ b/dist/types/session/agent-session.d.ts
-@@ -1048,6 +1048,7 @@
+@@ -1123,6 +1123,7 @@
          selector?: string;
          thinkingLevel?: ThinkingLevel;
          persist?: boolean;
@@ -410,7 +410,7 @@ diff --git a/src/extensibility/extensions/runner.ts b/src/extensibility/extensio
  	#uiContext: ExtensionUIContext;
  	#mode: ExtensionMode = "print";
  	#toolApprovalPreviewWaiter?: (toolCallId: string) => Promise<void>;
-@@ -1487,6 +1488,7 @@
+@@ -1491,6 +1492,7 @@
  			cwd: this.cwd,
  			sessionManager: this.sessionManager,
  			modelRegistry: this.modelRegistry,
@@ -421,15 +421,15 @@ diff --git a/src/extensibility/extensions/runner.ts b/src/extensibility/extensio
 diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extensions/types.ts
 --- a/src/extensibility/extensions/types.ts
 +++ b/src/extensibility/extensions/types.ts
-@@ -81,6 +81,7 @@
- import type * as PiCodingAgent from "../../index";
+@@ -83,6 +83,7 @@
  import type { LocalProtocolOptions } from "../../internal-urls/local-protocol";
+ import type { LoopLimitConfig } from "../../modes/loop-limit";
  import type { MemoryRuntimeContext } from "../../memory-backend";
 +import type { MCPManager } from "../../mcp/manager";
  import type { CustomEditor } from "@oh-my-pi/pi-tui/prompt/custom-editor";
  import type { Theme } from "@oh-my-pi/pi-tui/theme";
  import type { NativeToolView } from "@oh-my-pi/pi-tui/tools/renderer";
-@@ -687,6 +688,8 @@
+@@ -696,6 +697,8 @@
  	sessionManager: ReadonlySessionManager;
  	/** Model registry for API key resolution */
  	modelRegistry: ModelRegistry;
@@ -438,7 +438,7 @@ diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extension
  	/** Calling session's `local://` root mapping for external tool bridges. */
  	localProtocolOptions?: LocalProtocolOptions;
  	/** Current model (may be undefined) */
-@@ -1891,8 +1894,11 @@
+@@ -1966,8 +1969,11 @@
  	/** Get available slash commands in the current session. */
  	getCommands(): SlashCommandInfo[];
  
@@ -452,7 +452,7 @@ diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extension
  
  	/** Get current thinking level. */
  	getThinkingLevel(): ThinkingLevel | undefined;
-@@ -2123,7 +2129,7 @@
+@@ -2198,7 +2204,7 @@
  
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
  
@@ -889,7 +889,7 @@ diff --git a/src/modes/acp/acp-agent.ts b/src/modes/acp/acp-agent.ts
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
  import { parseSkillInvocation } from "../../extensibility/skills";
  import { PYTHON_KERNEL_CANCEL_BUDGET_MS } from "../../eval/py/kernel";
-@@ -2990,14 +2990,7 @@
+@@ -2992,14 +2992,7 @@
  				getAllTools: () => record.session.getAllToolInfos(),
  				setActiveTools: toolNames => record.session.setActiveToolsByName(toolNames),
  				getCommands: () => getSessionSlashCommands(record.session),
@@ -950,7 +950,7 @@ diff --git a/src/modes/controllers/extension-ui-controller.ts b/src/modes/contro
  			getThinkingLevel: () => this.ctx.session.thinkingLevel,
  			setThinkingLevel: level => this.ctx.session.setThinkingLevel(level),
  			getServiceTiers: () => this.ctx.session.serviceTierByFamily,
-@@ -459,12 +455,7 @@
+@@ -460,12 +456,7 @@
  			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
  			getAllTools: () => this.ctx.session.getAllToolInfos(),
  			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
@@ -1000,7 +1000,7 @@ diff --git a/src/modes/runtime-init.ts b/src/modes/runtime-init.ts
 diff --git a/src/sdk.ts b/src/sdk.ts
 --- a/src/sdk.ts
 +++ b/src/sdk.ts
-@@ -3528,6 +3528,7 @@
+@@ -3534,6 +3534,7 @@
  			}),
  			createAnnotationsAPI,
  		);
@@ -1008,7 +1008,7 @@ diff --git a/src/sdk.ts b/src/sdk.ts
  		// A dialog waits for the user, not the agent: the session lets the display sleep while one is open.
  		const trackUserWait: UserWaitTracker = dialog => (hasSession ? session.waitForUser(dialog) : dialog());
  		extensionRunner.setUserWaitTracker(trackUserWait);
-@@ -4930,6 +4931,7 @@
+@@ -4946,6 +4947,7 @@
  				hostMcpServerInstructions = source;
  			},
  			disconnectOwnedMcpManager: ownedMcpManager ? () => ownedMcpManager.disconnectAll() : undefined,
@@ -1019,7 +1019,7 @@ diff --git a/src/sdk.ts b/src/sdk.ts
 diff --git a/src/session/agent-session-types.ts b/src/session/agent-session-types.ts
 --- a/src/session/agent-session-types.ts
 +++ b/src/session/agent-session-types.ts
-@@ -407,6 +407,8 @@
+@@ -413,6 +413,8 @@
  	advisorConfigWarnings?: string[];
  	/** Disconnect the MCP manager owned by this session during disposal. */
  	disconnectOwnedMcpManager?: () => Promise<void>;
@@ -1031,7 +1031,7 @@ diff --git a/src/session/agent-session-types.ts b/src/session/agent-session-type
 diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
 --- a/src/session/agent-session.ts
 +++ b/src/session/agent-session.ts
-@@ -1124,6 +1124,7 @@
+@@ -1170,6 +1170,7 @@
  	#sideStreamFn: StreamFn;
  	#convertToLlm: (messages: AgentMessage[]) => Message[] | Promise<Message[]>;
  	#disconnectOwnedMcpManager: (() => Promise<void>) | undefined;
@@ -1039,7 +1039,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  
  	readonly #ttsr: TtsrCoordinator;
  	readonly #stats: SessionStatsTracker;
-@@ -2323,6 +2324,7 @@
+@@ -2454,6 +2455,7 @@
  			skillsReloadable: config.skillsReloadable,
  		});
  		this.#disconnectOwnedMcpManager = config.disconnectOwnedMcpManager;
@@ -1047,7 +1047,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  		const ttsrHost: TtsrCoordinatorHost = {
  			agent: this.agent,
  			sessionManager: this.sessionManager,
-@@ -5551,6 +5553,9 @@
+@@ -5710,6 +5712,9 @@
  		// `yielded` alone also covers queued steer/follow-up and IRC continuations,
  		// which `#flushPendingAgentEnd` re-tags non-terminal.
  		const awaitingAsyncWork = options?.willContinue === true && options.awaitingAsyncWork === true;
@@ -1057,7 +1057,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  		await this.#emitSessionEvent({
  			...event,
  			isTerminal: !options?.willContinue,
-@@ -6143,7 +6148,7 @@
+@@ -6305,7 +6310,7 @@
  		try {
  			await withTimeout(
  				this.#disconnectOwnedMcpManager(),
@@ -1066,7 +1066,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  				"Timed out disconnecting owned MCP manager during dispose",
  			);
  		} catch (error) {
-@@ -11207,6 +11212,7 @@
+@@ -11534,6 +11539,7 @@
  			selector?: string;
  			thinkingLevel?: ThinkingLevel;
  			persist?: boolean;
@@ -1155,15 +1155,15 @@ diff --git a/src/ssh/connection-manager.ts b/src/ssh/connection-manager.ts
 diff --git a/src/ssh/file-transfer.ts b/src/ssh/file-transfer.ts
 --- a/src/ssh/file-transfer.ts
 +++ b/src/ssh/file-transfer.ts
-@@ -6,6 +6,7 @@
-  * `ssh://` reads/writes round-trip exactly — leading/trailing whitespace, tabs,
-  * and final newlines are preserved.
+@@ -8,6 +8,7 @@
   */
+ import { type ShellFsDirEntry, ShellFsFileType } from "@oh-my-pi/pi-natives";
+ import { ConcatSink, ptree } from "@oh-my-pi/pi-utils";
 +import { createFileTransfer } from "./transfer-compression";
- import { ptree } from "@oh-my-pi/pi-utils";
  import { buildRemoteCommand, ensureConnection, ensureHostInfo, type SSHConnectionTarget } from "./connection-manager";
  import { quotePosixArgument } from "../utils/shell-quote";
-@@ -73,15 +74,13 @@
+ import { wrapInPosixShell } from "./utils";
+@@ -104,15 +105,13 @@
  	remotePath: string,
  	opts: RemoteFileReadOptions,
  ): Promise<RemoteFileReadResult> {
@@ -1184,7 +1184,7 @@ diff --git a/src/ssh/file-transfer.ts b/src/ssh/file-transfer.ts
  	const truncated = raw.length > opts.maxBytes;
  	return { bytes: truncated ? raw.subarray(0, opts.maxBytes) : raw, truncated };
  }
-@@ -120,6 +119,7 @@
+@@ -151,6 +150,7 @@
  	if (remotePath.endsWith("/")) {
  		throw new Error("ssh://: destination is a directory path (trailing '/'); ssh:// write requires a file path");
  	}
@@ -1192,7 +1192,7 @@ diff --git a/src/ssh/file-transfer.ts b/src/ssh/file-transfer.ts
  	const dest = quotePosixArgument(remotePath);
  	const tmp = quotePosixArgument(`${remotePath}.omp-tmp.${crypto.randomUUID()}`);
  	// Stage stdin into the temp first (so the remote never blocks on an unread
-@@ -135,18 +135,13 @@
+@@ -166,18 +166,13 @@
  	const command =
  		`t=${tmp}; trap 'rm -f -- "$t"' 0; ` +
  		`mkdir -p -- "$(dirname "$t")" && ` +

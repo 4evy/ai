@@ -37,7 +37,7 @@ diff --git a/packages/coding-agent/src/session/model-controls.ts b/packages/codi
 diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
 --- a/packages/coding-agent/src/session/agent-session.ts
 +++ b/packages/coding-agent/src/session/agent-session.ts
-@@ -11212,6 +11212,7 @@
+@@ -11534,6 +11534,7 @@
  			selector?: string;
  			thinkingLevel?: ThinkingLevel;
  			persist?: boolean;
@@ -82,7 +82,7 @@ diff --git a/packages/coding-agent/src/modes/controllers/extension-ui-controller
  			getThinkingLevel: () => this.ctx.session.thinkingLevel,
  			setThinkingLevel: level => this.ctx.session.setThinkingLevel(level),
  			getServiceTiers: () => this.ctx.session.serviceTierByFamily,
-@@ -459,12 +455,7 @@
+@@ -460,12 +456,7 @@
  			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
  			getAllTools: () => this.ctx.session.getAllToolInfos(),
  			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
@@ -141,7 +141,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/loader.ts b/pack
 diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packages/coding-agent/src/extensibility/extensions/types.ts
 --- a/packages/coding-agent/src/extensibility/extensions/types.ts
 +++ b/packages/coding-agent/src/extensibility/extensions/types.ts
-@@ -1894,8 +1894,11 @@
+@@ -1966,8 +1966,11 @@
  	/** Get available slash commands in the current session. */
  	getCommands(): SlashCommandInfo[];
  
@@ -155,7 +155,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packa
  
  	/** Get current thinking level. */
  	getThinkingLevel(): ThinkingLevel | undefined;
-@@ -2126,7 +2129,7 @@
+@@ -2198,7 +2201,7 @@
  
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
  
@@ -176,7 +176,7 @@ diff --git a/packages/coding-agent/src/modes/acp/acp-agent.ts b/packages/coding-
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
  import { parseSkillInvocation } from "../../extensibility/skills";
  import { PYTHON_KERNEL_CANCEL_BUDGET_MS } from "../../eval/py/kernel";
-@@ -2990,14 +2990,7 @@
+@@ -2992,14 +2992,7 @@
  				getAllTools: () => record.session.getAllToolInfos(),
  				setActiveTools: toolNames => record.session.setActiveToolsByName(toolNames),
  				getCommands: () => getSessionSlashCommands(record.session),

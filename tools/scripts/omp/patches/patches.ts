@@ -11,7 +11,7 @@ import { formatMessage } from "@optique/core/message";
 import { multiple } from "@optique/core/modifiers";
 import { parseSync } from "@optique/core/parser";
 import { flag } from "@optique/core/primitives";
-import { applyPatch, formatPatch, structuredPatch } from "diff";
+import { applyPatch, formatPatch, parsePatch, structuredPatch } from "diff";
 import { Effect } from "effect";
 import {
   applyProfileEffect as applyProfile,
@@ -224,6 +224,41 @@ const downloadSource = Effect.fnUntraced(function* (
   );
 });
 
+const checkSourcePatches = Effect.fnUntraced(function* (pristine: string) {
+  for (const name of (yield* files(join(runtimeRoot, "patches"))).filter((file) =>
+    file.endsWith(".patch"),
+  )) {
+    const content = yield* attempt((signal) =>
+      readFile(join(runtimeRoot, "patches", name), { encoding: "utf8", signal }),
+    );
+    for (const patch of parsePatch(content)) {
+      const file = patch.oldFileName?.replace(/^a\//, "");
+      if (!file) return yield* Effect.fail(new Error(`Missing source path in ${name}`));
+      const source = (yield* bytes(join(pristine, file)))?.toString("utf8") ?? "";
+      const lines = source.split("\n");
+      for (const hunk of patch.hunks) {
+        const expected = hunk.lines
+          .filter((line) => line.startsWith(" ") || line.startsWith("-"))
+          .map((line) => line.slice(1));
+        const start = Math.max(0, hunk.oldStart - 1);
+        if (expected.some((line, index) => lines[start + index] !== line))
+          return yield* Effect.fail(
+            new Error(`Stale source hunk in ${name}: ${file}:${hunk.oldStart}`),
+          );
+      }
+      if (
+        applyPatch(source, patch, {
+          fuzzFactor: 0,
+          autoConvertLineEndings: false,
+        }) === false
+      )
+        return yield* Effect.fail(
+          new Error(`Source patch is not independently applicable: ${name}: ${file}`),
+        );
+    }
+  }
+});
+
 const syncPatchesEffect = Effect.fnUntraced(function* (options: {
   version?: string;
   archive?: string;
@@ -251,6 +286,7 @@ const syncPatchesEffect = Effect.fnUntraced(function* (options: {
     )).version !== version
   )
     return yield* Effect.fail(new Error("OMP source version mismatch"));
+  yield* checkSourcePatches(pristine);
   yield* attempt(() => cp(pristine, patched, { recursive: true }), {
     awaitOnInterrupt: true,
   });

@@ -6,6 +6,6 @@ set default-list
 sync:
     bun tools/scripts/omp/patches/patches.ts
 
-# Verify runtime patches against the pinned upstream source
+# Verify independent source hunks, both profiles, and generated npm patches
 check:
-    bun tools/scripts/omp/runtime/runtime.ts --check-patches
+    bun tools/scripts/omp/patches/patches.ts --check

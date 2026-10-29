@@ -109,6 +109,7 @@ await writeJson(sourcePath, {
 
 for (const name of [
   "package.json",
+  "apps/chatgpt/package.json",
   "apps/omp/package.json",
   "apps/omp/runtime/upstream/package.json",
   "farstep/package.json",

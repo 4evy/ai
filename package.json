@@ -12,7 +12,7 @@
     "@ai/toolkit": "workspace:*",
     "diff": "9.0.0",
     "atomically": "2.1.1",
-    "@oh-my-pi/pi-utils": "18.13.1"
+    "@oh-my-pi/pi-utils": "18.13.3"
   },
   "devDependencies": {
     "@actions/core": "3.0.1",
@@ -26,8 +26,8 @@
     "vite": "catalog:"
   },
   "patchedDependencies": {
-    "@oh-my-pi/pi-coding-agent@18.13.1": "apps/omp/runtime/npm/agent/agent.patch",
-    "@oh-my-pi/pi-tui@18.13.1": "apps/omp/runtime/npm/tui/tui.patch"
+    "@oh-my-pi/pi-coding-agent@18.13.3": "apps/omp/runtime/npm/agent/agent.patch",
+    "@oh-my-pi/pi-tui@18.13.3": "apps/omp/runtime/npm/tui/tui.patch"
   },
   "private": true,
   "packageManager": "bun@1.4.4",

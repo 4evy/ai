@@ -250,18 +250,6 @@ diff --git a/src/theme/theme-schema.json b/src/theme/theme-schema.json
  		"colors": {
  			"type": "object",
  			"description": "Theme color definitions (all required except thinkingMax and assistantMessageText)",
-@@ -466,10 +473,7 @@
- 								}
- 							},
- 							"additionalProperties": false,
--							"anyOf": [
--								{ "required": ["status"] },
--								{ "required": ["activity"] }
--							]
-+							"anyOf": [{ "required": ["status"] }, { "required": ["activity"] }]
- 						}
- 					]
- 				}
 diff --git a/src/tools/todo.ts b/src/tools/todo.ts
 --- a/src/tools/todo.ts
 +++ b/src/tools/todo.ts

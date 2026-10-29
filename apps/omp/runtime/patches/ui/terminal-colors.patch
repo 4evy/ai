@@ -1,0 +1,14 @@
+diff --git a/packages/tui/src/theme/loader.ts b/packages/tui/src/theme/loader.ts
+--- a/packages/tui/src/theme/loader.ts
++++ b/packages/tui/src/theme/loader.ts
+@@ -175,6 +175,10 @@
+ 			fgColors[key as ThemeColor] = value;
+ 		}
+ 	}
++	// Keep tool frames and state colors, but inherit the terminal background
++	bgColors.toolPendingBg = "";
++	bgColors.toolSuccessBg = "";
++	bgColors.toolErrorBg = "";
+ 	// Extract symbol configuration - settings override takes precedence over theme
+ 	const symbolPreset: SymbolPreset = symbolPresetOverride ?? themeJson.symbols?.preset ?? "unicode";
+ 	const symbolOverrides = themeJson.symbols?.overrides ?? {};

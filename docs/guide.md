@@ -436,11 +436,16 @@ dependency of every component build.
 | Refresh flake inputs                        | `nix flake update`                                                     |
 
 Keep OMP patches small, independently applicable, and zero-fuzz. Prefer
-extensions for tools and presentation. Leave upstream branches intact when a
-narrow hook suffices, and regenerate edited hunks against the pinned source
-rather than retaining coordinates from earlier releases. After an upgrade,
-check a fresh interactive launch and first message. Inspect launcher stderr
-for fallback to an older cached runtime. See
+extensions for tools and presentation. The
+[profiles](../apps/omp/runtime/profiles.json) separate shared SDK hooks from
+runtime-only preferences. Keep HUD, tool-card, clipboard, keybinding-tip, and
+terminal-color changes in their own patches.
+
+`just omp patches check` verifies source hunks at their exact pinned
+coordinates, applies both profiles, and checks generated npm patches. Regenerate
+edited hunks against pristine source rather than retaining coordinates from
+earlier releases. After an upgrade, check a fresh interactive launch and first
+message. Inspect launcher stderr for fallback to an older cached runtime. See
 [patch maintenance](../tools/scripts/omp/patches/patches.ts) and
 [runtime launch](../tools/scripts/omp/runtime/launch.ts).
 
