@@ -2,8 +2,8 @@
   lib,
   bun,
   replaceVars,
-  cmake,
-  qt6,
+  farstep-extensions,
+  farstep-kde-bridge,
   kdePackages,
   gjs,
   coreutils,
@@ -11,7 +11,6 @@
   hyprland,
   grim,
   sway-unwrapped,
-  pkg-config,
   dbus,
   util-linux,
   zstd,
@@ -19,17 +18,13 @@
   ...
 }:
 {
-  nativeBuildInputs = {
-    inherit cmake pkg-config;
-    inherit (qt6) wrapQtAppsHook;
-  };
-  buildInputs = [
-    kdePackages.kwin
-    qt6.qtdeclarative
-  ];
+  nativeBuildInputs = { };
+  buildInputs = [ ];
   installScript = replaceVars ../packaging/install/linux.sh {
     BUN = lib.meta.getExe bun;
     DESKTOP = lib.meta.getExe' desktop "farstep-desktop";
+    EXTENSIONS = farstep-extensions;
+    KDE_BRIDGE = farstep-kde-bridge;
     SWAY = lib.meta.getExe' sway-unwrapped "sway";
     GRIM = lib.meta.getExe grim;
     GJS_BINARY = lib.meta.getExe gjs;

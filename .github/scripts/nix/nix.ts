@@ -74,7 +74,13 @@ switch (task) {
   case "package": {
     const name = choice("PACKAGE", [
       "ai-javascript",
-      "farstep-native",
+      "ai-core",
+      "farstep-modules",
+      "farstep-javascript",
+      "farstep-desktop",
+      "farstep-service",
+      "farstep-extensions",
+      "farstep-kde-bridge",
       "ai-configs",
       "farstep",
     ]);
@@ -90,9 +96,8 @@ switch (task) {
       artifact,
       `.#packages.${system}.${name}`,
     ]);
-    if (name === "farstep-native") {
-      for (const executable of ["farstep-desktop", "farstep-service"])
-        await run([join(artifact, "bin", executable), "--help"]);
+    if (name === "farstep-desktop" || name === "farstep-service") {
+      await run([join(artifact, "bin", name), "--help"]);
     } else if (name === "ai-configs") {
       const manifest = await Bun.file(join(artifact, "manifest.json")).json();
       if (

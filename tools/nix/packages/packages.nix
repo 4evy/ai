@@ -26,6 +26,8 @@ let
         inherit (pkgs) bun;
       };
       bun2nix = bunTools;
+      ai-javascript-dependencies = self.callPackage ../javascript/dependencies.nix { };
+      ai-core = self.callPackage ../javascript/core.nix { };
       ai-javascript = self.callPackage ../javascript/javascript.nix { };
       ghidra-bin = (pkgs.ghidra-bin.override { openjdk21 = pkgs.openjdk25; }).overrideAttrs (old: {
         inherit (ghidraNative.ghidra) version;
@@ -58,7 +60,11 @@ let
           self.ghidra-windows-api-types
         ];
       };
-      farstep-native = self.callPackage ../../../farstep/nix/native.nix { };
+      farstep-desktop = self.callPackage ../../../farstep/nix/native.nix { };
+      farstep-service = self.callPackage ../../../farstep/nix/service.nix { };
+      farstep-javascript = self.callPackage ../../../farstep/nix/javascript.nix { };
+      farstep-modules = self.farstep-javascript.modules;
+      ai-app-modules = self.ai-javascript.modules;
       ai-tools = self.callPackage ../../runtime/runtime.nix { };
       farstep = self.callPackage ../../../farstep {
         farstep-sky = self.farstep-sky or null;
@@ -69,6 +75,10 @@ let
       ghidra-mcp-headless = self.ghidra-mcp.headless;
       ghidra-mcp-extension = self.ghidra-mcp.extension;
       powershell-analyzer = self.callPackage ../fmt/analyzer.nix { };
+    }
+    // pkgs.lib.attrsets.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+      farstep-extensions = self.callPackage ../../../farstep/nix/extensions.nix { };
+      farstep-kde-bridge = self.callPackage ../../../farstep/nix/bridge.nix { };
     }
     //
       pkgs.lib.attrsets.optionalAttrs

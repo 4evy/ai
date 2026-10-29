@@ -21,9 +21,6 @@
   libxkbcommon,
   xkeyboard_config,
   wayland,
-  bash,
-  coreutils,
-  nix,
 }:
 let
   source = import ../../tools/nix/source/source.nix { inherit lib; };
@@ -59,6 +56,7 @@ rustPlatform.buildRustPackage {
   pname = "farstep-desktop";
   inherit (metadata) version;
   src = source [
+    # Keep workspace metadata for locked resolution, not unrelated implementations
     ../../Cargo.toml
     ../../Cargo.lock
     ../native/protocol
@@ -68,7 +66,6 @@ rustPlatform.buildRustPackage {
     ../native/desktop/build.rs
     ../native/desktop/src
     ../native/service/Cargo.toml
-    ../native/service/src
   ];
   cargoDeps = callPackage ./cargo-deps.nix { };
   postPatch = lib.strings.optionalString stdenv.hostPlatform.isDarwin ''
@@ -77,10 +74,9 @@ rustPlatform.buildRustPackage {
         'lib/farstep/farstep/runtime/main.js'
   '';
   cargoBuildFlags = [
+    "--locked"
     "--package"
     "farstep-desktop"
-    "--package"
-    "farstep-service"
   ];
   nativeBuildInputs = lib.attrsets.attrValues (
     {
@@ -89,16 +85,7 @@ rustPlatform.buildRustPackage {
     // lib.attrsets.optionalAttrs stdenv.hostPlatform.isDarwin { inherit clang swift; }
   );
   buildInputs = nativeInputs;
-  env = {
-    FARSTEP_SERVICE_PATH = lib.strings.makeBinPath [
-      bash
-      coreutils
-      nix
-    ];
-    FARSTEP_NIX_STORE = lib.meta.getExe' nix "nix-store";
-    FARSTEP_STORE_DIR = builtins.storeDir;
-  };
-  # These crates have no test suites; keep Cargo from rebuilding them for checks
+  # This package has no test suite; keep Cargo from rebuilding it for checks
   doCheck = false;
   postInstall = lib.strings.optionalString linux ''
     wrapProgram "$out/bin/farstep-desktop" \
@@ -114,7 +101,7 @@ rustPlatform.buildRustPackage {
       }"
   '';
   meta = {
-    description = "Native desktop automation and machine service executables";
+    description = "Native desktop automation executable";
     homepage = "https://github.com/4evy/ai";
     license = lib.licenses.mit;
     maintainers = [ lib.maintainers._4evy ];

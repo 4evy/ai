@@ -8,6 +8,10 @@ license.workspace = true
 [lints]
 workspace = true
 
+[[bin]]
+name = "farstep-service"
+path = "src/main.rs"
+
 [dependencies]
 process-wrap = { workspace = true, features = [
   "tokio1",

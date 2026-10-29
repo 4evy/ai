@@ -4,15 +4,16 @@
   callPackage,
   makeBinaryWrapper,
   replaceVars,
-  ai-javascript,
-  farstep-native,
+  farstep-javascript,
+  farstep-desktop,
+  farstep-service,
   farstep-sky ? null,
   nix,
 }:
 let
   metadata = lib.trivial.importJSON ./package.json;
   source = import ../tools/nix/source/source.nix { inherit lib; };
-  desktop = farstep-native;
+  desktop = farstep-desktop;
   platform = callPackage (if stdenv.hostPlatform.isLinux then ./nix/linux.nix else ./nix/darwin.nix) {
     inherit desktop;
     inherit (metadata) version;
@@ -23,7 +24,12 @@ stdenv.mkDerivation {
   inherit (metadata) version;
   src = source [
     ./manifest.json
-    ./native/desktop/platform
+    (
+      if stdenv.hostPlatform.isLinux then
+        lib.fileset.fileFilter (file: file.hasExt "in") ./native/desktop/platform/linux
+      else
+        ./native/desktop/platform/macos/Info.plist
+    )
   ];
   postUnpack = ''
     sourceRoot="$sourceRoot/farstep"
@@ -32,16 +38,14 @@ stdenv.mkDerivation {
     { inherit makeBinaryWrapper; } // platform.nativeBuildInputs
   );
   inherit (platform) buildInputs postFixup;
-  dontUseCmakeConfigure = true;
-  dontWrapQtApps = true;
   dontConfigure = true;
   dontBuild = true;
   strictDeps = true;
   dontStrip = stdenv.hostPlatform.isDarwin;
 
   installPhase = ''
-    source ${replaceVars ./packaging/install/install.sh { JAVASCRIPT = ai-javascript; }}
-    cp ${desktop}/bin/farstep-service "$out/bin/farstep-service"
+    source ${replaceVars ./packaging/install/install.sh { JAVASCRIPT = farstep-javascript; }}
+    ln -s ${farstep-service}/bin/farstep-service "$out/bin/farstep-service"
     source ${platform.installScript}
     ${lib.strings.optionalString (farstep-sky != null) ''
       ln -s ${farstep-sky} "$out/share/farstep/sky"
@@ -57,6 +61,8 @@ stdenv.mkDerivation {
 
   passthru = {
     inherit desktop;
+    service = farstep-service;
+    javascript = farstep-javascript;
     nativeInputs = desktop.buildInputs;
     skyRuntime = farstep-sky;
   };
@@ -64,7 +70,7 @@ stdenv.mkDerivation {
     description = "Agent jobs, coordination, and desktop automation";
     homepage = "https://github.com/4evy/ai";
     license = lib.licenses.mit;
-    inherit (ai-javascript.meta) sourceProvenance;
+    inherit (farstep-javascript.meta) sourceProvenance;
     maintainers = [ lib.maintainers._4evy ];
     platforms = [
       "x86_64-linux"

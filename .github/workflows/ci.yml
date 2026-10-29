@@ -81,7 +81,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [ai-javascript, farstep-native, ai-configs, farstep]
+        package: [ai-javascript, ai-core, farstep-modules, farstep-javascript, farstep-desktop, farstep-service, ai-configs, farstep]
         platform:
           - runner: ubuntu-26.04
             system: x86_64-linux
@@ -89,6 +89,15 @@ jobs:
             system: aarch64-linux
           - runner: macos-26
             system: aarch64-darwin
+        include:
+          - package: farstep-extensions
+            platform:
+              runner: ubuntu-26.04
+              system: x86_64-linux
+          - package: farstep-kde-bridge
+            platform:
+              runner: ubuntu-26.04
+              system: x86_64-linux
     uses: $/.github/workflows/nix-check.yml
     permissions:
       contents: read

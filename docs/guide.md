@@ -340,8 +340,10 @@ runtime in the user cache. Use `ai update TOOL` for one tool and `--dry-run` to
 preview package changes. See [setup.ts](../tools/scripts/setup/setup.ts).
 
 Build without installing with `just nix build OUTPUT --no-link`. Outputs include
-`ai-tools`, `ai-javascript`, `farstep`, `farstep-native`, `farstep-sky`,
-`ai-configs`, `chatgpt`, and `ghidra-mcp`.
+`ai-tools`, `ai-javascript`, `ai-core`, `farstep`, `farstep-modules`,
+`farstep-javascript`, `farstep-desktop`, `farstep-service`, `farstep-sky`,
+`ai-configs`, `chatgpt`, and `ghidra-mcp`. Linux also exposes
+`farstep-extensions` and `farstep-kde-bridge`.
 
 For declarative settings, import `ai.homeManagerModules.default`,
 `ai.nixosModules.default`, or `ai.darwinModules.default`. Set
@@ -353,6 +355,52 @@ settings. See [options](../tools/nix/common/common.nix) and the
 
 Activation preserves undeclared writable settings. `just config generate` and
 `just config export` stage settings for inspection, not activation.
+
+### Build Farstep components independently
+
+The [package set](../tools/nix/packages/packages.nix) exposes compilation and
+assembly separately:
+
+| Output                       | Owns                                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------- |
+| `ai-javascript-dependencies` | Frozen external dependency installs, with separate development and production outputs |
+| `ai-core`                    | Compiled core utilities and their runtime dependency links                            |
+| `farstep-modules`            | Farstep TypeScript compilation and adjacent runtime resources                         |
+| `farstep-javascript`         | Runtime assembly of Farstep modules, core, and external dependencies                  |
+| `farstep-desktop`            | Native desktop executable, desktop runtime, and Rust protocol                         |
+| `farstep-service`            | Privileged service executable without desktop implementations                         |
+| `farstep-extensions`         | Linux desktop JavaScript extensions, excluding the KDE C++ bridge                     |
+| `farstep-kde-bridge`         | Independently compiled KWin QML plugin                                                |
+| `farstep`                    | Platform launchers, native executables, desktop assets, and optional Sky payload      |
+| `ai-app-modules`             | Root tooling and app compilation, without recompiling core or Farstep                 |
+| `ai-javascript`              | Aggregate distribution assembled from app, core, and Farstep outputs                  |
+
+For example, `just nix build farstep-service --no-link` builds the service
+without compiling desktop or JavaScript code. Build `farstep-javascript` to
+exercise the runnable JavaScript tree, rather than the compile-only
+`farstep-modules` output.
+
+Source changes propagate through their owning component and its assemblers.
+An OMP implementation edit does not rebuild Farstep. A service implementation
+edit rebuilds the service and final Farstep assembly, not desktop code. An
+extension or bridge edit rebuilds that component and final assembly, not the
+JavaScript runtime. Core implementation edits rebuild core and runtime
+assemblies, not Farstep or app module compilation.
+
+Some coupling remains explicit. JavaScript dependency installation shares the
+root lockfile, dependency declarations, and npm patches. Changes to those
+inputs can invalidate every JavaScript consumer, unlike source-only edits.
+Manifest scripts and exports do not enter the dependency install. Rust builds
+share workspace manifests and `Cargo.lock` for locked resolution, while each
+filtered source includes only its implementation closure. Build-tool changes
+and changes to actual shared dependencies still rebuild their consumers.
+
+The [module compiler](../tools/nix/javascript/modules.nix) selects Vite projects
+with `AI_BUILD_PROJECTS`. The
+[installer](../tools/scripts/vite/install.ts) supports `--modules-only` for
+compilation outputs. Default workspace builds still include distribution
+resources. Typechecking remains a separate workspace CI gate rather than a
+dependency of every component build.
 
 ## Maintain integrations and pins
 
