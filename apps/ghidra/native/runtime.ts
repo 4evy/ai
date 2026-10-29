@@ -6,6 +6,12 @@ import { delimiter, dirname, join } from "node:path";
 import { attempt, run } from "@ai/core/effect/effect";
 import { executeCommand, terminateProcess } from "@ai/core/effect/process/process";
 import { walk } from "@nodelib/fs.walk/promises";
+import { object, or, tuple } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { withDefault } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { argument, command, constant, passThrough } from "@optique/core/primitives";
+import { string } from "@optique/core/valueparser";
 import { writeFile as atomicWrite } from "atomically";
 import { Effect, Schedule } from "effect";
 import {
@@ -200,6 +206,24 @@ const ghidra = Effect.fnUntraced(function* (
 });
 
 export async function launch(action: string, args: string[]): Promise<number> {
+  const direct = ["gui", "analyzeHeadless", "httpd", "bridge"].includes(action);
+  const help = args.includes("--help") || args.includes("-h");
+  const parsed = parseSync(
+    or(
+      ...(["gui", "analyzeHeadless", "httpd", "bridge", "headless"] as const).map(
+        (action) =>
+          command(
+            action,
+            object({
+              action: constant(action),
+              args: withDefault(passThrough({ format: "greedy" }), []),
+            }),
+          ),
+      ),
+    ),
+    [!direct && help ? "bridge" : action, ...args],
+  );
+  if (!parsed.success) throw new Error(formatMessage(parsed.error));
   const receipt = await installed();
   if (!receipt)
     throw new Error("Install the native runtime with ai ghidra install first");
@@ -217,12 +241,10 @@ export async function launch(action: string, args: string[]): Promise<number> {
       Effect.scoped(
         Effect.gen(function* () {
           let child: Bun.Subprocess;
-          const direct = ["gui", "analyzeHeadless", "httpd", "bridge"].includes(action);
-          const help = args.includes("--help") || args.includes("-h");
-          switch (!direct && help ? "bridge" : action) {
+          switch (parsed.value.action) {
             case "gui":
             case "analyzeHeadless":
-              child = yield* ghidra(receipt, action, args, env);
+              child = yield* ghidra(receipt, parsed.value.action, args, env);
               break;
             case "httpd":
               child = yield* server(receipt, args, env);
@@ -292,10 +314,6 @@ export async function launch(action: string, args: string[]): Promise<number> {
               child = yield* bridge(receipt, args, env);
               break;
             }
-            default:
-              return yield* Effect.fail(
-                new Error(`Unknown native Ghidra command: ${action}`),
-              );
           }
           return yield* attempt(() => child.exited);
         }),
@@ -313,7 +331,22 @@ export async function launch(action: string, args: string[]): Promise<number> {
 
 if (import.meta.main) {
   try {
-    process.exitCode = await launch(Bun.argv[2] ?? "", Bun.argv.slice(3));
+    const action = argument(string());
+    const rawAction = {
+      ...action,
+      parse(context: Parameters<typeof action.parse>[0]) {
+        return action.parse({ ...context, optionsTerminated: true });
+      },
+    };
+    const parsed = parseSync(
+      tuple([
+        withDefault(rawAction, ""),
+        withDefault(passThrough({ format: "greedy" }), []),
+      ]),
+      Bun.argv.slice(2),
+    );
+    if (!parsed.success) throw new Error(formatMessage(parsed.error));
+    process.exitCode = await launch(parsed.value[0], [...parsed.value[1]]);
   } catch (error) {
     console.error(
       `ai ghidra: ${error instanceof Error ? error.message : String(error)}`,

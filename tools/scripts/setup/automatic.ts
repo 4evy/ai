@@ -5,6 +5,11 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { errorCode, errorMessage } from "@ai/core/error/error";
 import { tryAcquireFileLock } from "@oh-my-pi/pi-utils/file-lock";
+import { formatMessage } from "@optique/core/message";
+import { withDefault } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { argument } from "@optique/core/primitives";
+import { choice } from "@optique/core/valueparser";
 import { setup } from "./setup";
 
 const directory = join(
@@ -61,9 +66,12 @@ if (
   process.platform === "win32" &&
   process.env.AI_TOOLS_AUTO_UPDATE !== "0"
 ) {
-  const tool = Bun.argv[2] ?? "codex";
-  if (tool !== "codex" && tool !== "claude")
-    throw new Error("Unknown automatic update target");
+  const parsed = parseSync(
+    withDefault(argument(choice(["codex", "claude"] as const)), "codex"),
+    Bun.argv.slice(2),
+  );
+  if (!parsed.success) throw new Error(formatMessage(parsed.error));
+  const tool = parsed.value;
   const attemptPath = join(directory, `${tool}-last-attempt`);
   const lockPath = join(directory, tool);
   await mkdir(directory, { recursive: true });

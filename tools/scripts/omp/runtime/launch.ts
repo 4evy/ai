@@ -1,9 +1,18 @@
 import { fileURLToPath } from "node:url";
 import { errorMessage } from "@ai/core/error/error";
 import { launchProcess } from "@ai/core/process/launch";
+import { formatMessage } from "@optique/core/message";
+import { withDefault } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { passThrough } from "@optique/core/primitives";
 import { buildPinnedRuntime, lastWorking } from "./runtime.ts";
 
-const args = Bun.argv.slice(2);
+const parsed = parseSync(
+  withDefault(passThrough({ format: "greedy" }), []),
+  Bun.argv.slice(2),
+);
+if (!parsed.success) throw new Error(formatMessage(parsed.error));
+const args = parsed.value;
 if (
   args[0] === "update" &&
   !args.some((arg) =>

@@ -1,8 +1,18 @@
 import { join } from "node:path";
+import { formatMessage } from "@optique/core/message";
+import { optional } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { argument } from "@optique/core/primitives";
+import { choice } from "@optique/core/valueparser";
 import * as v from "valibot";
 import { root, run } from "../run/run.ts";
 
-const operation = Bun.argv[2] ?? process.env.TASK;
+const parsed = parseSync(
+  optional(argument(choice(["rust-install", "clippy", "tests"] as const))),
+  Bun.argv.slice(2),
+);
+if (!parsed.success) throw new Error(formatMessage(parsed.error));
+const operation = parsed.value ?? process.env.TASK;
 switch (operation) {
   case "rust-install": {
     const manifest = await Bun.file(join(root, "Cargo.toml")).text();

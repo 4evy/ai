@@ -6,6 +6,11 @@ import { attempt, run as runEffect } from "@ai/core/effect/effect";
 import { temporaryDirectory } from "@ai/core/effect/fs/fs";
 import { errorCode } from "@ai/core/error/error";
 import { packageJsonSchema } from "@ai/core/schema/package";
+import { object } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { multiple } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { flag } from "@optique/core/primitives";
 import { applyPatch, formatPatch, structuredPatch } from "diff";
 import { Effect } from "effect";
 import {
@@ -277,4 +282,11 @@ export function syncPatches(
   return runEffect(syncPatchesEffect(options));
 }
 
-if (import.meta.main) await syncPatches({ check: process.argv.includes("--check") });
+if (import.meta.main) {
+  const parsed = parseSync(
+    object({ check: multiple(flag("--check")) }),
+    Bun.argv.slice(2),
+  );
+  if (!parsed.success) throw new Error(formatMessage(parsed.error));
+  await syncPatches({ check: parsed.value.check.length > 0 });
+}

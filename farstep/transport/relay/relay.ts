@@ -1,6 +1,11 @@
 import { spawn } from "node:child_process";
 import { pipeline } from "node:stream";
 import { Lifetime, run } from "@ai/core/effect/effect";
+import { seq } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { optional, withDefault } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { constant, passThrough, command as subcommand } from "@optique/core/primitives";
 import { Deferred, Effect } from "effect";
 import {
   MAX_REQUEST_BYTES,
@@ -9,9 +14,15 @@ import {
 import { BoundedFrames } from "farstep/transport/bounds";
 import { unzstdFrames, zstdFrames } from "farstep/transport/zstd";
 
-const argv = process.argv.slice(2);
-const compressed = argv[0] === "--wire-codec=zstd";
-if (compressed) argv.shift();
+const parsed = parseSync(
+  seq(
+    optional(subcommand("--wire-codec=zstd", constant(true))),
+    withDefault(passThrough({ format: "greedy" }), []),
+  ),
+  process.argv.slice(2),
+);
+if (!parsed.success) throw new Error(formatMessage(parsed.error));
+const [compressed, argv] = parsed.value;
 const [command, ...args] = argv;
 if (!command) throw new Error("Missing helper relay command");
 await using lifetime = new Lifetime();

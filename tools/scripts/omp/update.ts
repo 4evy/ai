@@ -4,6 +4,11 @@ import { join } from "node:path";
 import { run as runEffect } from "@ai/core/effect/effect";
 import { executeCommand } from "@ai/core/effect/process/process";
 import { packageJsonSchema } from "@ai/core/schema/package";
+import { formatMessage } from "@optique/core/message";
+import { optional } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { argument } from "@optique/core/primitives";
+import { string } from "@optique/core/valueparser";
 import { parsePatch } from "diff";
 import * as Records from "effect/Record";
 import { applyProfile } from "omp-agent-runtime/runtime/profile";
@@ -13,10 +18,16 @@ import { downloadArchive, extractArchive } from "../archive/archive";
 import { syncNixDependencies, writeJson } from "../renovate/process";
 import { syncPatches } from "./patches/patches";
 
+const parsed = parseSync(
+  optional(argument(string({ metavar: "VERSION" }))),
+  Bun.argv.slice(2),
+);
+if (!parsed.success) throw new Error(formatMessage(parsed.error));
+
 const root = join(import.meta.dir, "../../..");
 const sourcePath = join(root, "apps/omp/runtime/source.json");
 const source = v.parse(sourceSchema, await Bun.file(sourcePath).json());
-const version = process.argv[2] ?? source.version;
+const version = parsed.value ?? source.version;
 if (!/^\d+\.\d+\.\d+$/.test(version))
   throw new Error(`Invalid OMP release version: ${version}`);
 const url = `https://codeload.github.com/can1357/oh-my-pi/tar.gz/refs/tags/v${version}`;

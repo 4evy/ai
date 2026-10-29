@@ -1,6 +1,6 @@
 import { extname } from "node:path";
 
-export function processCommand(executable: string, args: string[]): string[] {
+export function processCommand(executable: string, args: readonly string[]): string[] {
   return [".js", ".mjs", ".cjs", ".ts"].includes(extname(executable))
     ? [process.execPath, executable, ...args]
     : [executable, ...args];
@@ -8,7 +8,7 @@ export function processCommand(executable: string, args: string[]): string[] {
 
 export async function launchProcess(
   executable: string,
-  args: string[],
+  args: readonly string[],
   env = process.env,
 ): Promise<number> {
   const command = processCommand(executable, args);

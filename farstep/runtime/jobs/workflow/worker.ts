@@ -2,6 +2,10 @@ import { dirname, join } from "node:path";
 import { attempt, Lifetime, operation, run } from "@ai/core/effect/effect";
 import { postmortem } from "@oh-my-pi/pi-utils";
 import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
+import { formatMessage } from "@optique/core/message";
+import { parseSync } from "@optique/core/parser";
+import { argument, command } from "@optique/core/primitives";
+import { valibot } from "@optique/valibot";
 import { Deferred, Effect, Fiber, FiberMap, FiberSet, Schedule, Scope } from "effect";
 import * as v from "valibot";
 import type { WorkflowStepResult } from "#farstep/protocol/workflow/workflow";
@@ -289,10 +293,16 @@ class WorkflowWorker implements StepContext {
   }
 }
 
-export async function runWorkflow(args: string[]): Promise<void> {
+export async function runWorkflow(args: readonly string[]): Promise<void> {
   const started = performance.now();
-  if (args.length !== 2 || args[0] !== "--record" || !args[1])
-    throw new Error("Invalid managed workflow invocation");
+  const parsed = parseSync(
+    command(
+      "--record",
+      argument(valibot(v.pipe(v.string(), v.nonEmpty()), { placeholder: "" })),
+    ),
+    args,
+  );
+  if (!parsed.success) throw new Error(formatMessage(parsed.error));
   await using lifetime = new Lifetime();
-  await new WorkflowWorker(args[1], lifetime, started).run();
+  await new WorkflowWorker(parsed.value, lifetime, started).run();
 }

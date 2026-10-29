@@ -3,6 +3,12 @@ import { copyFile, mkdir, readdir, readFile } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 import { attempt, run as runEffect } from "@ai/core/effect/effect";
 import { executeCommand } from "@ai/core/effect/process/process";
+import { object, or } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { optional, withDefault } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { argument, command, constant } from "@optique/core/primitives";
+import { choice, string } from "@optique/core/valueparser";
 import { Effect, Struct } from "effect";
 import profiles from "./profiles.json";
 
@@ -164,10 +170,31 @@ export function profileFingerprint(profile: PatchProfile): Promise<string> {
 }
 
 if (import.meta.main) {
-  const [action, tree, profile = "runtime"] = process.argv.slice(2);
-  if (profile !== "runtime" && profile !== "sdk")
-    throw new Error(`Unknown patch profile: ${profile}`);
-  if (action === "--apply" && tree) await applyProfile(tree, profile);
-  else if (action === "--fingerprint") console.log(await profileFingerprint(profile));
-  else throw new Error("Usage: profile.ts --apply TREE [PROFILE] | --fingerprint");
+  const profile = withDefault(argument(choice(["runtime", "sdk"] as const)), "runtime");
+  const parsed = parseSync(
+    or(
+      command(
+        "--apply",
+        object({
+          action: constant("apply"),
+          tree: argument(string()),
+          profile,
+        }),
+      ),
+      command(
+        "--fingerprint",
+        object({
+          action: constant("fingerprint"),
+          tree: optional(argument(string())),
+          profile,
+        }),
+      ),
+    ),
+    process.argv.slice(2),
+  );
+  if (!parsed.success) throw new Error(formatMessage(parsed.error));
+  if (parsed.value.action === "apply") {
+    if (!parsed.value.tree) throw new Error("--apply requires a tree");
+    await applyProfile(parsed.value.tree, parsed.value.profile);
+  } else console.log(await profileFingerprint(parsed.value.profile));
 }

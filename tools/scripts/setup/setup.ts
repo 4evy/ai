@@ -12,6 +12,7 @@ import { installUpstream } from "./upstream/upstream";
 
 const tools = ["codex", "claude", "opencode", "omp"] as const;
 const parser = object({
+  help: multiple(option("-h", "--help")),
   update: multiple(option("--update")),
   dryRun: multiple(option("--dry-run")),
   tools: multiple(
@@ -25,7 +26,9 @@ export async function setup(
   args: string[],
   { background = false }: { background?: boolean } = {},
 ): Promise<void> {
-  if (args.includes("--help") || args.includes("-h")) {
+  const parsed = parseSync(parser, args);
+  if (!parsed.success) throw new Error(formatMessage(parsed.error));
+  if (parsed.value.help.length > 0) {
     console.log("Usage: ai setup|update [codex|claude|opencode|omp ...] [--dry-run]");
     console.log(
       "Codex uses Bun's alpha channel. Claude and OpenCode use Bun's latest releases",
@@ -35,8 +38,6 @@ export async function setup(
     );
     return;
   }
-  const parsed = parseSync(parser, args);
-  if (!parsed.success) throw new Error(formatMessage(parsed.error));
   const update = parsed.value.update.length > 0;
   const dryRun = parsed.value.dryRun.length > 0;
   if (process.platform !== "win32" && !update)

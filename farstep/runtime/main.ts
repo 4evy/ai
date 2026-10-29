@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { flushObservability, operation } from "@ai/core/effect/effect";
 import { errorMessage } from "@ai/core/error/error";
 import { Match } from "effect";
-import { commandHelp, parseCommand } from "./cli/cli";
+import { type Command, parseCommand } from "./cli/cli";
 import { doctor } from "./cli/doctor";
 import { workList } from "./cli/work";
 import { relayDesktop } from "./desktop";
@@ -26,26 +26,24 @@ async function assertActivated(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const native = await platform();
+  const options = parseCommand(process.argv.slice(2));
+  if (options.action === "help") {
+    process.stdout.write(`${options.text}\n`);
+    return;
+  }
   process.umask(0o077);
-  if (process.argv[2] === "deadline") {
-    await runDeadline(process.argv.slice(3));
+  if (options.action === "deadline") {
+    await runDeadline(options.args);
     return;
   }
-  if (process.argv[2] === "workflow") {
-    await runWorkflow(process.argv.slice(3));
+  if (options.action === "workflow") {
+    await runWorkflow(options.args);
     return;
   }
-  const args = process.argv.slice(2);
-  if (args.includes("--help")) {
-    process.stdout.write(commandHelp(args.filter((arg) => arg !== "--help")));
-    return;
-  }
-  const options = parseCommand(args);
+  const native = await platform();
   await executeCommand(options, native);
 }
 
-type Command = ReturnType<typeof parseCommand>;
 type Native = Awaited<ReturnType<typeof platform>>;
 
 async function writeResult(result: unknown): Promise<void> {

@@ -2,6 +2,11 @@ import { readFileSync, statSync } from "node:fs";
 import { isBuiltin } from "node:module";
 import { dirname, relative, resolve } from "node:path";
 import { walkSync } from "@nodelib/fs.walk";
+import { formatMessage } from "@optique/core/message";
+import { multiple } from "@optique/core/modifiers";
+import { parseSync as parseArguments } from "@optique/core/parser";
+import { argument } from "@optique/core/primitives";
+import { string } from "@optique/core/valueparser";
 import { Graph, Option } from "effect";
 import { type Node, parseSync, Visitor } from "oxc-parser";
 import { type ResolveResult, ResolverFactory } from "oxc-resolver";
@@ -204,10 +209,12 @@ function gather(path: string): void {
   }
 }
 
-const roots = Bun.argv.slice(2);
-if (roots.length === 0)
-  throw new Error("Architecture checks require source files or directories");
-for (const path of roots) gather(resolve(root, path));
+const parsedArguments = parseArguments(
+  multiple(argument(string({ metavar: "PATH" })), { min: 1 }),
+  Bun.argv.slice(2),
+);
+if (!parsedArguments.success) throw new Error(formatMessage(parsedArguments.error));
+for (const path of parsedArguments.value) gather(resolve(root, path));
 const graph = new Map<string, Dependency[]>();
 for (const source of pending) {
   const imports = dependencies(source);

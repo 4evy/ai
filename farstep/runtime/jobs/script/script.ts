@@ -12,6 +12,12 @@ import { type Readable, Transform } from "node:stream";
 import { pathToFileURL } from "node:url";
 import { shellFlags } from "@ai/core/shell/flags";
 import { Process } from "@oh-my-pi/pi-natives";
+import { tuple } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { parseSync } from "@optique/core/parser";
+import { argument, command } from "@optique/core/primitives";
+import { choice } from "@optique/core/valueparser";
+import { valibot } from "@optique/valibot";
 import * as v from "valibot";
 import * as zx from "zx";
 import {
@@ -205,15 +211,19 @@ async function runScript(
 }
 
 if (import.meta.main) {
-  const [mode, shell, application, payload, ...extra] = Bun.argv.slice(2);
-  if (
-    mode !== "--script" ||
-    (shell !== "bash" && shell !== "zsh") ||
-    !application?.startsWith("/") ||
-    !payload ||
-    extra.length
-  )
-    throw new Error("Invalid native TypeScript script invocation");
+  const parsed = parseSync(
+    command(
+      "--script",
+      tuple([
+        argument(choice(["bash", "zsh"] as const)),
+        argument(valibot(v.pipe(v.string(), v.startsWith("/")), { placeholder: "/" })),
+        argument(valibot(v.pipe(v.string(), v.nonEmpty()), { placeholder: "{}" })),
+      ]),
+    ),
+    Bun.argv.slice(2),
+  );
+  if (!parsed.success) throw new Error(formatMessage(parsed.error));
+  const [shell, application, payload] = parsed.value;
   const status = await runScript(JSON.parse(payload), shell, application);
   process.exitCode = status;
   if (status !== 0) {

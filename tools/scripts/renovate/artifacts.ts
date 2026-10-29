@@ -1,13 +1,24 @@
+import { object } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { multiple } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { flag } from "@optique/core/primitives";
 import { updateSkylight } from "./checksums";
 import { updateNativeGhidra } from "./native";
 import { run, syncNixDependencies } from "./process";
 import { updateSources } from "./sources";
 
+const parsed = parseSync(
+  object({ toolchainRefreshed: multiple(flag("--toolchain-refreshed")) }),
+  Bun.argv.slice(2),
+);
+if (!parsed.success) throw new Error(formatMessage(parsed.error));
+
 const changed = new Set(
   (await run(["git", "diff", "HEAD", "--name-only"])).split("\n"),
 );
 
-if (!Bun.argv.includes("--toolchain-refreshed")) {
+if (parsed.value.toolchainRefreshed.length === 0) {
   for (const [path, name] of [
     ["tools/nix/javascript/runtime/runtime.nix", "bun"],
     ["tools/nix/fmt/analyzer.nix", "powershell-analyzer"],

@@ -1,5 +1,10 @@
 import { mkdir, rm } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { object } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { multiple } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { flag } from "@optique/core/primitives";
 import { ensureRuntime } from "farstep/runtime/sky/runtime/install";
 import { MODULES, WINDOWS } from "farstep/runtime/sky/runtime/paths";
 import pins from "farstep/runtime/sky/runtime/pins.json";
@@ -159,8 +164,16 @@ export async function writePackage(
 }
 
 if (import.meta.main) {
-  const local = Bun.argv.includes("--check-local");
-  const check = local || Bun.argv.includes("--check");
+  const parsed = parseSync(
+    object({
+      checkLocal: multiple(flag("--check-local")),
+      check: multiple(flag("--check")),
+    }),
+    Bun.argv.slice(2),
+  );
+  if (!parsed.success) throw new Error(formatMessage(parsed.error));
+  const local = parsed.value.checkLocal.length > 0;
+  const check = local || parsed.value.check.length > 0;
   if (!local) await ensureRuntime();
   let generated = await readPackage(
     local ? destination : join(MODULES, "@oai/sky"),

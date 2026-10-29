@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { copyFile, cp, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { formatMessage } from "@optique/core/message";
+import { withDefault } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { argument } from "@optique/core/primitives";
+import { string } from "@optique/core/valueparser";
 import { run } from "../common";
 import { packageMsi } from "./msi/msi";
 
@@ -136,5 +141,11 @@ export async function packageWindows(output: string, release = "1") {
   );
 }
 
-if (import.meta.main)
-  await packageWindows(process.argv[2] || ".generated/farstep-windows");
+if (import.meta.main) {
+  const parsed = parseSync(
+    withDefault(argument(string()), ".generated/farstep-windows"),
+    process.argv.slice(2),
+  );
+  if (!parsed.success) throw new Error(formatMessage(parsed.error));
+  await packageWindows(parsed.value || ".generated/farstep-windows");
+}

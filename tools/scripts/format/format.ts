@@ -5,6 +5,12 @@ import { run } from "@ai/core/effect/effect";
 import { executeCommand } from "@ai/core/effect/process/process";
 import { errorMessage } from "@ai/core/error/error";
 import { readText } from "@ai/core/text/text";
+import { object } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { parseSync } from "@optique/core/parser";
+import { argument, passThrough } from "@optique/core/primitives";
+import { string } from "@optique/core/valueparser";
+import { valibot } from "@optique/valibot";
 import * as v from "valibot";
 
 const kindSchema = v.picklist(["shell", "xml", "text"]);
@@ -232,11 +238,26 @@ function engineArguments(kind: Kind, filename: string, body: string): string[] {
   }
 }
 
-const [kindArgument, executable, ...filenames] = Bun.argv.slice(2);
+const parsed = parseSync(
+  object({
+    kind: argument(valibot<Kind>(kindSchema, { placeholder: "shell" })),
+    executable: argument(string({ metavar: "EXECUTABLE" })),
+    filenames: passThrough({ format: "greedy" }),
+  }),
+  Bun.argv.slice(2),
+);
+if (!parsed.success) {
+  console.error(formatMessage(parsed.error));
+  console.error(
+    readText(new URL("./format.md", import.meta.url), "usage", {
+      KINDS: kindSchema.options.join(", "),
+    }),
+  );
+  process.exit(2);
+}
+const { kind: kindArgument, executable, filenames } = parsed.value;
 if (
-  !v.is(kindSchema, kindArgument) ||
   !executable ||
-  !filenames.length ||
   (kindArgument === "text" ? executable !== "-" : executable === "-")
 ) {
   console.error(

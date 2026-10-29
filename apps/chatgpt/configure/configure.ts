@@ -5,6 +5,9 @@ import { delimiter, dirname, join } from "node:path";
 import { run } from "@ai/core/effect/effect";
 import { executeCommand } from "@ai/core/effect/process/process";
 import { errorMessage } from "@ai/core/error/error";
+import { object } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { parseSync } from "@optique/core/parser";
 import { Effect } from "effect";
 import { MARKETPLACE } from "../plugins/marketplace.ts";
 import { directory, Synchronizer } from "../plugins/sync.ts";
@@ -86,9 +89,9 @@ const patchComputerUse = Effect.fnUntraced(function* (app: string) {
 });
 
 const main = Effect.fnUntraced(function* () {
-  const args = Bun.argv.slice(2);
-  if (args.length) {
-    return yield* Effect.fail(new Error("Usage: ai chatgpt configure"));
+  const parsed = parseSync(object({}), Bun.argv.slice(2));
+  if (!parsed.success) {
+    return yield* Effect.fail(new Error(formatMessage(parsed.error)));
   }
   const resources =
     process.env.CHATGPT_RESOURCES ?? "/Applications/ChatGPT.app/Contents/Resources";

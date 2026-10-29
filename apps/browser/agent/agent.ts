@@ -5,11 +5,11 @@ import { attempt, flushObservability, run } from "@ai/core/effect/effect";
 import { executeCommand } from "@ai/core/effect/process/process";
 import { errorCode, errorMessage } from "@ai/core/error/error";
 import { toError } from "@oh-my-pi/pi-utils/type-guards";
-import { object } from "@optique/core/constructs";
+import { or } from "@optique/core/constructs";
 import { formatMessage } from "@optique/core/message";
-import { optional } from "@optique/core/modifiers";
+import { map, multiple } from "@optique/core/modifiers";
 import { parseSync } from "@optique/core/parser";
-import { option } from "@optique/core/primitives";
+import { command, flag, option, passThrough } from "@optique/core/primitives";
 import { valibot } from "@optique/valibot";
 import { writeFile } from "atomically";
 import { Effect, Schedule } from "effect";
@@ -82,22 +82,38 @@ function parseArguments(
   arguments_: string[],
   configuration: BrowserConfiguration,
 ): Options {
-  const separator = arguments_.indexOf("--");
+  const forwarded = passThrough({ format: "greedy" });
+  // Keep the separator branch active until its entire opaque tail is consumed
+  // Empty tails still complete, even though they cannot be skipped mid-parse
+  const browserArguments = command("--", {
+    ...forwarded,
+    canSkip: (state: readonly string[]) => state.length > 0,
+  });
   const parsed = parseSync(
-    object({
-      browser: optional(option("--browser", pathValue)),
-      refresh: option("--refresh"),
-      help: option("--help", "-h"),
-    }),
-    separator < 0 ? arguments_ : arguments_.slice(0, separator),
+    multiple(
+      or(
+        map(browserArguments, (browserArguments) => ({ browserArguments })),
+        map(option("--browser", pathValue), (browser) => ({ browser })),
+        map(flag("--refresh"), () => ({ refresh: true })),
+        map(flag("--help", "-h"), () => ({ help: true })),
+      ),
+    ),
+    arguments_,
   );
   if (!parsed.success) throw new Error(formatMessage(parsed.error));
-  const values = parsed.value;
+  const values: Partial<Options> = {};
+  for (const value of parsed.value) {
+    for (const key of Object.keys(value)) {
+      if (Object.hasOwn(values, key))
+        throw new Error(`Option specified more than once: ${key}`);
+    }
+    Object.assign(values, value);
+  }
   return {
     browser: values.browser ?? Bun.env[configuration.environmentVariable],
-    browserArguments: separator < 0 ? [] : arguments_.slice(separator + 1),
-    help: values.help,
-    refresh: values.refresh,
+    browserArguments: values.browserArguments ?? [],
+    help: values.help ?? false,
+    refresh: values.refresh ?? false,
   };
 }
 

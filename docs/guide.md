@@ -216,6 +216,17 @@ Farstep management tools and Skylight retain their full arguments in the
 result card. Expand **Args** in native terminals, or expand the result in an
 ordinary terminal. This does not change the model-facing result.
 
+## Parse TypeScript CLI arguments
+
+Use Optique for CLI options, positional arguments, and subcommands. Follow the
+existing [Optique parsers](../farstep/runtime/cli/cli.ts), using `parseSync` or
+`runParserSync` and `formatMessage` for errors. Use defaulted greedy
+`passThrough` for forwarded arguments so downstream flags and literal `--`
+tokens remain intact.
+
+Keep third-party launchers transparent when they do not interpret arguments.
+Validate arguments before starting work or changing machine state.
+
 ## Compose Effect at runtime boundaries
 
 Use the installed Effect version's source and examples under

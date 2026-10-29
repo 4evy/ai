@@ -18,6 +18,12 @@ import { run as runEffect } from "@ai/core/effect/effect";
 import { executeCommand } from "@ai/core/effect/process/process";
 import { errorCode } from "@ai/core/error/error";
 import { packageJsonSchema } from "@ai/core/schema/package";
+import { object, or } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { optional, withDefault } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { argument, constant, flag } from "@optique/core/primitives";
+import { string } from "@optique/core/valueparser";
 import { writeFile } from "atomically";
 import {
   applyProfile,
@@ -238,24 +244,37 @@ export async function buildPinnedRuntime(): Promise<string> {
 }
 
 if (import.meta.main) {
-  const args = process.argv.slice(2);
-  const usage =
-    "Usage: bun tools/scripts/omp/runtime/runtime.ts [--check-patches [VERSION] | --last-working]";
-  switch (args[0]) {
-    case undefined:
+  const parsed = parseSync(
+    withDefault(
+      or(
+        object({
+          mode: constant("check-patches"),
+          check: flag("--check-patches"),
+          version: optional(argument(string({ metavar: "VERSION" }))),
+        }),
+        object({
+          mode: constant("last-working"),
+          lastWorking: flag("--last-working"),
+        }),
+      ),
+      { mode: "build" } as const,
+    ),
+    Bun.argv.slice(2),
+  );
+  if (!parsed.success) throw new Error(formatMessage(parsed.error));
+  switch (parsed.value.mode) {
+    case "build":
       console.log(await buildPinnedRuntime());
       break;
-    case "--last-working":
-      if (args.length !== 1) throw new Error(usage);
+    case "last-working":
       console.log(await lastWorking());
       break;
-    case "--check-patches": {
-      if (args.length > 2) throw new Error(usage);
+    case "check-patches": {
       const pin = v.parse(
         sourceSchema,
         await Bun.file(join(runtimeRoot, "source.json")).json(),
       );
-      const version = args[1] ?? pin.version;
+      const version = parsed.value.version ?? pin.version;
       if (!version || !/^\d+\.\d+\.\d+$/.test(version))
         throw new Error("Invalid OMP version");
       await using directory = await mkdtempDisposable(join(tmpdir(), "omp-check-"));
@@ -267,7 +286,5 @@ if (import.meta.main) {
       console.error(`omp: runtime profile applies cleanly to ${version}`);
       break;
     }
-    default:
-      throw new Error(usage);
   }
 }

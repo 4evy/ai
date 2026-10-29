@@ -1,10 +1,29 @@
 #!/usr/bin/env bun
 import { delimiter, dirname, join, resolve } from "node:path";
 import { isRecord } from "@ai/core/value/value";
+import { tuple } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { withDefault } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { argument, passThrough } from "@optique/core/primitives";
+import { string } from "@optique/core/valueparser";
 import { execProcess } from "../../codex/lib/codex.ts";
 import { MARKETPLACE } from "../plugins/marketplace.ts";
 
-const [resources, defaultHome, ...args] = Bun.argv.slice(2);
+const positional = argument(string());
+// These launcher paths are opaque positional values, even when they start with -
+const rawArgument = {
+  ...positional,
+  parse(context: Parameters<typeof positional.parse>[0]) {
+    return positional.parse({ ...context, optionsTerminated: true });
+  },
+};
+const parsed = parseSync(
+  tuple([rawArgument, rawArgument, withDefault(passThrough({ format: "greedy" }), [])]),
+  Bun.argv.slice(2),
+);
+if (!parsed.success) throw new Error(formatMessage(parsed.error));
+const [resources, defaultHome, args] = parsed.value;
 if (!resources || !defaultHome)
   throw new Error("Usage: bun repl.ts RESOURCES CODEX_HOME [ARGUMENTS...]");
 const codexHome = process.env.CODEX_HOME ?? defaultHome;

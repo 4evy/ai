@@ -1,6 +1,11 @@
 import { readFileSync as readResource } from "node:fs";
 import { chmod, copyFile, mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { formatMessage } from "@optique/core/message";
+import { withDefault } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { argument } from "@optique/core/primitives";
+import { string } from "@optique/core/valueparser";
 import { build, parse } from "plist";
 import { run } from "../common";
 
@@ -74,7 +79,12 @@ export async function stageBundle(repo: string, payload: string, version: string
 
 if (import.meta.main) {
   if (process.platform !== "darwin") throw new Error("Build Farstep.app on macOS");
-  const payload = resolve(process.argv[2] || ".generated/farstep-darwin");
+  const parsed = parseSync(
+    withDefault(argument(string()), ".generated/farstep-darwin"),
+    process.argv.slice(2),
+  );
+  if (!parsed.success) throw new Error(formatMessage(parsed.error));
+  const payload = resolve(parsed.value || ".generated/farstep-darwin");
   const repo = resolve(import.meta.dir, "../../..");
   await stageBundle(repo, payload, "1.0.0");
   console.log(join(payload, "share/Farstep.app"));

@@ -3,6 +3,12 @@ import { dirname, join, resolve } from "node:path";
 import { attempt, run } from "@ai/core/effect/effect";
 import { Process } from "@oh-my-pi/pi-natives";
 import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
+import { seq, tuple } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { map, withDefault } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { argument, command, passThrough } from "@optique/core/primitives";
+import { valibot } from "@optique/valibot";
 import { Deferred, Effect } from "effect";
 import { uuidSchema } from "farstep/protocol/identity";
 import type { JobSpec } from "farstep/protocol/jobs/protocol";
@@ -134,8 +140,8 @@ export async function deadlineEvidence(
   }
 }
 
-export async function runDeadline(args: string[]): Promise<void> {
-  const { path, application, seconds } = deadlineArgs(args);
+export async function runDeadline(args: readonly string[]): Promise<void> {
+  const { path, application, seconds, forwarded } = deadlineArgs(args);
   await privateDirectory(dirname(path));
   const record = v.parse(recordSchema, JSON.parse(await privateRead(path)));
   if (record.evidence.deadlineSeconds !== seconds)
@@ -144,7 +150,7 @@ export async function runDeadline(args: string[]): Promise<void> {
   evidence.startedAt = Date.now();
   await persist(path, record);
   // Inherit the broker's foreground PTY group so interactive reads never SIGTTIN
-  const child = Bun.spawn([application, ...args.slice(7)], {
+  const child = Bun.spawn([application, ...forwarded], {
     stdin: "inherit",
     stdout: "inherit",
     stderr: "inherit",
@@ -243,26 +249,49 @@ export async function runDeadline(args: string[]): Promise<void> {
   process.exitCode = evidence.signalSentAt === undefined ? exitCode : 124;
 }
 
-function deadlineArgs(args: string[]) {
-  if (
-    args[0] !== "--record" ||
-    args[2] !== "--seconds" ||
-    args[4] !== "--application" ||
-    args[6] !== "--"
-  )
-    throw new Error("Invalid managed deadline invocation");
-  const path = args[1];
-  const application = args[5];
-  const seconds = Number(args[3]);
-  if (
-    !path ||
-    resolve(path) !== path ||
-    !application?.startsWith("/") ||
-    !Number.isInteger(seconds) ||
-    seconds <= 0
-  )
-    throw new Error("Invalid managed deadline arguments");
-  return { path, application, seconds };
+const deadlineParser = map(
+  seq(
+    command(
+      "--record",
+      argument(
+        valibot(
+          v.pipe(
+            v.string(),
+            v.nonEmpty(),
+            v.check((path) => resolve(path) === path),
+          ),
+          { placeholder: "/" },
+        ),
+      ),
+    ),
+    command(
+      "--seconds",
+      argument(
+        valibot(v.pipe(v.string(), v.toNumber(), v.integer(), v.minValue(1)), {
+          placeholder: 1,
+        }),
+      ),
+    ),
+    command(
+      "--application",
+      tuple([
+        command("--", withDefault(passThrough({ format: "greedy" }), [])),
+        argument(valibot(v.pipe(v.string(), v.startsWith("/")), { placeholder: "/" })),
+      ]),
+    ),
+  ),
+  ([path, seconds, [forwarded, application]]) => ({
+    path,
+    seconds,
+    application,
+    forwarded,
+  }),
+);
+
+function deadlineArgs(args: readonly string[]) {
+  const parsed = parseSync(deadlineParser, args);
+  if (!parsed.success) throw new Error(formatMessage(parsed.error));
+  return parsed.value;
 }
 type DeadlineEvidence = v.InferOutput<typeof deadlineEvidenceSchema>;
 

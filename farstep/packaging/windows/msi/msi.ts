@@ -4,6 +4,12 @@ import { readdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { render } from "@ai/core/template/template";
 import { escapeXmlAttribute } from "@oh-my-pi/pi-utils/sanitize-text";
+import { tuple } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { parseSync } from "@optique/core/parser";
+import { argument } from "@optique/core/primitives";
+import { valibot } from "@optique/valibot";
+import * as v from "valibot";
 import { run } from "../../common";
 
 const template = readFileSync(new URL("./msi.wxs", import.meta.url), "utf8");
@@ -110,8 +116,12 @@ if (Test-Path -LiteralPath $path) {
 }
 
 if (import.meta.main) {
-  const [payload, version, compiler] = process.argv.slice(2);
-  if (!payload || !version || !compiler)
-    throw new Error("Usage: msi.ts PAYLOAD VERSION WIX");
+  const text = valibot(v.pipe(v.string(), v.nonEmpty()), { placeholder: "" });
+  const parsed = parseSync(
+    tuple([argument(text), argument(text), argument(text)]),
+    process.argv.slice(2),
+  );
+  if (!parsed.success) throw new Error(formatMessage(parsed.error));
+  const [payload, version, compiler] = parsed.value;
   console.log(await packageMsi(payload, version, process.arch, compiler));
 }

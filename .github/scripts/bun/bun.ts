@@ -1,6 +1,15 @@
+import { formatMessage } from "@optique/core/message";
+import { optional } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { command, constant } from "@optique/core/primitives";
 import { choice, run } from "../run/run.ts";
 
-if (Bun.argv[2] === "install") {
+const parsed = parseSync(
+  optional(command("install", constant("install"))),
+  Bun.argv.slice(2),
+);
+if (!parsed.success) throw new Error(formatMessage(parsed.error));
+if (parsed.value === "install") {
   await run([process.execPath, "install", "--frozen-lockfile", "--ignore-scripts"]);
   await run([
     process.execPath,
@@ -10,7 +19,7 @@ if (Bun.argv[2] === "install") {
     "--frozen-lockfile",
     "--ignore-scripts",
   ]);
-} else if (Bun.argv[2] === undefined) {
+} else {
   const task = choice("TASK", [
     "biome",
     "dependencies",
@@ -45,6 +54,4 @@ if (Bun.argv[2] === "install") {
   } else {
     await run([process.execPath, "run", task === "test" ? "test" : `check:${task}`]);
   }
-} else {
-  throw new Error(`Unknown Bun operation: ${Bun.argv[2]}`);
 }

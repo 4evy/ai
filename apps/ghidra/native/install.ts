@@ -2,7 +2,12 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
-import { parseArgs } from "node:util";
+import { object } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { optional, withDefault } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { flag, option } from "@optique/core/primitives";
+import { string } from "@optique/core/valueparser";
 import { writeFile as atomicWrite } from "atomically";
 import { Struct } from "effect";
 import * as v from "valibot";
@@ -20,14 +25,16 @@ import { command } from "./platform.ts";
 import source from "./source.json";
 
 export async function install(args: string[]): Promise<void> {
-  const { values } = parseArgs({
+  const parsed = parseSync(
+    object({
+      directory: optional(option("--directory", string())),
+      force: withDefault(flag("--force"), false),
+      help: withDefault(flag("--help", "-h"), false),
+    }),
     args,
-    options: {
-      directory: { type: "string" },
-      force: { type: "boolean" },
-      help: { type: "boolean", short: "h" },
-    },
-  });
+  );
+  if (!parsed.success) throw new Error(formatMessage(parsed.error));
+  const values = parsed.value;
   if (values.help) {
     console.log(
       "ai ghidra install [--force]\nUnix installs the Nix Ghidra MCP package. Windows also accepts --directory PATH for its private runtime",

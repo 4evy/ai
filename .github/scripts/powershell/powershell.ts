@@ -1,7 +1,16 @@
+import { formatMessage } from "@optique/core/message";
+import { optional } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { command, constant } from "@optique/core/primitives";
 import { choice, run } from "../run/run.ts";
 
+const parsed = parseSync(
+  optional(command("install", constant("install"))),
+  Bun.argv.slice(2),
+);
+if (!parsed.success) throw new Error(formatMessage(parsed.error));
 const shell = choice("POWERSHELL", ["pwsh", "powershell"]);
-switch (Bun.argv[2]) {
+switch (parsed.value) {
   case "install":
     await run([
       shell,
@@ -33,6 +42,4 @@ switch (Bun.argv[2]) {
     `,
     ]);
     break;
-  default:
-    throw new Error(`Unknown PowerShell operation: ${Bun.argv[2]}`);
 }

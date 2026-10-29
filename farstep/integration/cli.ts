@@ -1,8 +1,13 @@
 #!/usr/bin/env bun
-import { parseArgs } from "node:util";
 import { flushObservability } from "@ai/core/effect/effect";
 import { errorMessage } from "@ai/core/error/error";
 import { schemaJsonSchema } from "@ai/core/schema/json";
+import { object } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { optional, withDefault } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { flag, option } from "@optique/core/primitives";
+import { string } from "@optique/core/valueparser";
 import * as v from "valibot";
 import { remoteDefinitions } from "../remote/remote";
 import { ToolClient, toolRequestSchema } from "./client";
@@ -44,15 +49,16 @@ function print(result: unknown) {
 }
 
 async function main() {
-  const { values } = parseArgs({
-    args: Bun.argv.slice(2),
-    strict: true,
-    options: {
-      state: { type: "string" },
-      discover: { type: "boolean" },
-      help: { type: "boolean" },
-    },
-  });
+  const parsed = parseSync(
+    object({
+      state: optional(option("--state", string())),
+      discover: withDefault(flag("--discover"), false),
+      help: withDefault(flag("--help"), false),
+    }),
+    Bun.argv.slice(2),
+  );
+  if (!parsed.success) throw new Error(formatMessage(parsed.error));
+  const values = parsed.value;
   if (values.discover) {
     print(toolCatalog());
     return;

@@ -3,11 +3,17 @@ import { cp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { packageJsonSchema } from "@ai/core/schema/package";
 import { isRecord } from "@ai/core/value/value";
+import { formatMessage } from "@optique/core/message";
+import { parseSync } from "@optique/core/parser";
+import { argument } from "@optique/core/primitives";
+import { string } from "@optique/core/valueparser";
 import * as Records from "effect/Record";
 import * as v from "valibot";
 import { files, manifest, projects, repo } from "./projects.ts";
 
-const destination = process.argv[2];
+const parsed = parseSync(argument(string({ metavar: "DIRECTORY" })), Bun.argv.slice(2));
+if (!parsed.success) throw new Error(formatMessage(parsed.error));
+const destination = parsed.value;
 if (!destination) throw new Error("Usage: bun tools/scripts/vite/install.ts DIRECTORY");
 const output = resolve(destination);
 

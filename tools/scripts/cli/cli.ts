@@ -7,6 +7,11 @@ import { run } from "@ai/core/effect/effect";
 import { executeCommand } from "@ai/core/effect/process/process";
 import { errorMessage } from "@ai/core/error/error";
 import { launchProcess } from "@ai/core/process/launch";
+import { object, or, seq } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { map, withDefault } from "@optique/core/modifiers";
+import { type Parser, parseSync } from "@optique/core/parser";
+import { command, constant, flag, passThrough } from "@optique/core/primitives";
 import { installed } from "../../../apps/ghidra/native/common.ts";
 import { launch } from "../../../apps/ghidra/native/runtime.ts";
 
@@ -74,6 +79,54 @@ const routes = [
   })),
 ];
 
+type Route = (typeof routes)[number];
+type Selection =
+  | { kind: "help"; prefix: string[] }
+  | { kind: "run"; route: Route; args: readonly string[] };
+
+function commandParser(prefix: string[] = []): Parser<"sync", Selection> {
+  const selected = routes.filter((route) =>
+    prefix.every((part, index) => route.path[index] === part),
+  );
+  const route = selected.find((route) => route.path.length === prefix.length);
+  const forwarded = withDefault(passThrough({ format: "greedy" }), []);
+  if (route) {
+    const parser = object({
+      kind: constant("run"),
+      route: constant(route),
+      args: forwarded,
+    });
+    const leafHelp =
+      prefix[0] === "browser" ||
+      (prefix[0] === "ghidra" && ["macos", "install"].includes(prefix[1] ?? ""));
+    if (leafHelp) return parser;
+    return withDefault(
+      or(
+        map(seq(flag("-h", "--help"), forwarded), () => ({
+          kind: "help" as const,
+          prefix,
+        })),
+        parser,
+      ),
+      { kind: "run", route, args: [] },
+    );
+  }
+  const names = new Set(
+    selected
+      .map((route) => route.path[prefix.length])
+      .filter((name) => name !== undefined),
+  );
+  return withDefault(
+    or(
+      ...[...names].map((name) => command(name, commandParser([...prefix, name]))),
+      map(flag("-h", "--help"), () => ({ kind: "help" as const, prefix })),
+    ),
+    { kind: "help", prefix },
+  );
+}
+
+const parser = commandParser();
+
 function help(prefix: string[]): string {
   const selected = routes.filter((route) =>
     prefix.every((part, index) => route.path[index] === part),
@@ -122,20 +175,14 @@ async function ghidraPackage(): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  const args = Bun.argv.slice(2);
-  const helpIndex = args.findIndex((arg) => arg === "--help" || arg === "-h");
-  const route = routes.find((route) =>
-    route.path.every((part, index) => args[index] === part),
-  );
-  const leafHelp =
-    route?.path[0] === "browser" ||
-    (route?.path[0] === "ghidra" && ["macos", "install"].includes(route.path[1] ?? ""));
-  if (!route || (helpIndex >= 0 && helpIndex === route.path.length && !leafHelp)) {
-    const prefix = helpIndex >= 0 ? args.slice(0, helpIndex) : args;
-    console.log(help(prefix));
+  const parsed = parseSync(parser, Bun.argv.slice(2));
+  if (!parsed.success) throw new Error(formatMessage(parsed.error));
+  if (parsed.value.kind === "help") {
+    console.log(help(parsed.value.prefix));
     return;
   }
-  const rest = args.slice(route.path.length);
+  const { route, args } = parsed.value;
+  const rest = [...args];
   if (
     process.platform === "win32" &&
     route.path[0] === "ghidra" &&

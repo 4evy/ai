@@ -1,6 +1,11 @@
 import { mkdtempDisposable, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
+import { object } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { multiple } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { flag } from "@optique/core/primitives";
 import {
   downloadRuntime,
   extractRuntime,
@@ -11,9 +16,15 @@ import type pinned from "farstep/runtime/sky/runtime/pins.json";
 import { execute, root, writeJson } from "../renovate/process";
 import { checkDeclarations, destination, readPackage, writePackage } from "./sky";
 
+const parsed = parseSync(
+  object({ check: multiple(flag("--check")) }),
+  Bun.argv.slice(2),
+);
+if (!parsed.success) throw new Error(formatMessage(parsed.error));
+
 const path = join(root, "farstep/runtime/sky/runtime/pins.json");
 const pins: typeof pinned = await Bun.file(path).json();
-const check = Bun.argv.includes("--check");
+const check = parsed.value.check.length > 0;
 const SKY_TARGETS = ["darwin-arm64", "linux-x64", "win32-x64", "win32-arm64"] as const;
 async function run(command: string[], cwd = root) {
   const result = await execute(command, cwd);

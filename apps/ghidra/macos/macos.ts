@@ -21,8 +21,9 @@ import { errorMessage } from "@ai/core/error/error";
 import { readText } from "@ai/core/text/text";
 import { object, or } from "@optique/core/constructs";
 import { formatMessage } from "@optique/core/message";
+import { optional } from "@optique/core/modifiers";
 import { parseSync } from "@optique/core/parser";
-import { argument, command, constant } from "@optique/core/primitives";
+import { argument, command, constant, option } from "@optique/core/primitives";
 import { string } from "@optique/core/valueparser";
 import { Effect } from "effect";
 
@@ -275,11 +276,27 @@ async function load(binary: string): Promise<void> {
 if (import.meta.main) {
   const actions = ["find", "extract", "load"] as const;
   try {
-    if (
-      process.argv
-        .slice(2)
-        .some((argument) => argument === "--help" || argument === "-h")
-    )
+    const parsed = parseSync(
+      object({
+        help: option("--help", "-h"),
+        operation: optional(
+          or(
+            ...actions.map((action) =>
+              command(
+                action,
+                object({
+                  action: constant(action),
+                  query: optional(argument(string())),
+                }),
+              ),
+            ),
+          ),
+        ),
+      }),
+      process.argv.slice(2),
+    );
+    if (!parsed.success) throw new UsageError(formatMessage(parsed.error));
+    if (parsed.value.help)
       console.log(
         readText(new URL("./macos.md", import.meta.url), "usage", {
           ACTIONS: actions.join("|"),
@@ -288,19 +305,10 @@ if (import.meta.main) {
     else {
       if (process.platform !== "darwin")
         throw new UsageError("macOS shared caches require macOS");
-      const parsed = parseSync(
-        or(
-          ...actions.map((action) =>
-            command(
-              action,
-              object({ action: constant(action), query: argument(string()) }),
-            ),
-          ),
-        ),
-        process.argv.slice(2),
-      );
-      if (!parsed.success) throw new UsageError(formatMessage(parsed.error));
-      const { action, query } = parsed.value;
+      const operation = parsed.value.operation;
+      if (!operation || operation.query === undefined)
+        throw new UsageError("Expected find|extract|load QUERY");
+      const { action, query } = operation;
       switch (action) {
         case "find":
           for (const image of await findImages(query))

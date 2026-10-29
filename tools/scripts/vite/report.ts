@@ -1,4 +1,9 @@
 import { gzipSync } from "node:zlib";
+import { object } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { multiple } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { flag } from "@optique/core/primitives";
 import { build, mergeConfig, rolldownVersion, type UserConfig, version } from "vite";
 import { bundles } from "../../../farstep/native/desktop/platform/linux/extensions/bundles.ts";
 import { bundleConfig } from "./desktop.ts";
@@ -90,9 +95,8 @@ async function measure(configs: UserConfig[], mode: Mode): Promise<Metrics> {
   return { ...metrics, externals: [...externals].sort() };
 }
 
-const args = process.argv.slice(2);
-if (args.some((arg) => arg !== "--json"))
-  throw new Error("Usage: bun run build:report [--json]");
+const parsed = parseSync(object({ json: multiple(flag("--json")) }), Bun.argv.slice(2));
+if (!parsed.success) throw new Error(formatMessage(parsed.error));
 
 const groups = [
   ...projects.map((project) => ({
@@ -111,7 +115,7 @@ for (const group of groups) {
   const production = await measure(group.configs, "production");
   rows.push({ name: group.name, unoptimized, shaken, production });
 }
-if (args.includes("--json")) {
+if (parsed.value.json.length > 0) {
   console.log(
     JSON.stringify(
       {

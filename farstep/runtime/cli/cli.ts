@@ -1,9 +1,15 @@
 import { conditional, object, or } from "@optique/core/constructs";
-import { formatDocPage } from "@optique/core/doc";
+import { runParserSync } from "@optique/core/facade";
 import { formatMessage } from "@optique/core/message";
 import { map, optional, withDefault } from "@optique/core/modifiers";
-import { getDocPageSync, parseSync } from "@optique/core/parser";
-import { argument, command, constant, option } from "@optique/core/primitives";
+import type { InferValue } from "@optique/core/parser";
+import {
+  argument,
+  command,
+  constant,
+  option,
+  passThrough,
+} from "@optique/core/primitives";
 import { valibot } from "@optique/valibot";
 import * as v from "valibot";
 
@@ -25,6 +31,22 @@ const pageNumber = (minimum: number, maximum = Number.MAX_SAFE_INTEGER) =>
     { placeholder: minimum },
   );
 const parser = or(
+  command(
+    "deadline",
+    object({
+      action: constant("deadline"),
+      args: withDefault(passThrough({ format: "greedy" }), []),
+    }),
+    { hidden: true },
+  ),
+  command(
+    "workflow",
+    object({
+      action: constant("workflow"),
+      args: withDefault(passThrough({ format: "greedy" }), []),
+    }),
+    { hidden: true },
+  ),
   command(
     "sky",
     command(
@@ -141,14 +163,24 @@ const parser = or(
   ),
 );
 
-export function parseCommand(args: readonly string[]) {
-  const result = parseSync(parser, args);
-  if (!result.success) throw new Error(formatMessage(result.error));
-  return result.value;
-}
+export type Command = Exclude<
+  InferValue<typeof parser>,
+  { action: "deadline" | "workflow" }
+>;
 
-export function commandHelp(args: readonly string[]): string {
-  const page = getDocPageSync(parser, args) ?? getDocPageSync(parser, []);
-  if (!page) throw new Error("Helper command help is unavailable");
-  return formatDocPage("farstep", page, { showChoices: true, showDefault: true });
+export function parseCommand(args: readonly string[]) {
+  let help: string | undefined;
+  const result = runParserSync(parser, "farstep", args, {
+    help: { option: true, onShow: () => {} },
+    showChoices: true,
+    showDefault: true,
+    stdout: (text) => {
+      help = text;
+    },
+    stderr: () => {},
+    onError: (_exitCode, error) => {
+      throw new Error(formatMessage(error));
+    },
+  });
+  return help === undefined ? result : { action: "help" as const, text: help };
 }

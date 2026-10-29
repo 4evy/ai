@@ -1,6 +1,10 @@
 import { cp, mkdtempDisposable, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { formatMessage } from "@optique/core/message";
+import { parseSync } from "@optique/core/parser";
+import { argument } from "@optique/core/primitives";
+import { string } from "@optique/core/valueparser";
 import { run, writeJson } from "../../../tools/scripts/renovate/process";
 import { applyBridgePatches, readBridgeInputs } from "../native/bridge";
 import type pinned from "./source.json";
@@ -36,7 +40,9 @@ export async function updateBridgeLock(source: string): Promise<void> {
 }
 
 if (import.meta.main) {
-  const source = Bun.argv[2];
+  const parsed = parseSync(argument(string()), Bun.argv.slice(2));
+  if (!parsed.success) throw new Error(formatMessage(parsed.error));
+  const source = parsed.value;
   if (!source) throw new Error("Usage: bun apps/ghidra/mcp/update.ts SOURCE");
   await updateBridgeLock(source);
 }

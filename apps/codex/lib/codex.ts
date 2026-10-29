@@ -4,6 +4,12 @@ import { isAbsolute, join, resolve } from "node:path";
 import { run } from "@ai/core/effect/effect";
 import { errorMessage } from "@ai/core/error/error";
 import { isRecord } from "@ai/core/value/value";
+import { object, or } from "@optique/core/constructs";
+import { formatMessage } from "@optique/core/message";
+import { map, multiple } from "@optique/core/modifiers";
+import { parseSync } from "@optique/core/parser";
+import { argument, command, option, passThrough } from "@optique/core/primitives";
+import { string } from "@optique/core/valueparser";
 import { Effect } from "effect";
 import * as v from "valibot";
 import { type AppServer, appServer } from "./server.ts";
@@ -141,17 +147,57 @@ export async function trustLaunchProjects(
 }
 
 export function launchDirectory(args: string[]): string {
-  let directory = process.cwd();
-  for (let index = 0; index < args.length; index++) {
-    const arg = args[index];
-    if (arg === "--") break;
-    if (arg === "-C" || arg === "--cd") {
-      const value = args[++index];
-      if (!value) throw new Error(`${arg} requires a directory`);
-      directory = value;
-    } else if (arg?.startsWith("--cd=")) directory = arg.slice(5);
+  const token = argument(string());
+  const forwarded = passThrough({ format: "greedy" });
+  // Keep the separator branch active until its entire opaque tail is consumed
+  // Empty tails still complete, even though they cannot be skipped mid-parse
+  const afterSeparator = command("--", {
+    ...forwarded,
+    canSkip: (state: readonly string[]) => state.length > 0,
+  });
+  // Unknown upstream flags are opaque tokens, not our CLI's options
+  const rawToken = {
+    ...token,
+    parse(context: Parameters<typeof token.parse>[0]) {
+      const result = token.parse({ ...context, optionsTerminated: true });
+      return result.success
+        ? {
+            ...result,
+            next: { ...result.next, optionsTerminated: context.optionsTerminated },
+          }
+        : result;
+    },
+  };
+  const parsed = parseSync(
+    multiple(
+      or(
+        afterSeparator,
+        command(
+          "-C",
+          map(rawToken, (directory) => {
+            if (!directory) throw new Error("-C requires a directory");
+            return { directory };
+          }),
+        ),
+        command(
+          "--cd",
+          map(rawToken, (directory) => {
+            if (!directory) throw new Error("--cd requires a directory");
+            return { directory };
+          }),
+        ),
+        object({ directory: option("--cd", string()) }),
+        rawToken,
+      ),
+    ),
+    args,
+  );
+  if (!parsed.success) throw new Error(formatMessage(parsed.error));
+  let cwd = process.cwd();
+  for (const value of parsed.value) {
+    if (typeof value === "object" && "directory" in value) cwd = value.directory;
   }
-  return resolve(directory);
+  return resolve(cwd);
 }
 
 export async function prepareLaunch(real: string, args: string[]): Promise<boolean> {
