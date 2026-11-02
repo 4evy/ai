@@ -1,9 +1,7 @@
-Migrate the Ghidra MCP 7.0.0 bridge to MCP Python SDK 2.2
+Migrate the Ghidra MCP 7.0.0 bridge to MCP Python SDK 2.3
 
-Use MCPServer and its public middleware, registration, progress, and
-subscription interfaces. Keep legacy per-connection notifications alongside
-modern subscriptions, with opt-in name-cursor pagination and truthful
-capabilities. Expected Ghidra failures remain error-marked tool results.
+Preserve legacy resource subscriptions, write invalidation, and tool changes
+while supporting modern subscription streams and request-scoped SDK sessions
 
 diff --git a/pyproject.toml b/pyproject.toml
 --- a/pyproject.toml
@@ -26,15 +24,15 @@ diff --git a/pyproject.toml b/pyproject.toml
 diff --git a/python/bridge_mcp_ghidra/server.py b/python/bridge_mcp_ghidra/server.py
 --- a/python/bridge_mcp_ghidra/server.py
 +++ b/python/bridge_mcp_ghidra/server.py
-@@ -1,110 +1,63 @@
+@@ -1,123 +1,83 @@
 -"""The FastMCP server singleton and its initialization-options patch."""
 +"""The MCPServer singleton, capability policy, and optional tool pagination"""
  
--from mcp import types
--from mcp.server.fastmcp import FastMCP, Context  # noqa: F401  (Context re-exported)
--from mcp.server.lowlevel.server import NotificationOptions
 +from typing import Any, cast
 +
+ from mcp import types
+-from mcp.server.fastmcp import FastMCP, Context  # noqa: F401  (Context re-exported)
+-from mcp.server.lowlevel.server import NotificationOptions
 +from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
 +from mcp.server.mcpserver import MCPServer, Context  # noqa: F401  (Context re-exported)
  
@@ -44,29 +42,35 @@ diff --git a/python/bridge_mcp_ghidra/server.py b/python/bridge_mcp_ghidra/serve
 -# The MCP server singleton. All static and dynamically registered tools attach
 -# to this object.
 -mcp = FastMCP("ghidra-mcp")
--
--# Enable tools/list_changed notifications so clients re-fetch tools after
--# dynamic registration.
++# All static and dynamically registered tools attach to this server
++mcp = MCPServer("ghidra-mcp", subscriptions=_state.tools_changed_bus)
++_tool_page_size: int | None = None
+ 
+-# Enable tools/list_changed and resources/list_changed so clients re-fetch after
+-# dynamic registration / write-triggered invalidation.
 -_orig_init_options = mcp._mcp_server.create_initialization_options
--
+ 
 -
 -def _patched_init_options(**kwargs):
 -    options = _orig_init_options(
--        notification_options=NotificationOptions(tools_changed=True), **kwargs
+-        notification_options=NotificationOptions(
+-            tools_changed=True,
+-            resources_changed=True,
+-        ),
+-        **kwargs,
 -    )
--    _drop_unimplemented_capabilities(options)
+-    _adjust_capabilities(options)
 -    return options
 -
 -
--def _drop_unimplemented_capabilities(options) -> None:
--    """Stop advertising `prompts` and `resources` while there are none.
+-def _adjust_capabilities(options) -> None:
+-    """Advertise only the resource/prompt features this process actually has.
 -
--    FastMCP registers handlers for both unconditionally, so the handshake
--    claimed both capabilities and then answered `prompts/list` and
--    `resources/list` with empty arrays — clients render dead sections for
--    features this bridge does not provide. Gated on emptiness rather than
--    hardcoded off, so the capability reappears by itself if a prompt or
--    resource is ever registered.
+-    FastMCP registers list handlers for prompts and resources unconditionally,
+-    so a stock handshake claimed both capabilities and then answered with empty
+-    arrays. Gate on emptiness for the whole capability, and — when resources
+-    exist — flip ``subscribe`` on once a SubscribeRequest handler is registered
+-    and the transport can actually deliver follow-up notifications.
 -    """
 -    capabilities = getattr(options, "capabilities", None)
 -    if capabilities is None:  # pragma: no cover - SDK shape changed
@@ -77,11 +81,18 @@ diff --git a/python/bridge_mcp_ghidra/server.py b/python/bridge_mcp_ghidra/serve
 -    templates = mcp._resource_manager.list_templates()
 -    if not resources and not templates:
 -        capabilities.resources = None
-+# All static and dynamically registered tools attach to this server
-+mcp = MCPServer("ghidra-mcp", subscriptions=_state.tools_changed_bus)
-+_tool_page_size: int | None = None
- 
- 
+-        return
+-    if capabilities.resources is None:
+-        capabilities.resources = types.ResourcesCapability(
+-            subscribe=False, listChanged=True
+-        )
+-    else:
+-        capabilities.resources.listChanged = True
+-    subscribe_handler = types.SubscribeRequest in mcp._mcp_server.request_handlers
+-    stateless = bool(getattr(mcp.settings, "stateless_http", False))
+-    capabilities.resources.subscribe = bool(subscribe_handler and not stateless)
+-
+-
  def enable_tool_pagination(page_size: int) -> None:
 -    """Serve `tools/list` in pages of ``page_size``.
 +    """Serve tools/list in optional name-sorted pages of ``page_size``
@@ -106,7 +117,6 @@ diff --git a/python/bridge_mcp_ghidra/server.py b/python/bridge_mcp_ghidra/serve
      """
 +    global _tool_page_size
 +    _tool_page_size = page_size
-+
  
 -    @mcp._mcp_server.list_tools()
 -    async def _list_tools_paginated(
@@ -122,11 +132,25 @@ diff --git a/python/bridge_mcp_ghidra/server.py b/python/bridge_mcp_ghidra/serve
 -            tools=page,
 -            nextCursor=page[-1].name if (page and remaining) else None,
 -        )
--
--
+ 
++async def _bridge_middleware(ctx: ServerRequestContext, call_next: CallNext) -> HandlerResult:
++    """Keep resource handlers bound to their originating SDK request"""
++    token = _state.mcp_request_context.set(ctx)
++    try:
++        return await _dispatch_bridge(ctx, call_next)
++    finally:
++        _state.mcp_request_context.reset(token)
+ 
 -mcp._mcp_server.create_initialization_options = _patched_init_options
--
--
+ 
++async def _dispatch_bridge(ctx: ServerRequestContext, call_next: CallNext) -> HandlerResult:
++    if ctx.method == "subscriptions/listen":
++        with _state.tools_changed_subscription():
++            params = types.SubscriptionsListenRequestParams.model_validate(ctx.params)
++            for uri in params.notifications.resource_subscriptions or ():
++                _state.remember_resource_interest(ctx.session, uri=uri, subscribed=True)
++            from . import change_poller
+ 
 -# Capture the client's session the first time it lists tools.
 -#
 -# Enabling the tools_changed capability above is only half of it: something has
@@ -138,24 +162,11 @@ diff --git a/python/bridge_mcp_ghidra/server.py b/python/bridge_mcp_ghidra/serve
 -# every MCP client issues right after initialize, so capturing here guarantees
 -# a target exists before the auto-connect retry thread can succeed.
 -_orig_list_tools = mcp.list_tools
--
--
--async def _list_tools_capturing_session():
--    try:
--        # Set by the low-level server for every request, including this one.
--        _state.remember_tools_changed_session(mcp._mcp_server.request_context.session)
--    except (LookupError, AttributeError):
--        # No active request context (direct call, e.g. from a test) -- nothing
--        # to capture, and listing tools must not fail because of it.
--        pass
--    return await _orig_list_tools()
-+async def _bridge_middleware(ctx: ServerRequestContext, call_next: CallNext) -> HandlerResult:
-+    """Customize validated SDK responses without replacing protocol handlers"""
-+    if ctx.method == "subscriptions/listen":
-+        # Modern clients receive changes on their opted-in subscription stream
-+        with _state.tools_changed_subscription():
-+            return await call_next(ctx)
-+
++            change_poller.kick()
++            try:
++                return await call_next(ctx)
++            finally:
++                _state.drop_resource_interest(ctx.session)
 +    result = cast(dict[str, Any], await call_next(ctx))
 +    if ctx.method == "tools/list":
 +        # SDK 2 passes context explicitly, and builds a new session proxy for
@@ -180,18 +191,33 @@ diff --git a/python/bridge_mcp_ghidra/server.py b/python/bridge_mcp_ghidra/serve
 +            capabilities.pop("prompts", None)
 +        if not await mcp.list_resources() and not await mcp.list_resource_templates():
 +            capabilities.pop("resources", None)
++        elif "resources" in capabilities:
++            capabilities["resources"]["listChanged"] = True
++            if ctx.protocol_version not in _state.MODERN_PROTOCOL_VERSIONS:
++                capabilities["resources"]["subscribe"] = not _state.stateless_http
 +        if "tools" in capabilities:
 +            capabilities["tools"]["listChanged"] = True
 +    return result
  
  
+-async def _list_tools_capturing_session():
+-    try:
+-        # Set by the low-level server for every request, including this one.
+-        _state.remember_tools_changed_session(mcp._mcp_server.request_context.session)
+-    except (LookupError, AttributeError):
+-        # No active request context (direct call, e.g. from a test) -- nothing
+-        # to capture, and listing tools must not fail because of it.
+-        pass
+-    return await _orig_list_tools()
+-
+-
 -mcp.list_tools = _list_tools_capturing_session
 -mcp._mcp_server.list_tools()(_list_tools_capturing_session)
 +mcp.middleware.append(_bridge_middleware)
 diff --git a/python/bridge_mcp_ghidra/registry.py b/python/bridge_mcp_ghidra/registry.py
 --- a/python/bridge_mcp_ghidra/registry.py
 +++ b/python/bridge_mcp_ghidra/registry.py
-@@ -44,13 +44,9 @@
+@@ -45,13 +45,9 @@
      # the server genuinely serves -- AnnotationScanner tries the canonical name
      # and then each alias -- and /mcp/schema publishes them as of 7.0.0.
      #
@@ -208,7 +234,7 @@ diff --git a/python/bridge_mcp_ghidra/registry.py b/python/bridge_mcp_ghidra/reg
      alias_to_canonical: dict[str, str] = {}
      for _canonical, _pdef in properties.items():
          for _alias in _pdef.get("aliases") or ():
-@@ -211,10 +207,8 @@
+@@ -212,10 +208,8 @@
              default = None
              py_type = py_type | None if py_type != str else str | None
  
@@ -221,7 +247,7 @@ diff --git a/python/bridge_mcp_ghidra/registry.py b/python/bridge_mcp_ghidra/reg
          pdesc = pdef.get("description")
          annotation = Annotated[py_type, Field(description=pdesc)] if pdesc else py_type
  
-@@ -265,7 +259,7 @@
+@@ -266,7 +260,7 @@
  
  
  def _signature_with_context(signature: inspect.Signature) -> inspect.Signature:
@@ -230,7 +256,7 @@ diff --git a/python/bridge_mcp_ghidra/registry.py b/python/bridge_mcp_ghidra/reg
      ctx_param = inspect.Parameter(
          "ctx",
          inspect.Parameter.KEYWORD_ONLY,
-@@ -276,29 +270,14 @@
+@@ -277,29 +271,14 @@
  
  
  def _start_progress_heartbeat(ctx: Context | None, tool_name: str):
@@ -252,19 +278,19 @@ diff --git a/python/bridge_mcp_ghidra/registry.py b/python/bridge_mcp_ghidra/reg
 -        meta = ctx.request_context.meta
 -    except (AttributeError, ValueError):
 -        # No active request context (direct call, or a test harness).
--        return None
--    if meta is None or meta.progressToken is None:
 +        ctx.request_context
 +    except ValueError:
 +        # Direct calls have no active request context
          return None
+-    if meta is None or meta.progressToken is None:
+-        return None
 -    token = meta.progressToken
 -    session = ctx.request_context.session
 -    request_id = ctx.request_context.request_id
  
      async def _tick() -> None:
          elapsed = 0.0
-@@ -306,20 +285,13 @@
+@@ -307,20 +286,13 @@
              while True:
                  await asyncio.sleep(_PROGRESS_INTERVAL_SECONDS)
                  elapsed += _PROGRESS_INTERVAL_SECONDS
@@ -290,7 +316,7 @@ diff --git a/python/bridge_mcp_ghidra/registry.py b/python/bridge_mcp_ghidra/reg
                  )
          except asyncio.CancelledError:
              pass
-@@ -343,20 +315,16 @@
+@@ -344,14 +316,11 @@
      sync_handler = _build_tool_function(endpoint, http_method, input_schema)
  
      async def handler(ctx: Context | None = None, **kwargs):
@@ -308,14 +334,7 @@ diff --git a/python/bridge_mcp_ghidra/registry.py b/python/bridge_mcp_ghidra/reg
              result = await state.run_blocking_ghidra_call(sync_handler, **kwargs)
          finally:
              if heartbeat is not None:
-                 heartbeat.cancel()
--        # Failures arrive as an ordinary 200 body; raising is what makes the
--        # tool result carry isError instead of looking like a success.
-+        # Raising a tool error makes the result carry isError on the wire
-         return dispatch.raise_on_failure(result)
- 
-     handler.__signature__ = _signature_with_context(sync_handler.__signature__)
-@@ -369,14 +337,9 @@
+@@ -378,14 +347,9 @@
          description=description,
          annotations=_tool_annotations(tool_def),
          # Every tool here returns the server's response body as text. Left to
@@ -333,7 +352,7 @@ diff --git a/python/bridge_mcp_ghidra/registry.py b/python/bridge_mcp_ghidra/reg
          structured_output=False,
      )(handler)
      state._dynamic_tool_names.append(name)
-@@ -430,17 +393,7 @@
+@@ -443,17 +407,7 @@
      with state._tool_registry_lock:
          # Remove previously registered dynamic tools
          for name in state._dynamic_tool_names:
@@ -352,7 +371,7 @@ diff --git a/python/bridge_mcp_ghidra/registry.py b/python/bridge_mcp_ghidra/reg
          state._dynamic_tool_names.clear()
          state._loaded_groups.clear()
  
-@@ -502,16 +455,8 @@
+@@ -524,16 +478,8 @@
                      to_remove.append(name)
  
          for name in to_remove:
@@ -371,7 +390,7 @@ diff --git a/python/bridge_mcp_ghidra/registry.py b/python/bridge_mcp_ghidra/reg
  
          if to_remove:
              state._loaded_groups.discard(group_name)
-@@ -576,7 +521,6 @@
+@@ -598,7 +544,6 @@
  
  
  async def _notify_tools_changed(ctx: Context | None) -> None:
@@ -385,17 +404,23 @@ diff --git a/python/bridge_mcp_ghidra/registry.py b/python/bridge_mcp_ghidra/reg
 diff --git a/python/bridge_mcp_ghidra/state.py b/python/bridge_mcp_ghidra/state.py
 --- a/python/bridge_mcp_ghidra/state.py
 +++ b/python/bridge_mcp_ghidra/state.py
-@@ -16,6 +16,9 @@
+@@ -12,11 +12,14 @@
+ import contextvars
+ import os
+ import threading
+-import weakref
+ from dataclasses import dataclass, field
  from functools import partial
  from contextlib import contextmanager
  
++from mcp.server.context import ServerRequestContext
 +from mcp.server.subscriptions import InMemorySubscriptionBus, ToolsListChanged
 +from mcp.types.version import MODERN_PROTOCOL_VERSIONS
 +
- from .config import CORE_GROUPS, MAX_CONCURRENT_GHIDRA_REQUESTS, logger
+ from .config import CORE_GROUPS, MAX_CONCURRENT_GHIDRA_REQUESTS, logger, parse_bool
  
  # --------------------------------------------------------------------------
-@@ -120,12 +123,13 @@
+@@ -121,10 +124,16 @@
  # once at a time even though normal HTTP requests may proceed concurrently.
  _reconnect_lock = threading.RLock()
  
@@ -405,26 +430,28 @@ diff --git a/python/bridge_mcp_ghidra/state.py b/python/bridge_mcp_ghidra/state.
 +# Dynamic tool registration mutates the shared MCP tool catalog and name/group
 +# state. Serialize those mutations while normal Ghidra requests stay concurrent
  _tool_registry_lock = threading.RLock()
- _tools_changed_session_lock = threading.Lock()
--_tools_changed_targets: list[tuple[asyncio.AbstractEventLoop, object]] = []
-+_tools_changed_targets: dict[tuple[asyncio.AbstractEventLoop, str], object] = {}
++_tools_changed_session_lock = threading.Lock()
 +_tools_changed_subscription_loops: dict[asyncio.AbstractEventLoop, int] = {}
 +tools_changed_bus = InMemorySubscriptionBus()
++mcp_request_context: contextvars.ContextVar[ServerRequestContext | None] = contextvars.ContextVar(
++    "ghidra_mcp_request", default=None
++)
++stateless_http = False
  _active_request_handles_lock = threading.Lock()
  _active_request_handles: set[RequestCancelHandle] = set()
  
-@@ -254,61 +258,97 @@
+@@ -253,46 +262,71 @@
          return get_connection_snapshot()
  
  
 -def remember_tools_changed_session(session) -> None:
 -    """Remember one MCP session that can receive tools/list_changed.
--
--    Must be called from the session's own event loop — the loop is captured
--    here so a worker thread can later dispatch the notification back onto it.
 +def remember_tools_changed_request(request_context) -> None:
 +    """Capture one legacy notification target per transport connection
  
+-    Must be called from the session's own event loop — the loop is captured
+-    here so a worker thread can later dispatch the notification back onto it.
+-
 -    Registration used to happen ONLY inside connect_instance/load_tool_group/
 -    unload_tool_group/import_file, which are tools the client has to call
 -    first. That made the whole notification path dead in the one situation it
@@ -445,25 +472,7 @@ diff --git a/python/bridge_mcp_ghidra/state.py b/python/bridge_mcp_ghidra/state.
 +    session = request_context.session
 +    if session.protocol_version in MODERN_PROTOCOL_VERSIONS:
          return
--    try:
--        loop = asyncio.get_running_loop()
--    except RuntimeError:
-+    request = request_context.request
-+    if request is None:
-+        key = "stdio"
-+    elif session_id := request.headers.get("mcp-session-id"):
-+        key = f"http:{session_id}"
-+    elif session_id := request.query_params.get("session_id"):
-+        key = f"sse:{session_id}"
-+    else:
-         return
-+    loop = asyncio.get_running_loop()
-     with _tools_changed_session_lock:
--        for existing_loop, existing_session in _tools_changed_targets:
--            if existing_loop is loop and existing_session is session:
--                return
--        _tools_changed_targets.append((loop, session))
-+        _tools_changed_targets[(loop, key)] = session
+     remember_resource_interest(session, tools_changed=True)
  
  
  def remember_tools_changed_context(ctx) -> None:
@@ -471,15 +480,17 @@ diff --git a/python/bridge_mcp_ghidra/state.py b/python/bridge_mcp_ghidra/state.
 -    if ctx is None or getattr(ctx, "_request_context", None) is None:
 +    """Remember an injected MCPServer Context's legacy connection, if any"""
 +    if ctx is None:
-+        return
+         return
+-    remember_tools_changed_session(ctx.request_context.session)
 +    try:
 +        request_context = ctx.request_context
 +    except ValueError:
-         return
--    remember_tools_changed_session(ctx.request_context.session)
++        return
 +    remember_tools_changed_request(request_context)
-+
-+
+ 
+ 
+-def notify_tools_changed_from_worker() -> None:
+-    """Best-effort tools/list_changed notification from a worker thread.
 +@contextmanager
 +def tools_changed_subscription():
 +    """Keep a publication loop only while modern listen requests are active"""
@@ -495,53 +506,32 @@ diff --git a/python/bridge_mcp_ghidra/state.py b/python/bridge_mcp_ghidra/state.
 +                _tools_changed_subscription_loops[loop] = count
 +            else:
 +                del _tools_changed_subscription_loops[loop]
+ 
+-    Shares the session registry below, which holds sessions by weakref and
+-    prunes on a failed send — this list used to be its own strong-reference
+-    list that only noticed a *closed loop*, so a dropped session stayed in it
+-    (and stayed alive) until the process exited.
+-    """
 +
-+
-+async def _notify_legacy_tools_changed(key, session) -> None:
++async def _notify_legacy_tools_changed(session) -> None:
 +    try:
 +        await session.send_tool_list_changed()
-+        # SDK 2 drops notifications on closed connections instead of raising
-+        # Bound the probe because HTTP clients without a standalone GET stream
-+        # cannot answer it. wait_for cancels the pending RPC before pruning
 +        await asyncio.wait_for(session.send_ping(), timeout=5.0)
 +    except Exception:
-+        with _tools_changed_session_lock:
-+            if _tools_changed_targets.get(key) is session:
-+                del _tools_changed_targets[key]
- 
- 
- def notify_tools_changed_from_worker() -> None:
--    """Best-effort tools/list_changed notification from a worker thread."""
-+    """Notify legacy connections and publish to modern subscribed streams"""
-     with _tools_changed_session_lock:
--        targets = list(_tools_changed_targets)
--    stale: list[tuple[asyncio.AbstractEventLoop, object]] = []
--    for loop, session in targets:
-+        targets = list(_tools_changed_targets.items())
-+        subscription_loops = list(_tools_changed_subscription_loops)
-+    for key, session in targets:
-+        loop, _ = key
-         if loop.is_closed():
--            stale.append((loop, session))
-+            with _tools_changed_session_lock:
-+                _tools_changed_targets.pop(key, None)
-             continue
-+        notification = _notify_legacy_tools_changed(key, session)
-         try:
--            asyncio.run_coroutine_threadsafe(session.send_tool_list_changed(), loop)
--        except Exception:
--            stale.append((loop, session))
--    if stale:
--        with _tools_changed_session_lock:
--            for target in stale:
--                if target in _tools_changed_targets:
--                    _tools_changed_targets.remove(target)
-+            asyncio.run_coroutine_threadsafe(notification, loop)
-+        except RuntimeError:
-+            notification.close()
-+            with _tools_changed_session_lock:
-+                _tools_changed_targets.pop(key, None)
-+    for loop in subscription_loops:
++        drop_resource_interest(session)
++
++
++def notify_tools_changed_from_worker() -> None:
++    """Notify legacy connections and publish to active modern streams"""
+     for loop, session, _entry in iter_resource_interest(require_tools_changed=True):
+-        if not schedule_on_session_loop(loop, session.send_tool_list_changed()):
+-            drop_resource_interest(session)
++        if session.protocol_version not in MODERN_PROTOCOL_VERSIONS:
++            if not schedule_on_session_loop(loop, _notify_legacy_tools_changed(session)):
++                drop_resource_interest(session)
++    with _tools_changed_session_lock:
++        loops = list(_tools_changed_subscription_loops)
++    for loop in loops:
 +        publication = tools_changed_bus.publish(ToolsListChanged())
 +        try:
 +            asyncio.run_coroutine_threadsafe(publication, loop)
@@ -549,11 +539,178 @@ diff --git a/python/bridge_mcp_ghidra/state.py b/python/bridge_mcp_ghidra/state.
 +            publication.close()
  
  
+ # --------------------------------------------------------------------------
+@@ -305,9 +339,9 @@
+ # knows about — so a write cannot storm every connected client with URIs it
+ # never asked for.
+ #
+-# Held by weakref so a dropped session (stdio EOF, HTTP session GC) does not
+-# pin the ServerSession forever the way the strong-reference tools/list_changed
+-# list this replaced did. Failed sends also prune the entry.
++# SDK 2 session proxies are request-scoped. Retain the latest proxy per
++# transport connection, preserving interest across requests and pruning failed
++# notification targets rather than losing interests to weakref collection
+ 
+ _RESOURCE_NOTIFY_TIMEOUT_SECONDS = 2.0
+ 
+@@ -317,7 +351,7 @@
+     """One MCP session's interest in Ghidra resource URIs."""
+ 
+     loop: asyncio.AbstractEventLoop
+-    session_ref: weakref.ref
++    session: object
+     subscribed_uris: set[str] = field(default_factory=set)
+     read_uris: set[str] = field(default_factory=set)
+     # tools/list_changed goes to every session that ran a tool, not only the
+@@ -327,12 +361,24 @@
+ 
+ 
+ _resource_interest_lock = threading.Lock()
+-_resource_interest: dict[int, ResourceSessionInterest] = {}
++_resource_interest: dict[tuple[asyncio.AbstractEventLoop, str], ResourceSessionInterest] = {}
+ 
+ 
+-def _drop_resource_interest(session_id: int) -> None:
+-    with _resource_interest_lock:
+-        _resource_interest.pop(session_id, None)
++def _resource_key(session):
++    ctx = mcp_request_context.get()
++    if ctx is None or ctx.session is not session:
++        return None
++    loop = asyncio.get_running_loop()
++    if ctx.protocol_version in MODERN_PROTOCOL_VERSIONS:
++        return (loop, f"listen:{id(session)}") if ctx.method == "subscriptions/listen" else None
++    request = ctx.request
++    if request is None:
++        return loop, "stdio"
++    if session_id := request.headers.get("mcp-session-id"):
++        return loop, f"http:{session_id}"
++    if session_id := request.query_params.get("session_id"):
++        return loop, f"sse:{session_id}"
++    return None
+ 
+ 
+ def remember_resource_interest(
+@@ -344,33 +390,17 @@
+     tools_changed: bool = False,
+ ) -> None:
+     """Record that ``session`` cares about ``uri`` (subscribe and/or read)."""
+-    if session is None:
++    key = _resource_key(session)
++    if key is None:
+         return
+-    try:
+-        loop = asyncio.get_running_loop()
+-    except RuntimeError:
+-        return
+-    if loop.is_closed():
+-        return
+-
+-    session_id = id(session)
++    loop, _ = key
+     with _resource_interest_lock:
+-        entry = _resource_interest.get(session_id)
+-        if entry is None or entry.session_ref() is None:
+-            try:
+-                ref = weakref.ref(
+-                    session, lambda _ref, sid=session_id: _drop_resource_interest(sid)
+-                )
+-            except TypeError:
+-                # Bookkeeping is best-effort and must never break the call that
+-                # triggered it. A real ServerSession is weak-referenceable; a
+-                # substitute that is not simply goes untracked.
+-                logger.debug("Session %r cannot be tracked (no weakref support)", type(session))
+-                return
+-            entry = ResourceSessionInterest(loop=loop, session_ref=ref)
+-            _resource_interest[session_id] = entry
++        entry = _resource_interest.get(key)
++        if entry is None:
++            entry = ResourceSessionInterest(loop=loop, session=session)
++            _resource_interest[key] = entry
+         else:
+-            entry.loop = loop
++            entry.session = session
+         if uri:
+             if subscribed:
+                 entry.subscribed_uris.add(uri)
+@@ -384,8 +414,9 @@
+     """Drop a single subscription; read interest is kept (cache may still hold it)."""
+     if session is None:
+         return
++    key = _resource_key(session)
+     with _resource_interest_lock:
+-        entry = _resource_interest.get(id(session))
++        entry = _resource_interest.get(key)
+         if entry is None:
+             return
+         entry.subscribed_uris.discard(uri)
+@@ -399,15 +430,15 @@
+ ) -> list[tuple[asyncio.AbstractEventLoop, object, ResourceSessionInterest]]:
+     """Live ``(loop, session, entry)`` triples, optionally filtered to a URI.
+ 
+-    Dead weakrefs and closed loops are pruned as a side effect.
++    Closed loops are pruned as a side effect
+     """
+     with _resource_interest_lock:
+         items = list(_resource_interest.items())
+     live: list[tuple[asyncio.AbstractEventLoop, object, ResourceSessionInterest]] = []
+-    stale_ids: list[int] = []
++    stale_ids = []
+     for session_id, entry in items:
+-        session = entry.session_ref()
+-        if session is None or entry.loop.is_closed():
++        session = entry.session
++        if entry.loop.is_closed():
+             stale_ids.append(session_id)
+             continue
+         if require_tools_changed and not entry.wants_tools_changed:
+@@ -423,10 +454,8 @@
+         with _resource_interest_lock:
+             for session_id in stale_ids:
+                 current = _resource_interest.get(session_id)
+-                if current is not None and current.session_ref() is None:
++                if current is not None and current.loop.is_closed():
+                     _resource_interest.pop(session_id, None)
+-                elif current is not None and current.loop.is_closed():
+-                    _resource_interest.pop(session_id, None)
+     return live
+ 
+ 
+@@ -434,14 +463,15 @@
+     """URIs this session (or every session) has read or subscribed to."""
+     with _resource_interest_lock:
+         if session is not None:
+-            entry = _resource_interest.get(id(session))
++            entry = next(
++                (entry for entry in _resource_interest.values() if entry.session is session),
++                None,
++            )
+             if entry is None:
+                 return set()
+             return set(entry.subscribed_uris | entry.read_uris)
+         out: set[str] = set()
+         for entry in _resource_interest.values():
+-            if entry.session_ref() is None:
+-                continue
+             out |= entry.subscribed_uris
+             out |= entry.read_uris
+         return out
+@@ -486,7 +516,10 @@
+     """Forget a session entirely (used after a failed send)."""
+     if session is None:
+         return
+-    _drop_resource_interest(id(session))
++    with _resource_interest_lock:
++        stale = [key for key, entry in _resource_interest.items() if entry.session is session]
++        for key in stale:
++            del _resource_interest[key]
+ 
+ 
  def _get_worker_pool() -> concurrent.futures.ThreadPoolExecutor:
 diff --git a/python/bridge_mcp_ghidra/config.py b/python/bridge_mcp_ghidra/config.py
 --- a/python/bridge_mcp_ghidra/config.py
 +++ b/python/bridge_mcp_ghidra/config.py
-@@ -16,9 +16,9 @@
+@@ -17,9 +17,9 @@
  #
  # openWorldHint is left unset throughout: it would be false for nearly every
  # tool but not all of them, and no client gates behaviour on it.
@@ -612,3 +769,194 @@ diff --git a/python/bridge_mcp_ghidra/schema.py b/python/bridge_mcp_ghidra/schem
      "any": Any,
      "address": str,
  }
+diff --git a/python/bridge_mcp_ghidra/subscriptions.py b/python/bridge_mcp_ghidra/subscriptions.py
+--- a/python/bridge_mcp_ghidra/subscriptions.py
++++ b/python/bridge_mcp_ghidra/subscriptions.py
+@@ -9,8 +9,8 @@
+ from __future__ import annotations
+ 
+ from mcp import types
+-from mcp.shared.exceptions import McpError
+-from pydantic import AnyUrl
++from mcp.server.subscriptions import ResourcesListChanged, ResourceUpdated
++from mcp.shared.exceptions import MCPError
+ 
+ from . import state
+ from .config import logger
+@@ -19,17 +19,13 @@
+ 
+ def _current_session():
+     """Session for the in-flight MCP request, or None outside a request."""
+-    try:
+-        return mcp._mcp_server.request_context.session
+-    except LookupError:
+-        return None
++    ctx = state.mcp_request_context.get()
++    return ctx.session if ctx is not None else None
+ 
+ 
+ def _current_request_id():
+-    try:
+-        return mcp._mcp_server.request_context.request_id
+-    except LookupError:
+-        return None
++    ctx = state.mcp_request_context.get()
++    return ctx.request_id if ctx is not None else None
+ 
+ 
+ def note_resource_read(uri: str) -> None:
+@@ -45,58 +41,56 @@
+ 
+ def _subscriptions_supported() -> bool:
+     """False under ``--stateless-http``: there is no session to hang a sub on."""
+-    return not bool(getattr(mcp.settings, "stateless_http", False))
++    return not state.stateless_http
+ 
+ 
+-@mcp._mcp_server.subscribe_resource()
+-async def _on_subscribe(uri: AnyUrl) -> None:
++async def _on_subscribe(ctx, params: types.SubscribeRequestParams) -> types.EmptyResult:
+     if not _subscriptions_supported():
+-        raise McpError(
+-            types.ErrorData(
+-                code=types.INVALID_REQUEST,
+-                message="resources/subscribe is unavailable under --stateless-http "
+-                        "(no durable session to deliver resources/updated on)",
+-            )
++        raise MCPError(
++            types.INVALID_REQUEST,
++            "resources/subscribe is unavailable under --stateless-http "
++            "(no durable session to deliver resources/updated on)",
+         )
+-    session = _current_session()
+-    if session is None:
+-        raise McpError(
+-            types.ErrorData(
+-                code=types.INVALID_REQUEST,
+-                message="resources/subscribe requires an active MCP session",
+-            )
+-        )
+-    state.remember_resource_interest(session, uri=str(uri), subscribed=True)
+-    logger.debug("Resource subscribed: %s", uri)
++    state.remember_resource_interest(ctx.session, uri=params.uri, subscribed=True)
++    logger.debug("Resource subscribed: %s", params.uri)
+     from . import change_poller
+ 
+     change_poller.kick()
++    return types.EmptyResult()
+ 
+ 
+-@mcp._mcp_server.unsubscribe_resource()
+-async def _on_unsubscribe(uri: AnyUrl) -> None:
+-    session = _current_session()
+-    if session is None:
+-        return
+-    state.forget_resource_subscription(session, str(uri))
+-    logger.debug("Resource unsubscribed: %s", uri)
++async def _on_unsubscribe(ctx, params: types.UnsubscribeRequestParams) -> types.EmptyResult:
++    state.forget_resource_subscription(ctx.session, params.uri)
++    logger.debug("Resource unsubscribed: %s", params.uri)
++    return types.EmptyResult()
+ 
+ 
++# MCPServer has no resource-subscription facade; register typed SDK handlers
++mcp._lowlevel_server.add_request_handler(
++    "resources/subscribe", types.SubscribeRequestParams, _on_subscribe
++)
++mcp._lowlevel_server.add_request_handler(
++    "resources/unsubscribe", types.UnsubscribeRequestParams, _on_unsubscribe
++)
++
++
+ async def _send_updated(session, uri: str, related_request_id) -> None:
+-    notification = types.ServerNotification(
+-        types.ResourceUpdatedNotification(
+-            params=types.ResourceUpdatedNotificationParams(uri=AnyUrl(uri)),
+-        )
++    notification = types.ResourceUpdatedNotification(
++        params=types.ResourceUpdatedNotificationParams(uri=uri),
+     )
+-    # Prefer send_notification with related_request_id: send_resource_updated()
+-    # omits it, and streamable-HTTP then routes the notice to the standalone GET
+-    # stream where a POST-only client never sees it (same trap as progress).
+-    await session.send_notification(notification, related_request_id=related_request_id)
++    # SDK 2's proxy owns one request stream. Never attach a different client's
++    # invalidation to the request that happened to create this proxy
++    ctx = state.mcp_request_context.get()
++    related = related_request_id if ctx is not None and ctx.session is session else None
++    await session.send_notification(notification, related_request_id=related)
+ 
+ 
+ async def _send_list_changed(session, related_request_id) -> None:
+-    notification = types.ServerNotification(types.ResourceListChangedNotification())
+-    await session.send_notification(notification, related_request_id=related_request_id)
++    ctx = state.mcp_request_context.get()
++    related = related_request_id if ctx is not None and ctx.session is session else None
++    await session.send_notification(
++        types.ResourceListChangedNotification(), related_request_id=related
++    )
+ 
+ 
+ async def emit_resource_updated(
+@@ -113,9 +107,12 @@
+     """
+     uri_s = str(uri)
+     rid = related_request_id if related_request_id is not None else _current_request_id()
++    await state.tools_changed_bus.publish(ResourceUpdated(uri=uri_s))
+     targets = state.iter_resource_interest(uri=uri_s if only_known else None)
+     sent = 0
+     for _loop, session, _entry in targets:
++        if session.protocol_version in state.MODERN_PROTOCOL_VERSIONS:
++            continue
+         try:
+             await _send_updated(session, uri_s, rid)
+             sent += 1
+@@ -128,11 +125,14 @@
+ async def emit_resource_list_changed(*, related_request_id=None) -> int:
+     """Tell interested sessions to re-fetch ``resources/list`` / templates."""
+     rid = related_request_id if related_request_id is not None else _current_request_id()
++    await state.tools_changed_bus.publish(ResourcesListChanged())
+     # Any session that has touched a resource cares about listing churn (rename
+     # of an index row, new program, etc.).
+     targets = state.iter_resource_interest()
+     sent = 0
+     for _loop, session, _entry in targets:
++        if session.protocol_version in state.MODERN_PROTOCOL_VERSIONS:
++            continue
+         try:
+             await _send_list_changed(session, rid)
+             sent += 1
+@@ -145,8 +145,11 @@
+ def notify_resource_updated_from_worker(uri: str) -> int:
+     """Worker-thread variant for the change-token poller (no request to hitch to)."""
+     uri_s = str(uri)
++    _publish_from_worker(ResourceUpdated(uri=uri_s))
+     sent = 0
+     for loop, session, _entry in state.iter_resource_interest(uri=uri_s):
++        if session.protocol_version in state.MODERN_PROTOCOL_VERSIONS:
++            continue
+         ok = state.schedule_on_session_loop(loop, _send_updated(session, uri_s, None))
+         if ok:
+             sent += 1
+@@ -156,11 +159,21 @@
+ 
+ 
+ def notify_resource_list_changed_from_worker() -> int:
++    _publish_from_worker(ResourcesListChanged())
+     sent = 0
+     for loop, session, _entry in state.iter_resource_interest():
++        if session.protocol_version in state.MODERN_PROTOCOL_VERSIONS:
++            continue
+         ok = state.schedule_on_session_loop(loop, _send_list_changed(session, None))
+         if ok:
+             sent += 1
+         else:
+             state.drop_resource_interest(session)
+     return sent
++
++
++def _publish_from_worker(event) -> None:
++    with state._tools_changed_session_lock:
++        loops = list(state._tools_changed_subscription_loops)
++    for loop in loops:
++        state.schedule_on_session_loop(loop, state.tools_changed_bus.publish(event))

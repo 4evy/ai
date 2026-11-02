@@ -1,3 +1,4 @@
+diff --git a/python/bridge_mcp_ghidra/cli.py b/python/bridge_mcp_ghidra/cli.py
 --- a/python/bridge_mcp_ghidra/cli.py
 +++ b/python/bridge_mcp_ghidra/cli.py
 @@ -10,6 +10,7 @@
@@ -7,8 +8,8 @@
 +from mcp.types.version import HANDSHAKE_PROTOCOL_VERSIONS
  from starlette.middleware.cors import CORSMiddleware
  
- from . import server
-@@ -240,36 +241,6 @@
+ from . import resources  # noqa: F401  (registers MCP resources on import)
+@@ -242,36 +243,6 @@
              return b"".join(chunks)
  
  
@@ -45,7 +46,7 @@
  def _is_initialize_request(body: bytes) -> bool:
      """True when this body is the JSON-RPC ``initialize`` handshake."""
      try:
-@@ -352,14 +323,11 @@
+@@ -354,14 +325,11 @@
      ``Access-Control-Request-Method``. CORS sits *outside* this guard, so
      genuine preflights are handled there and never arrive here.
  
@@ -65,7 +66,7 @@
      """
  
      def __init__(self, app, *, guard_sessions: bool):
-@@ -391,6 +359,18 @@
+@@ -393,6 +361,18 @@
              return
  
          headers = {k.lower(): v for k, v in scope.get("headers", [])}
@@ -84,7 +85,7 @@
          if b"mcp-session-id" in headers:
              await self.app(scope, receive, send)
              return
-@@ -416,27 +396,18 @@
+@@ -418,27 +398,18 @@
              replayed = True
              return {"type": "http.request", "body": body, "more_body": False}
  
@@ -93,7 +94,9 @@
 -        # sessions created by *this* request can be dropped here.
 -        new_session: str | None = None
 -        rejected = False
--
++        # MCP 2 owns rejected, failed and cancelled opening-request cleanup
++        await self.app(scope, replay, send)
+ 
 -        async def watch(message):
 -            nonlocal new_session, rejected
 -            if message["type"] == "http.response.start":
@@ -102,14 +105,12 @@
 -                    if key.lower() == b"mcp-session-id":
 -                        new_session = value.decode("latin-1")
 -            await send(message)
--
+ 
 -        await self.app(scope, replay, watch)
 -        if rejected and new_session:
 -            await _drop_session(new_session)
-+        # MCP 2 owns rejected, failed and cancelled opening-request cleanup
-+        await self.app(scope, replay, send)
- 
- 
+-
+-
 -def _build_http_app(transport: str, bind_host: str):
 +def _build_http_app(
 +    transport: str,
@@ -122,7 +123,7 @@
      """Return the transport's Starlette app wrapped in the bridge's middleware.
  
      Browser-based clients (MCP Inspector) send an OPTIONS preflight before
-@@ -450,11 +421,20 @@
+@@ -452,11 +423,21 @@
      outermost, so it claims real preflights before ``TransportEdgeGuard``
      sees them.
      """
@@ -131,6 +132,7 @@
 -    # `mcp-session-id` header; stateless streamable-HTTP has no session at
 -    # all. Neither can be guarded by header presence.
 -    guard_sessions = transport == "streamable-http" and not mcp.settings.stateless_http
++    state.stateless_http = transport == "streamable-http" and stateless_http
 +    security = transport_security if transport_security is not None else _transport_security(bind_host)
 +    if transport == "sse":
 +        app = mcp.sse_app(host=bind_host, transport_security=security)
@@ -148,7 +150,7 @@
      app.add_middleware(TransportEdgeGuard, guard_sessions=guard_sessions)
      # Sits outside TransportEdgeGuard so an unauthenticated request never
      # reaches the session manager, and inside CORS so a browser still gets its
-@@ -532,17 +512,17 @@
+@@ -542,17 +523,17 @@
          action="store_true",
          default=False,
          help="streamable-http: answer POSTs with a plain JSON body instead of an "
@@ -170,11 +172,11 @@
 +        "standalone notification stream, for workers behind a load balancer. "
 +        "Modern protocol requests are already standalone.",
      )
-     args = parser.parse_args()
- 
-@@ -580,14 +560,6 @@
+     parser.add_argument(
+         "--project",
+@@ -608,14 +589,6 @@
          logger.info("No Ghidra tools registered at startup; retrying in the background")
-         _start_auto_connect_retry()
+         _start_auto_connect_retry(project=project)
  
 -    mcp.settings.log_level = "INFO"
 -    mcp.settings.host = args.mcp_host
@@ -187,7 +189,7 @@
      if (args.json_response or args.stateless_http) and args.transport != "streamable-http":
          logger.warning(
              "--json-response/--stateless-http only affect streamable-http; ignored for %s",
-@@ -595,12 +567,13 @@
+@@ -634,12 +607,13 @@
          )
      if args.stateless_http and state._lazy_mode:
          logger.warning(
@@ -204,7 +206,7 @@
      if (
          args.transport in ("sse", "streamable-http")
          and _host not in {"127.0.0.1", "localhost", "::1"}
-@@ -639,9 +612,8 @@
+@@ -678,9 +652,8 @@
                  "GHIDRA_MCP_DISABLE_REBIND_PROTECTION=1 — any page in the "
                  "user's browser can drive this server."
              )
@@ -215,7 +217,7 @@
              logger.info(
                  "Bind %s with DNS-rebinding protection ON; allowed Host "
                  "headers: %s. Extend with GHIDRA_MCP_ALLOWED_HOSTS=host1,host2 "
-@@ -650,17 +622,22 @@
+@@ -689,17 +662,22 @@
                  _host,
                  security.allowed_hosts,
              )

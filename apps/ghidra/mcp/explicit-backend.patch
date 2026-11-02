@@ -1,15 +1,12 @@
 diff --git a/python/bridge_mcp_ghidra/static_tools.py b/python/bridge_mcp_ghidra/static_tools.py
 --- a/python/bridge_mcp_ghidra/static_tools.py
 +++ b/python/bridge_mcp_ghidra/static_tools.py
-@@ -656,8 +656,9 @@ def _auto_connect() -> bool:
-     Ghidra. Callers use that to decide whether to keep retrying in the
-     background — see `_start_auto_connect_retry`.
-     """
+@@ -642,5 +642,6 @@ def _auto_connect(project: str | None = None) -> bool:
+     """Return True after connecting and registering tools for a unique instance."""
 -    # Try UDS first
 -    instances = discovery.discover_instances()
 +    # A configured backend takes priority over unrelated local instances
 +    instances = ([] if os.getenv("GHIDRA_MCP_URL")
 +                 else discovery.discover_instances())
-     if len(instances) == 1:
-         inst = instances[0]
-         if transport.uds_supported():
+     if project is not None:
+         instances = discovery.find_project_instances(project, instances)
