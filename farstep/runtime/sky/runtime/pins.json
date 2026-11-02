@@ -1,20 +1,20 @@
 {
-  "version": "26.1023.51421",
+  "version": "26.1027.51404",
   "skyVersion": "0.7.13",
   "artifacts": [
     {
       "platform": "darwin",
       "arch": "arm64",
-      "url": "https://persistent.oaistatic.com/codex-app-prod/ChatGPT-darwin-arm64-26.1023.51421.zip",
-      "sha256": "7642b2ac2a7a0742f9a1800abba15eef83f77e69d893be79d6467cf21e5e1110",
+      "url": "https://persistent.oaistatic.com/codex-app-prod/ChatGPT-darwin-arm64-26.1027.61615.zip",
+      "sha256": "a22e81ff9e52e7f3006c657ff2006c034982876a5a8a002bbf9c00fbf8307f23",
       "resources": "ChatGPT.app/Contents/Resources",
       "skyVersion": "0.7.13"
     },
     {
       "platform": "linux",
       "arch": "x64",
-      "url": "https://persistent.oaistatic.com/codex-app-prod/linux/rpm/x86_64/chatgpt-26.1023.51421-1.x86_64.rpm",
-      "sha256": "dfc857b549c68a90900ef7eebae93a1d89c09c7cb634dd260b2b17c0bd3ee562",
+      "url": "https://persistent.oaistatic.com/codex-app-prod/linux/rpm/x86_64/chatgpt-26.1027.51404-1.x86_64.rpm",
+      "sha256": "7b7cebf685e6ed70c35895a00d78ebc49cbd14dd900c159a636203b8ee0fa4a1",
       "resources": "usr/lib/chatgpt/resources",
       "skyVersion": "0.7.13"
     },
@@ -22,7 +22,7 @@
       "platform": "win32",
       "arch": "x64",
       "url": "https://persistent.oaistatic.com/codex-app-prod/ChatGPT-x64.msix",
-      "sha256": "fda8b07433d2e8872b8833bb665552eb8de6475ba9cca54fb8af28436629d133",
+      "sha256": "d442a3d7d5c229f45e5e11995711ac2619c8dbc89e3fa2bc185287dc8db8e76e",
       "resources": "app/resources",
       "skyVersion": "0.7.13"
     },
@@ -30,7 +30,7 @@
       "platform": "win32",
       "arch": "arm64",
       "url": "https://persistent.oaistatic.com/codex-app-prod/ChatGPT-arm64.msix",
-      "sha256": "322d20a7f118aa14bb38d2cf8a192d016e990159e61d5e51a93efd83a605796d",
+      "sha256": "954bc64d87ee327e0b3a64d678a7d350ac971b65e62fbc59ffbc32587f40cea6",
       "resources": "app/resources",
       "skyVersion": "0.7.13"
     }
