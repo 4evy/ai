@@ -6,13 +6,13 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  import { Container } from "../tui";
  import { Text } from "../components/text";
 +import { Box } from "../components/box";
- import { getLanguageFromPath, theme } from "../theme";
+ import { getLanguageFromPath, theme, type ThemeColor } from "../theme";
  import { parseLineRanges, selectorLineRanges } from "../tools/line-ranges";
  import {
-@@ -14,9 +15,9 @@
- 	splitPathAndSel,
- } from "../tools/read";
- import { PREVIEW_LIMITS, shortenPath } from "../render/render-utils";
+@@ -21,9 +22,9 @@
+ 	PREVIEW_LIMITS,
+ 	shortenPath,
+ } from "../render/render-utils";
 -import { fileHyperlink, renderCodeCell, renderMarkdownCell } from "../render";
 +import { fileHyperlink, renderCodeCell, renderMarkdownCell, renderOutputBlock } from "../render";
  import { wrapTreeLine } from "../render/hanging-wrap";
@@ -21,7 +21,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  import { canonicalizeMessage } from "./thinking-display";
  import { internalUrlSchemeSpec, splitUrlScheme } from "../tools/url-scheme-host";
  import type { ToolExecutionHandle } from "./tool-execution";
-@@ -366,6 +367,7 @@
+@@ -388,6 +389,7 @@
  	#text: Text;
  	#expanded = false;
  	#toolActivityVisible = true;
@@ -29,7 +29,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  	#showContentPreview: boolean;
  	// A read group accretes entries across multiple assistant completions for as
  	// long as the run of reads is uninterrupted. It remains active while its
-@@ -395,9 +397,19 @@
+@@ -417,9 +419,19 @@
  	}
  
  	override render(width: number): readonly string[] {
@@ -51,7 +51,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  	isTranscriptBlockFinalized(): boolean {
  		if (this.#sealed) return true;
  		if (!this.#finalized) return false;
-@@ -598,8 +610,8 @@
+@@ -620,8 +632,8 @@
  	}
  
  	/**
@@ -62,7 +62,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  	 * `Read (N)` in the head, a `list` of path items (status tone, link,
  	 * correction and conflict detail, nested usage) and a clamped preview per
  	 * read when content previews are on.
-@@ -613,7 +625,7 @@
+@@ -635,7 +647,7 @@
  	}
  
  	/**
@@ -71,7 +71,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  	 * `tool` (role `omp.tool.read`). One file: `Read path:13-36`, a failure's
  	 * message in the head. Several: `Read 3 files` over one 22px row per file
  	 * (glyph, dim dir, strong name, range). Each content preview is numbered
-@@ -677,7 +689,7 @@
+@@ -699,7 +711,7 @@
  				title: "Read",
  				status,
  				tone: status === "error" ? "error" : undefined,
@@ -80,7 +80,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  				collapsible,
  				collapsed: collapsible ? !this.#expanded : undefined,
  				preview: collapsible ? TRIMMED_BODY_PREVIEW : undefined,
-@@ -850,8 +862,8 @@
+@@ -872,8 +884,8 @@
  		return card(
  			{
  				role: "omp.tool.read",
@@ -91,7 +91,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  				status,
  				tone: status === "error" ? "error" : status === "running" ? "pending" : undefined,
  				head,
-@@ -893,6 +905,17 @@
+@@ -915,6 +927,17 @@
  		return text([span(plainText(line), "dim")], { wrap: "word", key, role: "omp.usage" });
  	}
  
@@ -109,7 +109,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  	#updateDisplay(): void {
  		this.#displayVersion++;
  		const entries = [...this.#entries.values()];
-@@ -907,7 +930,7 @@
+@@ -929,7 +952,7 @@
  
  		if (displayRows.length === 0) {
  			this.#text.setText(` ${theme.format.bullet} ${theme.fg("toolTitle", theme.bold("Read"))}`);
@@ -118,7 +118,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  			return;
  		}
  
-@@ -920,7 +943,7 @@
+@@ -942,7 +965,7 @@
  				const usageRows = this.#usageRowsBySummaryRow(displayRows).get(0) ?? [];
  				this.#appendUsageRows(lines, usageRows, "   ");
  				this.#text.setText(lines.join("\n"));
@@ -127,7 +127,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  			}
  			for (const entry of this.#previewEntriesForRow(row)) {
  				this.#addContentPreview(entry);
-@@ -940,7 +963,7 @@
+@@ -962,7 +985,7 @@
  		}
  
  		this.#text.setText(lines.join("\n"));
@@ -154,7 +154,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  import { cachedPngConversion, convertImageToPngShared, imagePayloadKey } from "./image-loading";
  import { FenceFigure } from "./fence-figure";
  import { sanitizeWithOptionalSixelPassthrough } from "../render/sixel";
-@@ -361,8 +367,7 @@
+@@ -363,8 +369,7 @@
  export class ToolExecutionComponent extends Container {
  	#contentBox: Box; // Used for custom tools and bash visual truncation
  	#contentText: WidthAwareText; // Generic fallback (no custom/built-in renderer)
@@ -164,7 +164,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  	#usesContentBox = false;
  	#multiFileBoxes: (Box | Spacer)[] = []; // Extra boxes for multi-file edit results
  	#imageComponents: Image[] = [];
-@@ -395,9 +400,7 @@
+@@ -397,9 +402,7 @@
  	// previews, and Kitty PNG conversions. Folded into the dirty key so those
  	// updates are not swallowed by the memo (see #updateDisplay).
  	#displayInputVersion = 0;
@@ -175,7 +175,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  	#displayBuilt = false;
  	// Number of Image children the last rebuild emitted. Only when this is > 0 does
  	// the memo key fold in viewport-dependent image sizing (resolveImageOptions),
-@@ -511,24 +514,16 @@
+@@ -513,24 +516,16 @@
  		this.#editMode = resolveEditModeForTool(toolName, tool);
  		if (this.#editMode) this.#previewReady = Promise.withResolvers<void>();
  
@@ -206,7 +206,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  		this.setIgnoreTight(true);
  
  		this.#updateSpinnerAnimation();
-@@ -1092,14 +1087,13 @@
+@@ -1095,14 +1090,13 @@
  		const late = this.#lateDiagnosticsParts();
  		const body: NativeChild[] = [...(view.body ?? []), ...this.#nativeResultImages(view.body)];
  		if (late.section) body.push(late.section);
@@ -222,7 +222,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  		return node(
  			"tool",
  			{
-@@ -1121,7 +1115,7 @@
+@@ -1124,7 +1118,7 @@
  				age: live ? ms : undefined,
  				took: live ? undefined : ms,
  				intent: typeof intent === "string" && intent ? plainText(intent) : undefined,
@@ -231,7 +231,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  				collapsible: hasBody,
  				collapsed: hasBody ? this.#nativeCollapsed(status, view) : undefined,
  				preview: hasBody ? (preview === "auto" ? { lines: DEFAULT_TERMINAL_PREVIEW_LINES } : preview) : undefined,
-@@ -1182,7 +1176,6 @@
+@@ -1185,7 +1179,6 @@
  			...(late.section ? [late.section] : []),
  		];
  		const role = `omp.tool.${this.#toolName}`;
@@ -239,7 +239,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  		const hasBody = children.length > 1;
  		return card(
  			{
-@@ -1380,12 +1373,8 @@
+@@ -1383,12 +1376,8 @@
  			return [];
  		}
  		let lines = super.render(width);
@@ -254,7 +254,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  			const trimmed = trimBlankEdges(lines);
  			if (trimmed.length > this.#allocation) return this.#renderCompact(width);
  			lines = trimmed;
-@@ -1416,7 +1405,7 @@
+@@ -1419,7 +1408,7 @@
  			const styledGlyph = theme.fg(this.#spinnerFrame === undefined ? "dim" : "muted", glyph);
  			return [truncateToWidth(`${styledGlyph} ${text}`, width)];
  		}
@@ -263,7 +263,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  	}
  
  	#activitySummary(): ToolActivitySummary {
-@@ -1473,11 +1462,7 @@
+@@ -1476,11 +1465,7 @@
  			return;
  		}
  
@@ -276,7 +276,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  		const benignSkip = this.#isBenignSkip();
  		const stateBgKey =
  			this.#isPartial || benignSkip ? "toolPendingBg" : this.#result?.isError ? "toolErrorBg" : "toolSuccessBg";
-@@ -1577,11 +1562,6 @@
+@@ -1580,11 +1565,6 @@
  					this.#contentBox.addChild(new Text(theme.fg("toolOutput", replaceTabs(output)), 0, 0));
  				}
  			}
@@ -288,7 +288,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  		} else if (this.#renderer) {
  			// The active registry entry is a built-in tool with a rich renderer.
  			const renderer = this.#renderer;
-@@ -1735,6 +1715,20 @@
+@@ -1738,6 +1718,20 @@
  			this.#refreshContentText(stateBgKey, stateBgFn);
  		}
  
@@ -407,37 +407,6 @@ diff --git a/packages/tui/src/render/code-cell.ts b/packages/tui/src/render/code
  			displayCodeLines.push(theme.fg("dim", gutterPad + moreLine));
  		}
  	}
-diff --git a/packages/tui/src/render/render-utils.ts b/packages/tui/src/render/render-utils.ts
---- a/packages/tui/src/render/render-utils.ts
-+++ b/packages/tui/src/render/render-utils.ts
-@@ -11,8 +11,8 @@
- import { Ellipsis } from "@oh-my-pi/pi-natives";
- import { expandWindowsLongPath, getWindowsShortPath } from "@oh-my-pi/pi-natives/path";
- import { pluralize, sanitizeText } from "@oh-my-pi/pi-utils";
--import { formatKeyHint, type KeyId } from "../app-keybindings";
--import { getKeybindings } from "../keybindings";
-+import { formatKeyHint } from "../app-keybindings";
-+import { appToolsExpandKey } from "../keybinding-matchers";
- import type { Theme } from "../theme/theme";
- import type { Component } from "../tui";
- import { replaceTabs, sliceByColumn, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "../utils";
-@@ -197,15 +197,9 @@
- 	RECAP: 280,
- } as const;
- 
--/** Keybinding action that toggles tool-output expansion. */
--const EXPAND_ACTION = "app.tools.expand";
--/** Fallback key when no binding is resolvable (e.g. outside an interactive session). */
--const DEFAULT_EXPAND_KEY: KeyId = "ctrl+o";
--
- /** Human-readable primary key bound to tool-output expansion, e.g. `Ctrl+O`. */
- export function expandKeyHint(): string {
--	const [key = DEFAULT_EXPAND_KEY] = getKeybindings().getKeys(EXPAND_ACTION);
--	return formatKeyHint(key);
-+	return formatKeyHint(appToolsExpandKey());
- }
- 
- // =============================================================================
 diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
 --- a/packages/tui/src/tools/bash.ts
 +++ b/packages/tui/src/tools/bash.ts
@@ -455,10 +424,10 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
 -	replaceTabs,
 -} from "../render/render-utils";
 -import {
+ 	formatMinimizedMeta,
  	formatStyledTruncationWarning,
  	type OutputMeta,
- 	stripOutputNotice,
-@@ -28,10 +21,11 @@
+@@ -29,10 +22,11 @@
  } from "./renderer";
  import { INTENT_FIELD, type TspTone } from "@oh-my-pi/pi-wire";
  import { plainText } from "../native/spans";
@@ -472,7 +441,7 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
  
  /**
   * LLM-facing footer appended when a tool call becomes a background job. It states the job's kill
-@@ -318,6 +312,7 @@
+@@ -321,6 +315,7 @@
  	contextTimeout: number | undefined,
  	artifactId: string | undefined,
  	isError: boolean,
@@ -480,7 +449,7 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
  ): string[] {
  	const timeoutDisabled = details?.timeoutDisabled === true || contextTimeout === 0;
  	const timeoutSeconds = timeoutDisabled ? undefined : (details?.timeoutSeconds ?? contextTimeout);
-@@ -329,17 +324,21 @@
+@@ -332,17 +327,21 @@
  	}
  	if (details?.service) {
  		const service = details.service;
@@ -507,7 +476,7 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
  		statsParts.push(
  			requestedTimeoutSeconds !== undefined && requestedTimeoutSeconds !== timeoutSeconds
  				? `Timeout: ${timeoutSeconds}s (requested ${requestedTimeoutSeconds}s clamped)`
-@@ -402,7 +401,12 @@
+@@ -411,7 +410,12 @@
  }
  
  /** The command line as a run's input: wrapped shell source. */
@@ -521,7 +490,7 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
  
  /** Box tint per run state: failed runs read as errors, timed-out ones as warnings. */
  const RUN_BOX_TONE: Partial<Record<RunState, TspTone>> = { failed: "error", "timed-out": "warning" };
-@@ -414,11 +418,13 @@
+@@ -423,11 +427,13 @@
  	isPartial: boolean,
  	cancelled: boolean,
  ): RunState {
@@ -537,7 +506,7 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
  	return "done";
  }
  
-@@ -431,37 +437,61 @@
+@@ -440,37 +446,61 @@
  	};
  }
  
@@ -609,7 +578,7 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
  				};
  			});
  		},
-@@ -477,25 +507,39 @@
+@@ -486,25 +516,39 @@
  			args?: TArgs,
  		): Component {
  			const renderArgs = toBashRenderArgs(args, config);
@@ -663,7 +632,7 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
  							uiTheme,
  						);
  			// Per-instance cache for the expensive inner lines computation. Mirrors
-@@ -571,6 +615,7 @@
+@@ -580,6 +624,7 @@
  						renderContext?.timeout,
  						rawOutputArtifact.artifactId,
  						isError,
@@ -671,7 +640,7 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
  					);
  					if (elapsedSecond !== undefined && elapsedSecond > 0) {
  						statsParts.unshift(`elapsed ${formatDuration(elapsedSecond * 1000)}`);
-@@ -608,17 +653,19 @@
+@@ -617,17 +662,19 @@
  
  					const snapshot: ToolCardSnapshot = {
  						header,
@@ -699,7 +668,7 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
  							},
  							{ label: uiTheme.fg("toolTitle", "Output"), content: outputLines },
  						],
-@@ -646,7 +693,7 @@
+@@ -655,7 +702,7 @@
  				body: [
  					runBox(
  						[
@@ -708,7 +677,7 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
  							started &&
  								runFoot({ state: options.cancelled ? "cancelled" : "running", elapsedMs: options.elapsedMs }),
  						],
-@@ -688,7 +735,7 @@
+@@ -697,7 +744,7 @@
  			const meta = details?.meta;
  			const box = runBox(
  				[
@@ -751,7 +720,7 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  
  /** Runtime backend that an eval cell dispatches to. */
  export type EvalLanguage = "python" | "js";
-@@ -136,8 +134,8 @@
+@@ -138,8 +136,8 @@
  	};
  }
  
@@ -762,7 +731,7 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  
  function languageForHighlighter(language: EvalLanguage | undefined): "python" | "javascript" {
  	if (language === "js") return "javascript";
-@@ -585,42 +583,66 @@
+@@ -587,42 +585,66 @@
  	return lines;
  }
  
@@ -853,7 +822,7 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  	return lines;
  }
  
-@@ -636,12 +658,8 @@
+@@ -638,12 +660,8 @@
  		return { lines: [], hiddenCount: 0 };
  	}
  
@@ -868,7 +837,7 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  	const innerWidth = outputBlockContentWidth(width);
  
  	const isError = cell.status === "error";
-@@ -651,11 +669,13 @@
+@@ -653,11 +671,13 @@
  		output,
  		cell.views?.filter(entry => entry.view.kind !== "table"),
  	);
@@ -885,7 +854,7 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  		const allLines: string[] = [];
  		for (const part of parts) {
  			if (part.kind === "text") {
-@@ -664,7 +684,12 @@
+@@ -666,7 +686,12 @@
  			}
  			const view = part.view;
  			if (view.kind === "json") {
@@ -899,7 +868,7 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  				allLines.push(...tree.lines);
  				if (tree.truncated) allLines.push(theme.fg("dim", "…"));
  			} else if (view.kind === "markdown") {
-@@ -674,9 +699,9 @@
+@@ -676,9 +701,9 @@
  		const formatted = formatOutputPaneLines(
  			{
  				lines: allLines,
@@ -911,7 +880,7 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  				visual: true,
  				width: innerWidth,
  				showHiddenMarker: false,
-@@ -688,7 +713,7 @@
+@@ -690,7 +715,7 @@
  	const formatted = formatOutputPaneLines(
  		{
  			lines: output.split("\n"),
@@ -920,7 +889,7 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  			collapsedMaxLines: previewLines,
  			edge: "tail",
  			visual: true,
-@@ -705,30 +730,43 @@
+@@ -707,30 +732,43 @@
  const STATUS_VALUE_WIDTH = 200;
  
  /**
@@ -976,7 +945,7 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  	const path = eventString(event.path);
  	return node("col", { role: "omp.tool.eval.status.event", gap: "none" }, [
  		keyed(line, "line"),
-@@ -737,7 +775,6 @@
+@@ -739,7 +777,6 @@
  				role: "omp.tool.eval.status.preview",
  				path: path ? splitPathAndSel(path).path : undefined,
  				wrap: false,
@@ -984,19 +953,23 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  			}),
  			"preview",
  		),
-@@ -818,51 +855,63 @@
+@@ -820,25 +857,30 @@
  }
  
  /**
 - * One cell's outputs in order: printed text (following its tail, clamped to
 - * the last `previewLines` while folded) with each view in place of its text.
+- * A json view is the host's own JSON viewer (`json`), top-level entries
+- * listed and containers folded, when it draws the kind; else a JSON tree.
 + * Ordered output parts, with a head preview for structured values and a tail
-+ * preview for ordinary text logs
++ * preview for ordinary text logs. JSON views use the host's JSON viewer when
++ * supported, otherwise a JSON tree
   */
  function evalOutputNodes(
  	output: string,
  	views: readonly EvalViewEntry[] | undefined,
  	previewLines: number,
+ 	json: boolean,
 +	isError = false,
  ): NativeNode[] {
  	if (output.trim().length === 0) return [];
@@ -1021,15 +994,8 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  		}
  		const view = part.view;
  		if (view.kind === "table") return evalTableNode(view, `table-${i}`);
--		if (view.kind === "json") return keyed(describeJsonTree(view.value, { hiddenRootKeys: [] }), `json-${i}`);
-+		if (view.kind === "json") {
-+			return keyed(
-+				describeJsonTree(view.value, {
-+					hiddenRootKeys: [],
-+				}),
-+				`json-${i}`,
-+			);
-+		}
+@@ -847,29 +889,28 @@
+ 		}
  		return keyed(md(view.text), `markdown-${i}`);
  	});
 +	// A bare native card clamps the ordered structured output from its head
@@ -1071,7 +1037,7 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  		"status",
  	);
  }
-@@ -908,11 +957,15 @@
+@@ -915,11 +956,15 @@
  		[
  			caption,
  			cell.code.trim().length > 0 &&
@@ -1092,7 +1058,7 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  			...(cell.outputs ?? []),
  			cell.status,
  			cell.foot && runFoot(cell.foot),
-@@ -963,11 +1016,7 @@
+@@ -970,11 +1015,7 @@
  								status: spinnerFrame !== undefined ? "running" : "pending",
  								spinnerFrame,
  								width,
@@ -1105,7 +1071,7 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  								expanded: options.expanded,
  							};
  							return { options: cellOptions, lines: renderCodeCell(cellOptions, uiTheme) };
-@@ -1025,24 +1074,21 @@
+@@ -1032,24 +1073,21 @@
  		if (cellResults && cellResults.length > 0) {
  			const displayCells = cellResults.map(cell => {
  				const language = cell.language ?? details?.language ?? "python";
@@ -1136,7 +1102,7 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  				  }
  				| undefined;
  			let cached: { key: string; result: string[] } | undefined;
-@@ -1056,31 +1102,40 @@
+@@ -1063,31 +1101,40 @@
  						options.renderContext?.previewLines ?? EVAL_DEFAULT_PREVIEW_LINES,
  						windowRows,
  					);
@@ -1190,7 +1156,7 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  									outputLines.push(...statusLines);
  								}
  								const cellOptions: CodeCellOptions = {
-@@ -1095,36 +1150,19 @@
+@@ -1102,36 +1149,19 @@
  									duration: cell.durationMs,
  									output: outputLines.length > 0 ? outputLines.join("\n") : undefined,
  									outputMaxLines: outputLines.length,
@@ -1230,7 +1196,7 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  						if (i < cellResults.length - 1) {
  							lines.push("");
  						}
-@@ -1145,6 +1183,7 @@
+@@ -1152,6 +1182,7 @@
  					return lines;
  				},
  				invalidate: () => {
@@ -1238,7 +1204,7 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  					bodies = undefined;
  					cached = undefined;
  				},
-@@ -1165,30 +1204,18 @@
+@@ -1172,30 +1203,18 @@
  		}
  
  		if (!output && statusLines.length > 0) {
@@ -1274,7 +1240,7 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  			return new Text(lines.join("\n"), 0, 0);
  		}
  
-@@ -1227,7 +1254,6 @@
+@@ -1234,7 +1253,6 @@
  				}
  				outputLines.push(...cachedLines);
  				if (statusLines.length > 0) {
@@ -1282,50 +1248,51 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  					for (const statusLine of statusLines) {
  						outputLines.push(truncateToWidth(statusLine, width));
  					}
-@@ -1307,7 +1333,7 @@
+@@ -1314,7 +1332,13 @@
  						language,
  						code: formatEvalCodeForDisplay(cell.code, language),
  						title: cell.title,
--						outputs: [...evalOutputNodes(cell.output, cell.views, previewLines)],
-+						outputs: evalOutputNodes(cell.output, cell.views, previewLines, cell.status === "error"),
+-						outputs: [...evalOutputNodes(cell.output, cell.views, previewLines, options.json === true)],
++						outputs: evalOutputNodes(
++							cell.output,
++							cell.views,
++							previewLines,
++							options.json === true,
++							cell.status === "error",
++						),
  						status: evalStatusSection(cell, expanded),
  						foot: state && {
  							state,
-@@ -1332,7 +1358,12 @@
- 		const rawOutput = options.renderContext?.output ?? resultText(result).trimEnd();
- 		const state: RunState = cancelled ? "cancelled" : isPartial ? "running" : result.isError ? "failed" : "done";
- 		const last: Omit<EvalCellRun, "language" | "code" | "title"> = {
--			outputs: evalOutputNodes(stripOutputNotice(rawOutput, details?.meta).trimEnd(), undefined, previewLines),
-+			outputs: evalOutputNodes(
-+				stripOutputNotice(rawOutput, details?.meta).trimEnd(),
-+				undefined,
-+				previewLines,
+@@ -1344,6 +1368,7 @@
+ 				undefined,
+ 				previewLines,
+ 				options.json === true,
 +				result.isError === true || details?.isError === true,
-+			),
+ 			),
  			status: evalStatusSection(details ?? {}, expanded),
  			foot: { state, elapsedMs: options.elapsedMs, ...callFacts },
- 		};
 diff --git a/packages/tui/src/tools/json-tree.ts b/packages/tui/src/tools/json-tree.ts
 --- a/packages/tui/src/tools/json-tree.ts
 +++ b/packages/tui/src/tools/json-tree.ts
-@@ -331,7 +331,7 @@
+@@ -375,7 +375,7 @@
  			let body: readonly string[];
  			const displayKey = item.key ? sanitize(item.key) : undefined;
  			const label = theme.fg(
--				"muted",
-+				item.depth <= 1 ? "toolOutput" : "muted",
+-				item.keyColor ?? "muted",
++				item.keyColor === "dim" ? "dim" : item.depth <= 1 ? "toolOutput" : (item.keyColor ?? "muted"),
  				displayKey || (item.kind === "array" ? "array" : item.kind === "object" ? "object" : "value"),
  			);
  			if (item.kind === "placeholder") {
-@@ -461,7 +461,7 @@
- 	const describeValue = (key: string | undefined, entry: unknown, depth: number): TspTreeNode => {
+@@ -517,7 +517,8 @@
+ 	): TspTreeNode => {
  		budget--;
  		const id = `${nextId++}`;
--		const keySpans: TspSpan[] = key === undefined ? [] : [span(plainText(key), "muted")];
-+		const keySpans: TspSpan[] = key === undefined ? [] : [span(plainText(key), depth <= 1 ? undefined : "muted")];
- 		if (Array.isArray(entry) || isRecord(entry)) {
- 			const entries = jsonEntries(entry);
- 			const size = Array.isArray(entry) ? `[${entry.length}]` : `{${entries.length}}`;
+-		const keySpans: TspSpan[] = key === undefined ? [] : [span(plainText(key), keyColor)];
++		const keySpans: TspSpan[] =
++			key === undefined ? [] : [span(plainText(key), depth <= 1 && keyColor === "muted" ? undefined : keyColor)];
+ 		const prefix = keySpans.length > 0 ? [...keySpans, span(": ", "muted")] : [];
+ 		const inline = inlineJson(entry, plainText);
+ 		if (inline) return { id, label: [...prefix, ...inline.map(([text, color]) => span(text, color))] };
 diff --git a/packages/tui/src/tools/xdev.ts b/packages/tui/src/tools/xdev.ts
 --- a/packages/tui/src/tools/xdev.ts
 +++ b/packages/tui/src/tools/xdev.ts

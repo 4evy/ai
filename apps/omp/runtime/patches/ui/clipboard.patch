@@ -1,7 +1,7 @@
 diff --git a/packages/coding-agent/src/modes/controllers/input-controller.ts b/packages/coding-agent/src/modes/controllers/input-controller.ts
 --- a/packages/coding-agent/src/modes/controllers/input-controller.ts
 +++ b/packages/coding-agent/src/modes/controllers/input-controller.ts
-@@ -411,6 +411,11 @@
+@@ -427,6 +427,11 @@
  					this.ctx.toggleThinkingBlockVisibility();
  					return { consume: true };
  				}
@@ -13,7 +13,7 @@ diff --git a/packages/coding-agent/src/modes/controllers/input-controller.ts b/p
  				if (this.ctx.keybindings.matches(data, "app.history.search")) {
  					if (this.ctx.ui.hasOverlay() || this.ctx.ui.getFocused() instanceof HistorySearchComponent) {
  						return undefined;
-@@ -2821,6 +2826,25 @@
+@@ -3010,6 +3015,25 @@
  		}
  	}
  
@@ -42,7 +42,7 @@ diff --git a/packages/coding-agent/src/modes/controllers/input-controller.ts b/p
 diff --git a/packages/tui/src/app-keybindings.ts b/packages/tui/src/app-keybindings.ts
 --- a/packages/tui/src/app-keybindings.ts
 +++ b/packages/tui/src/app-keybindings.ts
-@@ -48,6 +48,7 @@
+@@ -49,6 +49,7 @@
  	"app.clipboard.pasteTextRaw": true;
  	"app.clipboard.copyLine": true;
  	"app.clipboard.copyPrompt": true;
@@ -50,7 +50,7 @@ diff --git a/packages/tui/src/app-keybindings.ts b/packages/tui/src/app-keybindi
  	"app.agents.hub": true;
  	"app.session.new": true;
  	"app.session.tree": true;
-@@ -195,6 +196,10 @@
+@@ -203,6 +204,10 @@
  		defaultKeys: "alt+shift+c",
  		description: "Copy prompt",
  	},

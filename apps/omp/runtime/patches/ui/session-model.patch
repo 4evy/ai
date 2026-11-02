@@ -1,54 +1,44 @@
 diff --git a/packages/coding-agent/src/session/model-controls.ts b/packages/coding-agent/src/session/model-controls.ts
 --- a/packages/coding-agent/src/session/model-controls.ts
 +++ b/packages/coding-agent/src/session/model-controls.ts
-@@ -237,6 +237,7 @@
- 			selector?: string;
- 			thinkingLevel?: ThinkingLevel;
- 			persist?: boolean;
-+			ephemeral?: boolean;
- 		},
- 	): Promise<{ switched: boolean }> {
+@@ -282,7 +282,8 @@
+ 	async setModelTemporary(
+ 		model: Model,
+ 		thinkingLevel?: ConfiguredThinkingLevel,
+-		options?: { ephemeral?: boolean; prewalk?: boolean },
++		// Records model usage by default, including ephemeral switches
++		options?: { ephemeral?: boolean; prewalk?: boolean; recordUsage?: boolean },
+ 		selection: "explicit" | "automatic" = "explicit",
+ 	): Promise<void> {
  		const previousEditMode = this.#host.resolveActiveEditMode();
-@@ -249,8 +250,11 @@
- 		this.#host.modelRegistry.clearSuppressedSelector(formatModelStringWithRouting(targetModel));
- 		this.#host.clearActiveRetryFallback();
- 		await this.#host.setModelWithProviderSessionReset(targetModel);
--		this.#host.sessionManager.appendModelChange(`${targetModel.provider}/${targetModel.id}`, role);
--		if (options?.persist) {
-+		this.#host.sessionManager.appendModelChange(
-+			`${targetModel.provider}/${targetModel.id}`,
-+			options?.ephemeral ? EPHEMERAL_MODEL_CHANGE_ROLE : role,
-+		);
-+		if (options?.persist && !options.ephemeral) {
- 			this.#host.settings.setModelRole(
- 				role,
- 				formatRoleModelValue(
-@@ -263,7 +267,9 @@
- 				),
- 			);
- 		}
+@@ -299,7 +300,10 @@
+ 			`${targetModel.provider}/${targetModel.id}`,
+ 			options?.prewalk ? PREWALK_MODEL_CHANGE_ROLE : options?.ephemeral ? EPHEMERAL_MODEL_CHANGE_ROLE : "temporary",
+ 		);
 -		this.#host.settings.getStorage()?.recordModelUsage(`${targetModel.provider}/${targetModel.id}`);
-+		if (!options?.ephemeral) {
++		// Auxiliary extension selections must not reorder model usage history
++		if (options?.recordUsage !== false) {
 +			this.#host.settings.getStorage()?.recordModelUsage(`${targetModel.provider}/${targetModel.id}`);
 +		}
  
- 		// Re-apply thinking for the newly selected model. Prefer the model's
- 		// configured defaultLevel; otherwise preserve the current level (or auto).
+ 		// Apply explicit thinking level if given; otherwise prefer the model's
+ 		// configured defaultLevel; otherwise re-clamp the current level (or auto).
 diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
 --- a/packages/coding-agent/src/session/agent-session.ts
 +++ b/packages/coding-agent/src/session/agent-session.ts
-@@ -11534,6 +11534,7 @@
- 			selector?: string;
- 			thinkingLevel?: ThinkingLevel;
- 			persist?: boolean;
-+			ephemeral?: boolean;
- 		},
- 	): Promise<{ switched: boolean }> {
- 		return this.#models.setModel(model, role, options);
+@@ -11713,7 +11713,7 @@
+ 	setModelTemporary(
+ 		model: Model,
+ 		thinkingLevel?: ConfiguredThinkingLevel,
+-		options?: { ephemeral?: boolean },
++		options?: { ephemeral?: boolean; recordUsage?: boolean },
+ 	): Promise<void> {
+ 		return this.#models.setModelTemporary(model, thinkingLevel, options);
+ 	}
 diff --git a/packages/coding-agent/src/modes/runtime-init.ts b/packages/coding-agent/src/modes/runtime-init.ts
 --- a/packages/coding-agent/src/modes/runtime-init.ts
 +++ b/packages/coding-agent/src/modes/runtime-init.ts
-@@ -127,7 +127,7 @@
+@@ -128,7 +128,7 @@
  			setActiveTools: (toolNames: string[]) =>
  				session.setActiveToolsByName(filterActiveTools ? filterActiveTools(toolNames) : toolNames),
  			getCommands: () => getSessionSlashCommands(session),
@@ -66,9 +56,9 @@ diff --git a/packages/coding-agent/src/modes/controllers/extension-ui-controller
  } from "../../extensibility/extensions";
 +import { runExtensionSetModel } from "../../extensibility/extensions/compact-handler";
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
- import { ApprovalDialogComponent } from "@oh-my-pi/pi-tui/overlays/approval-dialog";
- import {
-@@ -228,12 +229,7 @@
+ import { cfgExtensionAssistantTextRenderers } from "../../extensibility/settings";
+ import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
+@@ -260,12 +261,7 @@
  			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
  			getAllTools: () => this.ctx.session.getAllToolInfos(),
  			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
@@ -82,7 +72,7 @@ diff --git a/packages/coding-agent/src/modes/controllers/extension-ui-controller
  			getThinkingLevel: () => this.ctx.session.thinkingLevel,
  			setThinkingLevel: level => this.ctx.session.setThinkingLevel(level),
  			getServiceTiers: () => this.ctx.session.serviceTierByFamily,
-@@ -460,12 +456,7 @@
+@@ -493,12 +489,7 @@
  			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
  			getAllTools: () => this.ctx.session.getAllToolInfos(),
  			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
@@ -99,16 +89,15 @@ diff --git a/packages/coding-agent/src/modes/controllers/extension-ui-controller
 diff --git a/packages/coding-agent/src/extensibility/extensions/compact-handler.ts b/packages/coding-agent/src/extensibility/extensions/compact-handler.ts
 --- a/packages/coding-agent/src/extensibility/extensions/compact-handler.ts
 +++ b/packages/coding-agent/src/extensibility/extensions/compact-handler.ts
-@@ -24,7 +24,7 @@
- 
+@@ -25,6 +25,7 @@
  interface SetModelCapableSession {
  	modelRegistry: { getApiKey(model: Model): Promise<string | undefined> };
--	setModel(model: Model): Promise<unknown>;
-+	setModel(model: Model, role?: string, options?: { ephemeral?: boolean }): Promise<unknown>;
+ 	setModel(model: Model): Promise<unknown>;
++	setModelTemporary(model: Model, thinkingLevel: undefined, options: { ephemeral: boolean; recordUsage: boolean }): Promise<unknown>;
  }
  
  /**
-@@ -32,9 +32,13 @@
+@@ -32,9 +33,17 @@
   *
   * Returns false when no API key is available for the requested model.
   */
@@ -121,13 +110,17 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/compact-handler.
  	const key = await session.modelRegistry.getApiKey(model);
  	if (!key) return false;
 -	await session.setModel(model);
-+	await session.setModel(model, "default", options);
++	if (options?.ephemeral) {
++		await session.setModelTemporary(model, undefined, { ephemeral: true, recordUsage: false });
++	} else {
++		await session.setModel(model);
++	}
  	return true;
  }
 diff --git a/packages/coding-agent/src/extensibility/extensions/loader.ts b/packages/coding-agent/src/extensibility/extensions/loader.ts
 --- a/packages/coding-agent/src/extensibility/extensions/loader.ts
 +++ b/packages/coding-agent/src/extensibility/extensions/loader.ts
-@@ -328,8 +328,8 @@
+@@ -374,8 +374,8 @@
  		return this.runtime.getCommands();
  	}
  
@@ -141,7 +134,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/loader.ts b/pack
 diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packages/coding-agent/src/extensibility/extensions/types.ts
 --- a/packages/coding-agent/src/extensibility/extensions/types.ts
 +++ b/packages/coding-agent/src/extensibility/extensions/types.ts
-@@ -1966,8 +1966,11 @@
+@@ -2079,8 +2079,11 @@
  	/** Get available slash commands in the current session. */
  	getCommands(): SlashCommandInfo[];
  
@@ -155,7 +148,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packa
  
  	/** Get current thinking level. */
  	getThinkingLevel(): ThinkingLevel | undefined;
-@@ -2198,7 +2201,7 @@
+@@ -2311,7 +2314,7 @@
  
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
  
@@ -176,7 +169,7 @@ diff --git a/packages/coding-agent/src/modes/acp/acp-agent.ts b/packages/coding-
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
  import { parseSkillInvocation } from "../../extensibility/skills";
  import { PYTHON_KERNEL_CANCEL_BUDGET_MS } from "../../eval/py/kernel";
-@@ -2992,14 +2992,7 @@
+@@ -3081,14 +3081,7 @@
  				getAllTools: () => record.session.getAllToolInfos(),
  				setActiveTools: toolNames => record.session.setActiveToolsByName(toolNames),
  				getCommands: () => getSessionSlashCommands(record.session),

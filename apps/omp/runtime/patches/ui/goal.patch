@@ -87,7 +87,7 @@ diff --git a/packages/coding-agent/src/modes/rpc/rpc-goal.ts b/packages/coding-a
 diff --git a/packages/coding-agent/src/modes/rpc/rpc-mode.ts b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
 --- a/packages/coding-agent/src/modes/rpc/rpc-mode.ts
 +++ b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
-@@ -1927,6 +1927,7 @@
+@@ -1937,6 +1937,7 @@
  					settings: session.settings,
  					cwd: session.sessionManager.getCwd(),
  					output: commandOutput => output({ type: "command_output", text: commandOutput }),
@@ -121,7 +121,7 @@ diff --git a/packages/coding-agent/src/slash-commands/builtin-modes.ts b/package
 diff --git a/packages/coding-agent/src/slash-commands/types.ts b/packages/coding-agent/src/slash-commands/types.ts
 --- a/packages/coding-agent/src/slash-commands/types.ts
 +++ b/packages/coding-agent/src/slash-commands/types.ts
-@@ -77,6 +77,8 @@
+@@ -78,6 +78,8 @@
  	signal?: AbortSignal;
  	/** Emit text to the operator. TUI maps to `ctx.showStatus`, ACP to `sessionUpdate`. */
  	output: (text: string) => Promise<void> | void;

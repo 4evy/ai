@@ -327,7 +327,7 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
 diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status-line/component.ts
 --- a/packages/tui/src/status-line/component.ts
 +++ b/packages/tui/src/status-line/component.ts
-@@ -2688,7 +2688,7 @@
+@@ -2682,7 +2682,7 @@
  
  	#subagentBadgeText(): string | undefined {
  		if (this.#subagentCount === 0) return undefined;
@@ -336,7 +336,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  	}
  
  	/**
-@@ -2957,10 +2957,10 @@
+@@ -2951,10 +2951,10 @@
  	#separatorMetrics(plain: boolean, style: StatusLineSeparatorStyle): SeparatorMetrics {
  		const themeEpoch = getThemeEpoch();
  		const memo = plain ? this.#plainSeparatorMetrics : this.#styledSeparatorMetrics;
@@ -349,7 +349,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  		const metrics: SeparatorMetrics = {
  			themeRef: theme,
  			themeEpoch,
-@@ -2983,8 +2983,8 @@
+@@ -2977,8 +2977,8 @@
  	 *   (embedded in the editor's top border).
  	 * - `band`: the box layout opened by a soft flush-left cap, for the band
  	 *   composer's frameless full-width top row.
@@ -360,7 +360,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  	 * - `plain-left`: left segments only (claude composer; the right group
  	 *   lives in the editor's top rule).
  	 * - `plain-right`: right segments only (claude composer's top rule).
-@@ -3078,8 +3078,12 @@
+@@ -3072,8 +3072,12 @@
  				const glance = widget ? formatJobWidgetGlance(widget.view, theme, JOBS_SEGMENT_SPARK_CELLS) : "";
  				const count = theme.fg("statusLineSubagents", `${theme.icon.job} ${runningBackgroundJobs}`);
  				rightParts.unshift(glance ? `${count} ${glance}` : count);
@@ -374,7 +374,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  		}
  		const topFillWidth = Math.max(0, width);
  		// These arrays are local to this render; overflow handling can mutate them.
-@@ -3130,14 +3134,20 @@
+@@ -3124,14 +3128,20 @@
  		const totalWidth = () => leftWidth + rightWidth + minimumGapWidth();
  
  		if (topFillWidth > 0) {
@@ -399,7 +399,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  				const currentNameVW = rightWidths[nameIdx];
  				const minNameVW = 8;
  				const shrinkBy = Math.min(Math.max(0, currentNameVW - minNameVW), totalWidth() - topFillWidth);
-@@ -3148,23 +3158,17 @@
+@@ -3142,23 +3152,17 @@
  					rightWidths[nameIdx] = nameWidth;
  				}
  			}
@@ -425,7 +425,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  					const pathCtx = (maxLen: number): SegmentContext => ({
  						...ctx,
  						options: { ...ctx.options, path: { ...ctx.options.path, maxLength: maxLen } },
-@@ -3176,7 +3180,7 @@
+@@ -3170,7 +3174,7 @@
  						for (let i = 0; i < 8; i++) {
  							const saved = currentPathVW - pathWidth;
  							if (saved >= shrinkBy) break;
@@ -434,7 +434,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  							if (nextMaxLen >= newMaxLen) break; // no progress or hit floor
  							newMaxLen = nextMaxLen;
  							const adjusted = renderSegment("path", pathCtx(newMaxLen));
-@@ -3190,6 +3194,15 @@
+@@ -3184,6 +3188,15 @@
  					}
  				}
  			}
@@ -450,7 +450,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  			const leftOverflowDropIndex = (): number => {
  				// Preserve the current working directory as long as possible. The
  				// previous right-to-left pop could collapse a normal-width bar to
-@@ -3209,6 +3222,14 @@
+@@ -3203,6 +3216,14 @@
  				leftSegIds.splice(dropIdx, 1);
  				leftWidth = left.length > 0 ? leftWidth - removedWidth - leftSepWidth - 2 : 0;
  			}
@@ -465,7 +465,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  		}
  
  		const renderGroup = (parts: string[], direction: "left" | "right"): string => {
-@@ -3842,8 +3863,7 @@
+@@ -3836,8 +3857,7 @@
  		// the inner edge, so they drop before any configured segment.
  		if (subagentBadge) {
  			push("subagent-badge", "right", 0, {

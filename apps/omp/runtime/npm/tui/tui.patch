@@ -42,12 +42,14 @@ diff --git a/dist/types/tools/todo.d.ts b/dist/types/tools/todo.d.ts
 diff --git a/src/chrome/dynamic-border.ts b/src/chrome/dynamic-border.ts
 --- a/src/chrome/dynamic-border.ts
 +++ b/src/chrome/dynamic-border.ts
-@@ -13,11 +13,13 @@
+@@ -14,13 +14,15 @@
   */
  export class DynamicBorder implements Component {
  	#color: (str: string) => string;
 +	readonly #ribbon: boolean;
+ 	#label: string | (() => string) | undefined;
  	#cachedWidth = -1;
+ 	#cachedLabel: string | undefined;
  	#cachedLines: string[] | undefined;
  
 -	constructor(color: (str: string) => string = str => fgOrPlain("border", str)) {
@@ -58,17 +60,31 @@ diff --git a/src/chrome/dynamic-border.ts b/src/chrome/dynamic-border.ts
  	}
  
  	invalidate(): void {
-@@ -35,7 +37,9 @@
- 			return this.#cachedLines;
- 		}
- 		const horizontal = typeof theme === "undefined" ? "─" : theme.boxRound.horizontal;
--		const lines = [this.#color(horizontal.repeat(Math.max(1, width)))];
+@@ -58,12 +60,19 @@
+ 	}
+ 
+ 	#rule(horizontal: string, width: number, label: string | undefined): string {
+-		const lead = horizontal.repeat(3);
++		const leadWidth = visibleWidth(horizontal) * 3;
+ 		// The label sits between single spaces and leaves at least one rule cell after it.
+-		const labelRoom = width - visibleWidth(lead) - 3;
+-		if (!label || labelRoom < 1) return this.#color(horizontal.repeat(width));
++		const labelRoom = width - leadWidth - 3;
++		if (!label || labelRoom < 1) return this.#ruleSegment(horizontal, width, 0, width);
+ 		const fitted = ` ${truncateToWidth(label, labelRoom)} `;
+-		const rest = width - visibleWidth(lead) - visibleWidth(fitted);
+-		return `${this.#color(lead)}${fitted}${this.#color(horizontal.repeat(rest))}`;
++		const offset = leadWidth + visibleWidth(fitted);
++		const rest = width - offset;
++		return `${this.#ruleSegment(horizontal, 3, 0, width)}${fitted}${this.#ruleSegment(horizontal, rest, offset, width)}`;
+ 	}
++
++	#ruleSegment(horizontal: string, width: number, offset: number, totalWidth: number): string {
 +		const ribbon =
-+			this.#ribbon && typeof theme !== "undefined" ? theme.ribbonRule(horizontal, Math.max(1, width)) : undefined;
-+		const lines = [ribbon ?? this.#color(horizontal.repeat(Math.max(1, width)))];
- 		this.#cachedWidth = width;
- 		this.#cachedLines = lines;
- 		return lines;
++			this.#ribbon && typeof theme !== "undefined" ? theme.ribbonRule(horizontal, width, offset, totalWidth) : undefined;
++		return ribbon ?? this.#color(horizontal.repeat(width));
++	}
+ }
 diff --git a/src/components/composer/pi.ts b/src/components/composer/pi.ts
 --- a/src/components/composer/pi.ts
 +++ b/src/components/composer/pi.ts
@@ -137,7 +153,7 @@ diff --git a/src/theme/loader.ts b/src/theme/loader.ts
 -import { detectColorMode, resolveThemeColors } from "./color";
 +import { detectColorMode, resolveThemeColors, resolveVarRefs } from "./color";
  import darkThemeJson from "./dark.json" with { type: "json" };
- import { defaultThemes } from "./defaults";
+ import defaultThemes from "./defaults.json" with { type: "json" };
  import lightThemeJson from "./light.json" with { type: "json" };
 @@ -179,7 +179,18 @@
  	const symbolPreset: SymbolPreset = symbolPresetOverride ?? themeJson.symbols?.preset ?? "unicode";
@@ -185,7 +201,7 @@ diff --git a/src/theme/schema.ts b/src/theme/schema.ts
 diff --git a/src/theme/theme-class.ts b/src/theme/theme-class.ts
 --- a/src/theme/theme-class.ts
 +++ b/src/theme/theme-class.ts
-@@ -179,6 +179,7 @@
+@@ -188,6 +188,7 @@
  	#sessionAccentInputs: SessionAccentTheme | undefined;
  	#symbols: SymbolMap;
  	#spinnerFramesOverrides: Partial<Record<SpinnerType, string[]>>;
@@ -193,7 +209,7 @@ diff --git a/src/theme/theme-class.ts b/src/theme/theme-class.ts
  	/**
  	 * Perceptual luma (0..1) of the status-line background — used to classify the
  	 * theme light/dark. Undefined when it can't be resolved. Classified against the
-@@ -196,9 +197,12 @@
+@@ -205,9 +206,12 @@
  		private readonly symbolPreset: SymbolPreset,
  		symbolOverrides: Partial<Record<SymbolKey, string>>,
  		spinnerFramesOverrides: Partial<Record<SpinnerType, string[]>> = {},
@@ -208,9 +224,9 @@ diff --git a/src/theme/theme-class.ts b/src/theme/theme-class.ts
  		const slIsLight = this.statusLineLuminance !== undefined && this.statusLineLuminance > 0.5;
  
  		this.#fgColors = {} as Record<ThemeColor, string>;
-@@ -235,8 +239,24 @@
- 			}
- 		}
+@@ -246,8 +250,24 @@
+ 		// `status.done` aliases `status.success` unless a theme overrides it explicitly.
+ 		if (!("status.done" in symbolOverrides)) this.#symbols["status.done"] = this.#symbols["status.success"];
  		this.#spinnerFramesOverrides = spinnerFramesOverrides;
 +		this.#ribbon = ribbonColors?.map(color => fgAnsi(color, mode));
  	}

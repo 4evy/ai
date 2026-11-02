@@ -15,13 +15,13 @@ diff --git a/dist/types/capability/mcp.d.ts b/dist/types/capability/mcp.d.ts
 diff --git a/dist/types/extensibility/extensions/compact-handler.d.ts b/dist/types/extensibility/extensions/compact-handler.d.ts
 --- a/dist/types/extensibility/extensions/compact-handler.d.ts
 +++ b/dist/types/extensibility/extensions/compact-handler.d.ts
-@@ -15,12 +15,16 @@
-     modelRegistry: {
+@@ -16,11 +16,17 @@
          getApiKey(model: Model): Promise<string | undefined>;
      };
--    setModel(model: Model): Promise<unknown>;
-+    setModel(model: Model, role?: string, options?: {
-+        ephemeral?: boolean;
+     setModel(model: Model): Promise<unknown>;
++    setModelTemporary(model: Model, thinkingLevel: undefined, options: {
++        ephemeral: boolean;
++        recordUsage: boolean;
 +    }): Promise<unknown>;
  }
  /**
@@ -48,7 +48,7 @@ diff --git a/dist/types/extensibility/extensions/runner.d.ts b/dist/types/extens
 diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensibility/extensions/types.d.ts
 --- a/dist/types/extensibility/extensions/types.d.ts
 +++ b/dist/types/extensibility/extensions/types.d.ts
-@@ -34,6 +34,7 @@
+@@ -36,6 +36,7 @@
  import type { LocalProtocolOptions } from "../../internal-urls/local-protocol.js";
  import type { LoopLimitConfig } from "../../modes/loop-limit.js";
  import type { MemoryRuntimeContext } from "../../memory-backend/index.js";
@@ -56,7 +56,7 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
  import type { CustomEditor } from "@oh-my-pi/pi-tui/prompt/custom-editor";
  import type { Theme } from "@oh-my-pi/pi-tui/theme";
  import type { NativeToolView } from "@oh-my-pi/pi-tui/tools/renderer";
-@@ -494,6 +495,8 @@
+@@ -553,6 +554,8 @@
      sessionManager: ReadonlySessionManager;
      /** Model registry for API key resolution */
      modelRegistry: ModelRegistry;
@@ -65,7 +65,7 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
      /** Calling session's `local://` root mapping for external tool bridges. */
      localProtocolOptions?: LocalProtocolOptions;
      /** Current model (may be undefined) */
-@@ -1453,8 +1456,13 @@
+@@ -1551,8 +1554,13 @@
      setActiveTools(toolNames: string[]): Promise<void>;
      /** Get available slash commands in the current session. */
      getCommands(): SlashCommandInfo[];
@@ -81,7 +81,7 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
      /** Get current thinking level. */
      getThinkingLevel(): ThinkingLevel | undefined;
      /** Set thinking level for the current session. */
-@@ -1648,7 +1656,7 @@
+@@ -1746,7 +1754,7 @@
  export type GetAllToolsHandler = () => ToolInfo[];
  export type GetCommandsHandler = () => SlashCommandInfo[];
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
@@ -176,7 +176,7 @@ diff --git a/dist/types/modes/components/extensions/mcp-runtime.d.ts b/dist/type
 diff --git a/dist/types/session/agent-session-types.d.ts b/dist/types/session/agent-session-types.d.ts
 --- a/dist/types/session/agent-session-types.d.ts
 +++ b/dist/types/session/agent-session-types.d.ts
-@@ -390,6 +390,8 @@
+@@ -404,6 +404,8 @@
      advisorConfigWarnings?: string[];
      /** Disconnect the MCP manager owned by this session during disposal. */
      disconnectOwnedMcpManager?: () => Promise<void>;
@@ -188,25 +188,25 @@ diff --git a/dist/types/session/agent-session-types.d.ts b/dist/types/session/ag
 diff --git a/dist/types/session/agent-session.d.ts b/dist/types/session/agent-session.d.ts
 --- a/dist/types/session/agent-session.d.ts
 +++ b/dist/types/session/agent-session.d.ts
-@@ -1123,6 +1123,7 @@
-         selector?: string;
-         thinkingLevel?: ThinkingLevel;
-         persist?: boolean;
-+        ephemeral?: boolean;
-     }): Promise<{
-         switched: boolean;
-     }>;
+@@ -1146,6 +1146,7 @@
+     /** Selects a model for this session without updating persisted model settings. */
+     setModelTemporary(model: Model, thinkingLevel?: ConfiguredThinkingLevel, options?: {
+         ephemeral?: boolean;
++        recordUsage?: boolean;
+     }): Promise<void>;
+     /** Cycles the scoped model set, or all available models when no scope exists. */
+     cycleModel(direction?: "forward" | "backward"): Promise<ModelCycleResult | undefined>;
 diff --git a/dist/types/session/model-controls.d.ts b/dist/types/session/model-controls.d.ts
 --- a/dist/types/session/model-controls.d.ts
 +++ b/dist/types/session/model-controls.d.ts
-@@ -82,6 +82,7 @@
-         selector?: string;
-         thinkingLevel?: ThinkingLevel;
-         persist?: boolean;
-+        ephemeral?: boolean;
-     }): Promise<{
-         switched: boolean;
-     }>;
+@@ -95,6 +95,7 @@
+     setModelTemporary(model: Model, thinkingLevel?: ConfiguredThinkingLevel, options?: {
+         ephemeral?: boolean;
+         prewalk?: boolean;
++        recordUsage?: boolean;
+     }, selection?: "explicit" | "automatic"): Promise<void>;
+     /**
+      * Cycle to next/previous model.
 diff --git a/dist/types/ssh/transfer-compression.d.ts b/dist/types/ssh/transfer-compression.d.ts
 new file mode 100644
 --- /dev/null
@@ -360,16 +360,15 @@ diff --git a/src/discovery/omp-plugins.ts b/src/discovery/omp-plugins.ts
 diff --git a/src/extensibility/extensions/compact-handler.ts b/src/extensibility/extensions/compact-handler.ts
 --- a/src/extensibility/extensions/compact-handler.ts
 +++ b/src/extensibility/extensions/compact-handler.ts
-@@ -24,7 +24,7 @@
- 
+@@ -25,6 +25,7 @@
  interface SetModelCapableSession {
  	modelRegistry: { getApiKey(model: Model): Promise<string | undefined> };
--	setModel(model: Model): Promise<unknown>;
-+	setModel(model: Model, role?: string, options?: { ephemeral?: boolean }): Promise<unknown>;
+ 	setModel(model: Model): Promise<unknown>;
++	setModelTemporary(model: Model, thinkingLevel: undefined, options: { ephemeral: boolean; recordUsage: boolean }): Promise<unknown>;
  }
  
  /**
-@@ -32,9 +32,13 @@
+@@ -32,9 +33,17 @@
   *
   * Returns false when no API key is available for the requested model.
   */
@@ -382,13 +381,17 @@ diff --git a/src/extensibility/extensions/compact-handler.ts b/src/extensibility
  	const key = await session.modelRegistry.getApiKey(model);
  	if (!key) return false;
 -	await session.setModel(model);
-+	await session.setModel(model, "default", options);
++	if (options?.ephemeral) {
++		await session.setModelTemporary(model, undefined, { ephemeral: true, recordUsage: false });
++	} else {
++		await session.setModel(model);
++	}
  	return true;
  }
 diff --git a/src/extensibility/extensions/loader.ts b/src/extensibility/extensions/loader.ts
 --- a/src/extensibility/extensions/loader.ts
 +++ b/src/extensibility/extensions/loader.ts
-@@ -328,8 +328,8 @@
+@@ -374,8 +374,8 @@
  		return this.runtime.getCommands();
  	}
  
@@ -402,7 +405,7 @@ diff --git a/src/extensibility/extensions/loader.ts b/src/extensibility/extensio
 diff --git a/src/extensibility/extensions/runner.ts b/src/extensibility/extensions/runner.ts
 --- a/src/extensibility/extensions/runner.ts
 +++ b/src/extensibility/extensions/runner.ts
-@@ -509,6 +509,7 @@
+@@ -516,6 +516,7 @@
  });
  
  export class ExtensionRunner {
@@ -410,7 +413,7 @@ diff --git a/src/extensibility/extensions/runner.ts b/src/extensibility/extensio
  	#uiContext: ExtensionUIContext;
  	#mode: ExtensionMode = "print";
  	#toolApprovalPreviewWaiter?: (toolCallId: string) => Promise<void>;
-@@ -1491,6 +1492,7 @@
+@@ -1607,6 +1608,7 @@
  			cwd: this.cwd,
  			sessionManager: this.sessionManager,
  			modelRegistry: this.modelRegistry,
@@ -421,7 +424,7 @@ diff --git a/src/extensibility/extensions/runner.ts b/src/extensibility/extensio
 diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extensions/types.ts
 --- a/src/extensibility/extensions/types.ts
 +++ b/src/extensibility/extensions/types.ts
-@@ -83,6 +83,7 @@
+@@ -88,6 +88,7 @@
  import type { LocalProtocolOptions } from "../../internal-urls/local-protocol";
  import type { LoopLimitConfig } from "../../modes/loop-limit";
  import type { MemoryRuntimeContext } from "../../memory-backend";
@@ -429,7 +432,7 @@ diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extension
  import type { CustomEditor } from "@oh-my-pi/pi-tui/prompt/custom-editor";
  import type { Theme } from "@oh-my-pi/pi-tui/theme";
  import type { NativeToolView } from "@oh-my-pi/pi-tui/tools/renderer";
-@@ -696,6 +697,8 @@
+@@ -762,6 +763,8 @@
  	sessionManager: ReadonlySessionManager;
  	/** Model registry for API key resolution */
  	modelRegistry: ModelRegistry;
@@ -438,7 +441,7 @@ diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extension
  	/** Calling session's `local://` root mapping for external tool bridges. */
  	localProtocolOptions?: LocalProtocolOptions;
  	/** Current model (may be undefined) */
-@@ -1966,8 +1969,11 @@
+@@ -2079,8 +2082,11 @@
  	/** Get available slash commands in the current session. */
  	getCommands(): SlashCommandInfo[];
  
@@ -452,7 +455,7 @@ diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extension
  
  	/** Get current thinking level. */
  	getThinkingLevel(): ThinkingLevel | undefined;
-@@ -2198,7 +2204,7 @@
+@@ -2311,7 +2317,7 @@
  
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
  
@@ -854,7 +857,7 @@ diff --git a/src/mcp/tool-bridge.ts b/src/mcp/tool-bridge.ts
 diff --git a/src/mcp/transports/stdio.ts b/src/mcp/transports/stdio.ts
 --- a/src/mcp/transports/stdio.ts
 +++ b/src/mcp/transports/stdio.ts
-@@ -415,7 +415,7 @@
+@@ -419,7 +419,7 @@
  }
  
  /** Grace window to observe a cooperative exit after SIGTERM before escalating to SIGKILL. */
@@ -889,7 +892,7 @@ diff --git a/src/modes/acp/acp-agent.ts b/src/modes/acp/acp-agent.ts
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
  import { parseSkillInvocation } from "../../extensibility/skills";
  import { PYTHON_KERNEL_CANCEL_BUDGET_MS } from "../../eval/py/kernel";
-@@ -2992,14 +2992,7 @@
+@@ -3081,14 +3081,7 @@
  				getAllTools: () => record.session.getAllToolInfos(),
  				setActiveTools: toolNames => record.session.setActiveToolsByName(toolNames),
  				getCommands: () => getSessionSlashCommands(record.session),
@@ -934,9 +937,9 @@ diff --git a/src/modes/controllers/extension-ui-controller.ts b/src/modes/contro
  } from "../../extensibility/extensions";
 +import { runExtensionSetModel } from "../../extensibility/extensions/compact-handler";
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
- import { ApprovalDialogComponent } from "@oh-my-pi/pi-tui/overlays/approval-dialog";
- import {
-@@ -228,12 +229,7 @@
+ import { cfgExtensionAssistantTextRenderers } from "../../extensibility/settings";
+ import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
+@@ -260,12 +261,7 @@
  			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
  			getAllTools: () => this.ctx.session.getAllToolInfos(),
  			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
@@ -950,7 +953,7 @@ diff --git a/src/modes/controllers/extension-ui-controller.ts b/src/modes/contro
  			getThinkingLevel: () => this.ctx.session.thinkingLevel,
  			setThinkingLevel: level => this.ctx.session.setThinkingLevel(level),
  			getServiceTiers: () => this.ctx.session.serviceTierByFamily,
-@@ -460,12 +456,7 @@
+@@ -493,12 +489,7 @@
  			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
  			getAllTools: () => this.ctx.session.getAllToolInfos(),
  			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
@@ -988,7 +991,7 @@ diff --git a/src/modes/controllers/mcp-command-controller.ts b/src/modes/control
 diff --git a/src/modes/runtime-init.ts b/src/modes/runtime-init.ts
 --- a/src/modes/runtime-init.ts
 +++ b/src/modes/runtime-init.ts
-@@ -127,7 +127,7 @@
+@@ -128,7 +128,7 @@
  			setActiveTools: (toolNames: string[]) =>
  				session.setActiveToolsByName(filterActiveTools ? filterActiveTools(toolNames) : toolNames),
  			getCommands: () => getSessionSlashCommands(session),
@@ -1000,7 +1003,7 @@ diff --git a/src/modes/runtime-init.ts b/src/modes/runtime-init.ts
 diff --git a/src/sdk.ts b/src/sdk.ts
 --- a/src/sdk.ts
 +++ b/src/sdk.ts
-@@ -3534,6 +3534,7 @@
+@@ -3730,6 +3730,7 @@
  			}),
  			createAnnotationsAPI,
  		);
@@ -1008,7 +1011,7 @@ diff --git a/src/sdk.ts b/src/sdk.ts
  		// A dialog waits for the user, not the agent: the session lets the display sleep while one is open.
  		const trackUserWait: UserWaitTracker = dialog => (hasSession ? session.waitForUser(dialog) : dialog());
  		extensionRunner.setUserWaitTracker(trackUserWait);
-@@ -4946,6 +4947,7 @@
+@@ -5155,6 +5156,7 @@
  				hostMcpServerInstructions = source;
  			},
  			disconnectOwnedMcpManager: ownedMcpManager ? () => ownedMcpManager.disconnectAll() : undefined,
@@ -1019,7 +1022,7 @@ diff --git a/src/sdk.ts b/src/sdk.ts
 diff --git a/src/session/agent-session-types.ts b/src/session/agent-session-types.ts
 --- a/src/session/agent-session-types.ts
 +++ b/src/session/agent-session-types.ts
-@@ -413,6 +413,8 @@
+@@ -427,6 +427,8 @@
  	advisorConfigWarnings?: string[];
  	/** Disconnect the MCP manager owned by this session during disposal. */
  	disconnectOwnedMcpManager?: () => Promise<void>;
@@ -1031,7 +1034,7 @@ diff --git a/src/session/agent-session-types.ts b/src/session/agent-session-type
 diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
 --- a/src/session/agent-session.ts
 +++ b/src/session/agent-session.ts
-@@ -1170,6 +1170,7 @@
+@@ -1196,6 +1196,7 @@
  	#sideStreamFn: StreamFn;
  	#convertToLlm: (messages: AgentMessage[]) => Message[] | Promise<Message[]>;
  	#disconnectOwnedMcpManager: (() => Promise<void>) | undefined;
@@ -1039,7 +1042,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  
  	readonly #ttsr: TtsrCoordinator;
  	readonly #stats: SessionStatsTracker;
-@@ -2454,6 +2455,7 @@
+@@ -2477,6 +2478,7 @@
  			skillsReloadable: config.skillsReloadable,
  		});
  		this.#disconnectOwnedMcpManager = config.disconnectOwnedMcpManager;
@@ -1047,7 +1050,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  		const ttsrHost: TtsrCoordinatorHost = {
  			agent: this.agent,
  			sessionManager: this.sessionManager,
-@@ -5710,6 +5712,9 @@
+@@ -5766,6 +5768,9 @@
  		// `yielded` alone also covers queued steer/follow-up and IRC continuations,
  		// which `#flushPendingAgentEnd` re-tags non-terminal.
  		const awaitingAsyncWork = options?.willContinue === true && options.awaitingAsyncWork === true;
@@ -1057,7 +1060,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  		await this.#emitSessionEvent({
  			...event,
  			isTerminal: !options?.willContinue,
-@@ -6305,7 +6310,7 @@
+@@ -6361,7 +6366,7 @@
  		try {
  			await withTimeout(
  				this.#disconnectOwnedMcpManager(),
@@ -1066,50 +1069,40 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  				"Timed out disconnecting owned MCP manager during dispose",
  			);
  		} catch (error) {
-@@ -11534,6 +11539,7 @@
- 			selector?: string;
- 			thinkingLevel?: ThinkingLevel;
- 			persist?: boolean;
-+			ephemeral?: boolean;
- 		},
- 	): Promise<{ switched: boolean }> {
- 		return this.#models.setModel(model, role, options);
+@@ -11713,7 +11718,7 @@
+ 	setModelTemporary(
+ 		model: Model,
+ 		thinkingLevel?: ConfiguredThinkingLevel,
+-		options?: { ephemeral?: boolean },
++		options?: { ephemeral?: boolean; recordUsage?: boolean },
+ 	): Promise<void> {
+ 		return this.#models.setModelTemporary(model, thinkingLevel, options);
+ 	}
 diff --git a/src/session/model-controls.ts b/src/session/model-controls.ts
 --- a/src/session/model-controls.ts
 +++ b/src/session/model-controls.ts
-@@ -237,6 +237,7 @@
- 			selector?: string;
- 			thinkingLevel?: ThinkingLevel;
- 			persist?: boolean;
-+			ephemeral?: boolean;
- 		},
- 	): Promise<{ switched: boolean }> {
+@@ -282,7 +282,8 @@
+ 	async setModelTemporary(
+ 		model: Model,
+ 		thinkingLevel?: ConfiguredThinkingLevel,
+-		options?: { ephemeral?: boolean; prewalk?: boolean },
++		// Records model usage by default, including ephemeral switches
++		options?: { ephemeral?: boolean; prewalk?: boolean; recordUsage?: boolean },
+ 		selection: "explicit" | "automatic" = "explicit",
+ 	): Promise<void> {
  		const previousEditMode = this.#host.resolveActiveEditMode();
-@@ -249,8 +250,11 @@
- 		this.#host.modelRegistry.clearSuppressedSelector(formatModelStringWithRouting(targetModel));
- 		this.#host.clearActiveRetryFallback();
- 		await this.#host.setModelWithProviderSessionReset(targetModel);
--		this.#host.sessionManager.appendModelChange(`${targetModel.provider}/${targetModel.id}`, role);
--		if (options?.persist) {
-+		this.#host.sessionManager.appendModelChange(
-+			`${targetModel.provider}/${targetModel.id}`,
-+			options?.ephemeral ? EPHEMERAL_MODEL_CHANGE_ROLE : role,
-+		);
-+		if (options?.persist && !options.ephemeral) {
- 			this.#host.settings.setModelRole(
- 				role,
- 				formatRoleModelValue(
-@@ -263,7 +267,9 @@
- 				),
- 			);
- 		}
+@@ -299,7 +300,10 @@
+ 			`${targetModel.provider}/${targetModel.id}`,
+ 			options?.prewalk ? PREWALK_MODEL_CHANGE_ROLE : options?.ephemeral ? EPHEMERAL_MODEL_CHANGE_ROLE : "temporary",
+ 		);
 -		this.#host.settings.getStorage()?.recordModelUsage(`${targetModel.provider}/${targetModel.id}`);
-+		if (!options?.ephemeral) {
++		// Auxiliary extension selections must not reorder model usage history
++		if (options?.recordUsage !== false) {
 +			this.#host.settings.getStorage()?.recordModelUsage(`${targetModel.provider}/${targetModel.id}`);
 +		}
  
- 		// Re-apply thinking for the newly selected model. Prefer the model's
- 		// configured defaultLevel; otherwise preserve the current level (or auto).
+ 		// Apply explicit thinking level if given; otherwise prefer the model's
+ 		// configured defaultLevel; otherwise re-clamp the current level (or auto).
 diff --git a/src/ssh/connection-manager.ts b/src/ssh/connection-manager.ts
 --- a/src/ssh/connection-manager.ts
 +++ b/src/ssh/connection-manager.ts

@@ -9,7 +9,7 @@ diff --git a/packages/coding-agent/src/tools/browser/launch.ts b/packages/coding
  import stealthWorkerScript from "../puppeteer/13_stealth_worker.txt" with { type: "text" };
  import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
  import { withDownload } from "../../downloads/activity";
-@@ -663,7 +664,7 @@
+@@ -671,7 +672,7 @@
  	try {
  		if (userDataDir) await seedOwnedProfilePreferences(userDataDir);
  		const executablePath = await ensureChromiumExecutable();
@@ -18,7 +18,7 @@ diff --git a/packages/coding-agent/src/tools/browser/launch.ts b/packages/coding
  			headless: opts.headless,
  			defaultViewport: opts.headless ? initialViewport : null,
  			executablePath,
-@@ -774,10 +775,11 @@
+@@ -782,10 +783,11 @@
  		args: buildHeadlessLaunchArgs(vp),
  		userDataDir: opts.userDataDir,
  	});
@@ -44,7 +44,7 @@ diff --git a/packages/coding-agent/src/tools/browser/registry.ts b/packages/codi
  
  export type PuppeteerBrowserKind =
  	| {
-@@ -332,6 +333,9 @@
+@@ -335,6 +336,9 @@
  	}
  	const appArgs = kind.args ?? [];
  	const reused = await findReusableCdp(exe, { signal: opts.signal, appArgs });
@@ -54,7 +54,7 @@ diff --git a/packages/coding-agent/src/tools/browser/registry.ts b/packages/codi
  	let cdpUrl: string;
  	let pid: number;
  	let subprocess: Subprocess | undefined;
-@@ -342,7 +346,8 @@
+@@ -345,7 +349,8 @@
  	} else {
  		const port = await findFreeCdpPort();
  		const launchArgs = [...appArgs, `--remote-debugging-port=${port}`];

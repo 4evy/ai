@@ -169,10 +169,6 @@ async function installClosure(tree: string): Promise<void> {
     );
   }
   await copyFile(join(runtimeRoot, "policy/policy.sh"), join(tree, "update-policy.sh"));
-  await run(
-    [process.execPath, "packages/collab-web/scripts/build-tool-views.ts"],
-    tree,
-  );
   await run([process.execPath, "--cwd=packages/stats", "run", "gen:stats"], tree);
   // Windows copies avoid requiring Developer Mode or administrator symlink
   // rights

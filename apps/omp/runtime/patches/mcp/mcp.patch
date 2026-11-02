@@ -517,7 +517,7 @@ diff --git a/packages/coding-agent/src/mcp/tool-bridge.ts b/packages/coding-agen
 diff --git a/packages/coding-agent/src/mcp/transports/stdio.ts b/packages/coding-agent/src/mcp/transports/stdio.ts
 --- a/packages/coding-agent/src/mcp/transports/stdio.ts
 +++ b/packages/coding-agent/src/mcp/transports/stdio.ts
-@@ -415,7 +415,7 @@
+@@ -419,7 +419,7 @@
  }
  
  /** Grace window to observe a cooperative exit after SIGTERM before escalating to SIGKILL. */
@@ -584,7 +584,7 @@ diff --git a/packages/coding-agent/src/modes/controllers/mcp-command-controller.
 diff --git a/packages/coding-agent/src/sdk.ts b/packages/coding-agent/src/sdk.ts
 --- a/packages/coding-agent/src/sdk.ts
 +++ b/packages/coding-agent/src/sdk.ts
-@@ -3534,6 +3534,7 @@
+@@ -3730,6 +3730,7 @@
  			}),
  			createAnnotationsAPI,
  		);
@@ -592,7 +592,7 @@ diff --git a/packages/coding-agent/src/sdk.ts b/packages/coding-agent/src/sdk.ts
  		// A dialog waits for the user, not the agent: the session lets the display sleep while one is open.
  		const trackUserWait: UserWaitTracker = dialog => (hasSession ? session.waitForUser(dialog) : dialog());
  		extensionRunner.setUserWaitTracker(trackUserWait);
-@@ -4946,6 +4947,7 @@
+@@ -5155,6 +5156,7 @@
  				hostMcpServerInstructions = source;
  			},
  			disconnectOwnedMcpManager: ownedMcpManager ? () => ownedMcpManager.disconnectAll() : undefined,
@@ -603,7 +603,7 @@ diff --git a/packages/coding-agent/src/sdk.ts b/packages/coding-agent/src/sdk.ts
 diff --git a/packages/coding-agent/src/session/agent-session-types.ts b/packages/coding-agent/src/session/agent-session-types.ts
 --- a/packages/coding-agent/src/session/agent-session-types.ts
 +++ b/packages/coding-agent/src/session/agent-session-types.ts
-@@ -413,6 +413,8 @@
+@@ -427,6 +427,8 @@
  	advisorConfigWarnings?: string[];
  	/** Disconnect the MCP manager owned by this session during disposal. */
  	disconnectOwnedMcpManager?: () => Promise<void>;
@@ -615,7 +615,7 @@ diff --git a/packages/coding-agent/src/session/agent-session-types.ts b/packages
 diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
 --- a/packages/coding-agent/src/session/agent-session.ts
 +++ b/packages/coding-agent/src/session/agent-session.ts
-@@ -1170,6 +1170,7 @@
+@@ -1196,6 +1196,7 @@
  	#sideStreamFn: StreamFn;
  	#convertToLlm: (messages: AgentMessage[]) => Message[] | Promise<Message[]>;
  	#disconnectOwnedMcpManager: (() => Promise<void>) | undefined;
@@ -623,7 +623,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  
  	readonly #ttsr: TtsrCoordinator;
  	readonly #stats: SessionStatsTracker;
-@@ -2454,6 +2455,7 @@
+@@ -2477,6 +2478,7 @@
  			skillsReloadable: config.skillsReloadable,
  		});
  		this.#disconnectOwnedMcpManager = config.disconnectOwnedMcpManager;
@@ -631,7 +631,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  		const ttsrHost: TtsrCoordinatorHost = {
  			agent: this.agent,
  			sessionManager: this.sessionManager,
-@@ -5710,6 +5712,9 @@
+@@ -5766,6 +5768,9 @@
  		// `yielded` alone also covers queued steer/follow-up and IRC continuations,
  		// which `#flushPendingAgentEnd` re-tags non-terminal.
  		const awaitingAsyncWork = options?.willContinue === true && options.awaitingAsyncWork === true;
@@ -641,7 +641,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  		await this.#emitSessionEvent({
  			...event,
  			isTerminal: !options?.willContinue,
-@@ -6305,7 +6310,7 @@
+@@ -6361,7 +6366,7 @@
  		try {
  			await withTimeout(
  				this.#disconnectOwnedMcpManager(),
@@ -653,7 +653,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
 diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packages/coding-agent/src/extensibility/extensions/types.ts
 --- a/packages/coding-agent/src/extensibility/extensions/types.ts
 +++ b/packages/coding-agent/src/extensibility/extensions/types.ts
-@@ -83,6 +83,7 @@
+@@ -88,6 +88,7 @@
  import type { LocalProtocolOptions } from "../../internal-urls/local-protocol";
  import type { LoopLimitConfig } from "../../modes/loop-limit";
  import type { MemoryRuntimeContext } from "../../memory-backend";
@@ -661,7 +661,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packa
  import type { CustomEditor } from "@oh-my-pi/pi-tui/prompt/custom-editor";
  import type { Theme } from "@oh-my-pi/pi-tui/theme";
  import type { NativeToolView } from "@oh-my-pi/pi-tui/tools/renderer";
-@@ -696,6 +697,8 @@
+@@ -762,6 +763,8 @@
  	sessionManager: ReadonlySessionManager;
  	/** Model registry for API key resolution */
  	modelRegistry: ModelRegistry;
@@ -673,7 +673,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packa
 diff --git a/packages/coding-agent/src/extensibility/extensions/runner.ts b/packages/coding-agent/src/extensibility/extensions/runner.ts
 --- a/packages/coding-agent/src/extensibility/extensions/runner.ts
 +++ b/packages/coding-agent/src/extensibility/extensions/runner.ts
-@@ -509,6 +509,7 @@
+@@ -516,6 +516,7 @@
  });
  
  export class ExtensionRunner {
@@ -681,7 +681,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/runner.ts b/pack
  	#uiContext: ExtensionUIContext;
  	#mode: ExtensionMode = "print";
  	#toolApprovalPreviewWaiter?: (toolCallId: string) => Promise<void>;
-@@ -1491,6 +1492,7 @@
+@@ -1607,6 +1608,7 @@
  			cwd: this.cwd,
  			sessionManager: this.sessionManager,
  			modelRegistry: this.modelRegistry,
