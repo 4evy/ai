@@ -219,6 +219,11 @@
   ],
   "packageRules": [
     {
+      "description": "The Actions bot token cannot push workflow-file changes",
+      "matchFileNames": [".github/workflows/**"],
+      "enabled": false
+    },
+    {
       "description": "Update Skylight runtimes together and regenerate their shared private Sky declarations",
       "matchManagers": ["custom.regex"],
       "matchFileNames": ["farstep/runtime/sky/runtime/pins.json"],

@@ -13,7 +13,9 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 180
     permissions:
-      contents: read
+      contents: write # Push dependency update branches
+      pull-requests: write # Open and update bot-authored PRs
+      issues: write # Maintain Renovate's dependency dashboard
     steps:
       - name: Check out the runner configuration
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -32,7 +34,7 @@ jobs:
         run: bun install --frozen-lockfile --ignore-scripts
       - name: Run Renovate with the repository toolchain
         env:
-          RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           RENOVATE_CONFIG_FILE: .github/renovate-runner.mjs
           LOG_LEVEL: info
         run: bun .github/scripts/renovate/renovate.ts

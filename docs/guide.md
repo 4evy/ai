@@ -485,11 +485,16 @@ Review pin, hash, lockfile, and generated-file changes together. Renovate's
 inputs. Read the [runner](../.github/scripts/renovate/renovate.ts) before
 changing automation.
 
-The scheduled Renovate workflow requires the repository Actions secret
-`RENOVATE_TOKEN`, containing a separate token with contents, pull requests,
-issues, and workflows write access. Restrict fine-grained tokens to this
-repository and renew them before expiry. The default `GITHUB_TOKEN` cannot
-replace it because updates must trigger CI and may change workflow files.
+The scheduled Renovate workflow uses its built-in `GITHUB_TOKEN`, so PRs belong
+to `github-actions[bot]`. It needs contents, pull requests, and issues write
+permissions, and the repository's Actions policy must allow creating pull
+requests. No personal token or separate GitHub App credentials are used.
+The runner only runs in Actions and overrides inherited Renovate and GitHub
+CLI tokens with the workflow token.
+
+GitHub does not trigger normal PR workflows for changes made with
+`GITHUB_TOKEN`, and that token cannot push workflow-file updates. Run the
+relevant checks manually for bot PRs and update workflow pins outside Renovate.
 
 ## Commit changes by domain in OMP
 
