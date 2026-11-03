@@ -199,7 +199,7 @@ async function runScript(
       error instanceof zx.ProcessOutput
         ? error.message
         : error instanceof Error
-          ? (error.stack ?? error.message)
+          ? error
           : String(error),
     );
     return error instanceof zx.ProcessOutput && error.exitCode ? error.exitCode : 1;
