@@ -50,9 +50,11 @@ export const readinessInputSchema = v.union([
   ]),
 ]);
 export type ReadinessInput = v.InferOutput<typeof readinessInputSchema>;
+// Lead with object diagnostics so an invalid policy reports its field limits
+// instead of being coerced to the string shorthand by harness validators
 const outputInputSchema = v.union([
-  v.picklist(["text", "json", "jsonl"]),
   workflowOutputPolicySchema,
+  v.picklist(["text", "json", "jsonl"]),
 ]);
 export const workflowInputFields = {
   requestId: v.pipe(
