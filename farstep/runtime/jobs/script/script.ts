@@ -18,6 +18,7 @@ import { parseSync } from "@optique/core/parser";
 import { argument, command } from "@optique/core/primitives";
 import { choice } from "@optique/core/valueparser";
 import { valibot } from "@optique/valibot";
+import { Config, ConfigProvider, Effect, Redacted, Schema, Stream } from "effect";
 import * as v from "valibot";
 import * as zx from "zx";
 import {
@@ -25,6 +26,10 @@ import {
   DEFAULT_CAPTURE_BYTES,
   scriptInputSchema,
 } from "../../../protocol/script/script";
+import { createCommands } from "./commands";
+import { Environment } from "./environment";
+import { CommandError } from "./errors";
+import { Query } from "./query";
 
 interface RunningCommand {
   child: ChildProcess;
@@ -94,26 +99,39 @@ async function runScript(
   // loaded the chosen login/shared environment, envFiles and explicit overrides
   zx.$.spawn = ((command, args, options) => {
     if (captureError) throw captureError;
-    const child = spawn(
-      application,
-      [...shellFlags(shell, false), "-c", String(command), ...(args ?? [])],
-      {
-        ...options,
-        shell: false,
-        detached: false,
-      },
-    );
-    const running: RunningCommand = {
+    const signal = options?.signal;
+    let running: RunningCommand;
+    const abort = () => stop(running);
+    // Stop descendants before spawn's abort listener can orphan them
+    signal?.addEventListener("abort", abort, { once: true });
+    let child: ChildProcess;
+    try {
+      child = spawn(
+        application,
+        [...shellFlags(shell, false), "-c", String(command), ...(args ?? [])],
+        {
+          ...options,
+          shell: false,
+          detached: false,
+        },
+      );
+    } catch (error) {
+      signal?.removeEventListener("abort", abort);
+      throw error;
+    }
+    running = {
       child,
       process: child.pid ? Process.fromPid(child.pid) : null,
       closed: new Promise((resolve) =>
         child.once("close", () => {
+          signal?.removeEventListener("abort", abort);
           children.delete(running);
           resolve();
         }),
       ),
     };
     children.add(running);
+    if (signal?.aborted) abort();
     let bytes = 0;
     const bounded = (stream: Readable | null): Readable | null => {
       if (!stream) return null;
@@ -132,6 +150,8 @@ async function runScript(
           callback();
         },
       });
+      // zx destroys these replacements on abort; close the owned pipe too
+      limit.once("close", () => stream.destroy());
       stream.on("error", (error) => child.emit("error", error));
       return stream.pipe(limit);
     };
@@ -178,15 +198,30 @@ async function runScript(
   try {
     directory = await mkdtemp(join(tmpdir(), "farstep-script-"));
     await mkdir(join(directory, "node_modules"), { mode: 0o700 });
-    // Resolve imports of zx to the pinned package even when cwd has another zx
-    await symlink(
-      dirname(Bun.resolveSync("zx/package.json", import.meta.dir)),
-      join(directory, "node_modules/zx"),
-      "dir",
-    );
+    // Resolve script imports to the pinned packages, not the job cwd's versions
+    for (const name of ["zx", "effect"])
+      await symlink(
+        dirname(Bun.resolveSync(`${name}/package.json`, import.meta.dir)),
+        join(directory, "node_modules", name),
+        "dir",
+      );
     const source = join(directory, "script.ts");
     await writeFile(source, script.script, { mode: 0o600 });
-    Object.assign(globalThis, { $: zx.$, zx, params: script.params ?? {} });
+    Object.assign(globalThis, {
+      $: zx.$,
+      zx,
+      cmd: createCommands(),
+      CommandError,
+      Query,
+      Env: Environment,
+      Config,
+      ConfigProvider,
+      Redacted,
+      Effect,
+      Schema,
+      Stream,
+      params: script.params ?? {},
+    });
     await Promise.race([import(pathToFileURL(source).href), captureFailure.promise]);
     if (captureError) throw captureError;
     if (children.size)
@@ -202,7 +237,10 @@ async function runScript(
           ? error
           : String(error),
     );
-    return error instanceof zx.ProcessOutput && error.exitCode ? error.exitCode : 1;
+    return (error instanceof zx.ProcessOutput || error instanceof CommandError) &&
+      error.exitCode
+      ? error.exitCode
+      : 1;
   } finally {
     cleanup();
     await Promise.all(Array.from(children, (child) => child.closed));

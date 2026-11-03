@@ -157,11 +157,21 @@ export const EXAMPLES = {
       cwd: "trials",
       envFiles: ["trials/first.env", "trials/second.env"],
     }),
+    environmentConfig: example(
+      runParameters,
+      {
+        script:
+          "const service = cmd.with({\n  cwd: params.directory,\n  env: Env.only(['PATH', 'HOME']).dotenv(params.dotenv).set({ NODE_ENV: 'production' }),\n});\nconst settings = await service.config(Config.all({\n  name: Config.String('SERVICE_NAME'),\n  port: Config.Number('PORT'),\n  debug: Config.Boolean('DEBUG'),\n  token: Config.Redacted('API_TOKEN'),\n}));\nconsole.log({ name: settings.name, port: settings.port, debug: settings.debug });",
+        params: { directory: "./service", dotenv: ".env" },
+        pty: false,
+      },
+      true,
+    ),
     literalSearch: example(
       runParameters,
       {
         script:
-          "const result = await $({ nothrow: true })`rg --fixed-strings -- ${params.text} ${params.path}`;\nif (result.exitCode !== 0 && result.exitCode !== 1) throw result;\nconsole.log(result.stdout);",
+          "const result = await cmd.run(['rg', '--fixed-strings', '--', params.text, params.path], { okExitCodes: [0, 1] });\nconsole.log(result.stdout);",
         params: { text: "a $literal", path: "./src" },
         pty: false,
       },
@@ -171,7 +181,7 @@ export const EXAMPLES = {
       runParameters,
       {
         script:
-          "for (const argv of params.commands as string[][]) {\n  const result = await $`${argv}`;\n  console.log(result.stdout);\n}",
+          "for (const argv of params.commands as string[][]) {\n  console.log(await cmd.text(argv));\n}",
         params: {
           commands: [
             ["printf", "%s\n", "a path with spaces", "$(not a command)"],
@@ -186,7 +196,7 @@ export const EXAMPLES = {
       runParameters,
       {
         script:
-          "const rows = await $({ input: params.text })`sort`.lines();\nconsole.log(JSON.stringify(rows));",
+          "const rows = await cmd.lines(['sort'], { stdin: { text: params.text } });\nconsole.log(JSON.stringify(rows));",
         params: { text: "pear\napple\npear\n" },
         output: { format: "json", maxBytes: 4096, maxCaptureBytes: 1024 * 1024 },
         pty: false,
@@ -197,7 +207,7 @@ export const EXAMPLES = {
       runParameters,
       {
         script:
-          "for (const directory of params.packages as string[]) {\n  console.error(`Checking ${directory}`);\n  await $({ cwd: directory, verbose: true })`bun run check`;\n}",
+          "const results = await cmd.map(params.packages as string[], async (directory, _index, signal) => {\n  const local = cmd.with({ cwd: directory, env: { CI: '1' }, signal });\n  await local.run(['bun', 'run', 'check'], { verbose: true });\n  return directory;\n}, { concurrency: 2 });\nconsole.log(JSON.stringify({ checked: results }));",
         params: { packages: ["packages/api", "packages/ui"] },
         pty: false,
       },
@@ -207,8 +217,80 @@ export const EXAMPLES = {
       runParameters,
       {
         script:
-          "async function readCount(value: string): Promise<number> {\n  const result = await $`printf '%s\\n' ${value}`;\n  return Number(result.stdout.trim());\n}\nconst counts = [];\nfor (const value of params.values as string[]) {\n  const count = await readCount(value);\n  if (count > 0) counts.push(count);\n}\nconsole.log(JSON.stringify({ counts }));",
+          "const counts = [];\nfor (const value of params.values as string[]) {\n  const count = Number(await cmd.text(['printf', '%s', value]));\n  if (count > 0) counts.push(count);\n}\nconsole.log(JSON.stringify({ counts }));",
         params: { values: ["2", "0", "3"] },
+        output: "json",
+        pty: false,
+      },
+      true,
+    ),
+    stdoutJson: example(
+      runParameters,
+      {
+        script:
+          "const value = await cmd.json(['bun', '--eval', params.source]);\nconsole.log(JSON.stringify(value));",
+        params: {
+          source:
+            "console.error('progress'); console.log(JSON.stringify({ ok: true }));",
+        },
+        output: "json",
+        pty: false,
+      },
+      true,
+    ),
+    pipeline: example(
+      runParameters,
+      {
+        script:
+          "const result = await cmd.pipe([\n  { argv: ['cat'], options: { stdin: { file: params.input }, timeout: '5s' } },\n  { argv: ['gzip', '-c'], options: { env: { LC_ALL: 'C' }, timeout: '10s' } },\n], { stdout: { file: params.output }, stderr: { file: params.log, append: true } });\nconst archive = await cmd.bytes(['cat'], { stdin: { file: params.output } });\nawait cmd.run(['gzip', '-t'], { stdin: { bytes: archive } });\nconsole.log(JSON.stringify({ exitCode: result.exitCode, bytes: archive.byteLength }));",
+        params: {
+          input: "./input.bin",
+          output: "./input.bin.gz",
+          log: "./compression.log",
+        },
+        pty: false,
+      },
+      true,
+    ),
+    typedQuery: example(
+      runParameters,
+      {
+        script:
+          "const Job = Schema.Struct({ team: Schema.String, cpu: Schema.Number });\nconst Owner = Schema.Struct({ team: Schema.String, name: Schema.String });\nconst owners = Query.fromEffect(Schema.decodeUnknownEffect(Schema.Array(Owner))(params.owners));\nconst report = cmd.query.json(['cat'], { stdin: { text: JSON.stringify(params.jobs) }, schema: Job })\n  .where(job => job.cpu >= 2)\n  .groupBy(job => job.team)\n  .select(({ key, rows }) => ({ team: key, cpu: Math.sumPrecise(rows.map(row => row.cpu)), jobs: rows.length }))\n  .leftJoin(owners, { left: row => row.team, right: owner => owner.team }, (row, owner) => ({ ...row, owner: owner?.name ?? 'unassigned' }))\n  .orderBy((a, b) => b.cpu - a.cpu)\n  .pick('team', 'cpu', 'jobs', 'owner');\nconsole.log(JSON.stringify(await report.take(10).collect()));",
+        params: {
+          jobs: [
+            { team: "build", cpu: 3 },
+            { team: "build", cpu: 4 },
+            { team: "search", cpu: 2 },
+            { team: "idle", cpu: 0 },
+          ],
+          owners: [{ team: "build", name: "compiler" }],
+        },
+        output: "json",
+        pty: false,
+      },
+      true,
+    ),
+    effectQueries: example(
+      runParameters,
+      {
+        script:
+          "const Snapshot = Schema.Struct({ ready: Schema.Boolean, workers: Schema.Number });\nconst results = await cmd.execute(Effect.all({\n  snapshot: cmd.effect.json(['cat'], { stdin: { text: JSON.stringify(params.snapshot) }, schema: Snapshot }),\n  version: cmd.effect.text(['bun', '--version']),\n}, { concurrency: 2 }).pipe(Effect.timeout('5 seconds')));\nconsole.log(JSON.stringify(results));",
+        params: { snapshot: { ready: true, workers: 4 } },
+        output: "json",
+        pty: false,
+      },
+      true,
+    ),
+    liveQuery: example(
+      runParameters,
+      {
+        script:
+          "const Row = Schema.Struct({ sequence: Schema.Number });\nconst rows = await cmd.query.jsonl(['bun', '--eval', params.source], { schema: Row })\n  .where(row => row.sequence % 2 === 0)\n  .take(3)\n  .collect();\nconsole.log(JSON.stringify(rows));",
+        params: {
+          source:
+            "let sequence = 0; setInterval(() => console.log(JSON.stringify({ sequence: ++sequence })), 25);",
+        },
         output: "json",
         pty: false,
       },
