@@ -2,8 +2,7 @@
   lib,
   stdenv,
   fetchurl,
-  rpm,
-  cpio,
+  libarchive,
   unzip,
   autoPatchelfHook,
   chatgpt,
@@ -24,8 +23,7 @@ stdenv.mkDerivation {
   nativeBuildInputs =
     if linux then
       [
-        rpm
-        cpio
+        libarchive
         autoPatchelfHook
       ]
     else
@@ -42,8 +40,8 @@ stdenv.mkDerivation {
       ''
         mkdir source
         cd source
-        rpm2cpio "$src" | cpio --extract --make-directories --quiet \
-          --no-absolute-filenames './usr/lib/chatgpt/resources/cua_node/*'
+        # Read the RPM directly so cpio cannot close the conversion pipe early
+        bsdtar -xf "$src" './usr/lib/chatgpt/resources/cua_node/*'
       ''
     else
       ''
