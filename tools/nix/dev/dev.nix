@@ -14,7 +14,7 @@ let
       pkgs.cargo
     else
       let
-        vendor = pkgs.callPackage ../../../farstep/nix/cargo-deps.nix { };
+        vendor = farstep.desktop.cargoVendorDir;
       in
       pkgs.writeShellScriptBin "cargo" ''
         configuration=(

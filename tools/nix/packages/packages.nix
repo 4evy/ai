@@ -1,4 +1,4 @@
-{ bun2nix }:
+{ bun2nix, crane }:
 pkgs:
 let
   ghidraNative = pkgs.lib.trivial.importJSON ../../../apps/ghidra/native/source.json;
@@ -21,6 +21,8 @@ let
   scope = pkgs.lib.makeScope pkgs.newScope (
     self:
     {
+      craneLib = crane.mkLib pkgs;
+      farstep-cargo = self.callPackage ../../../farstep/nix/cargo-deps.nix { };
       aiUpdateScript = self.callPackage ../update/update.nix { };
       bun = self.callPackage ../javascript/runtime/runtime.nix {
         inherit (pkgs) bun;
@@ -132,6 +134,8 @@ in
 # Keep the public package set limited to derivations, without scope helpers
 removeAttrs (scope.packages scope) [
   "aiUpdateScript"
+  "craneLib"
+  "farstep-cargo"
   "ghidra-bin"
   "gradle"
 ]

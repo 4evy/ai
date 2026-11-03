@@ -1,0 +1,39 @@
+[package]
+name = "farstep-desktop"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["desktop", "systemd"]
+# The CLI is also usable without a graphical backend
+cli = ["dep:farstep-protocol", "dep:tokio"]
+systemd = ["cli", "dep:clap", "dep:farstep-systemd"]
+desktop = ["cli", "dep:clap", "dep:farstep-desktop-platform"]
+
+[[bin]]
+name = "farstep-desktop"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[dependencies]
+farstep-protocol = { path = "../../protocol", optional = true }
+tokio = { workspace = true, optional = true, features = [
+  "macros",
+  "rt-multi-thread",
+] }
+farstep-desktop-platform = { path = "../platform", optional = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+farstep-systemd = { path = "../../systemd", optional = true }
+clap = { workspace = true, optional = true, features = [
+  "std",
+  "derive",
+  "help",
+  "usage",
+  "error-context",
+] }

@@ -1,0 +1,27 @@
+[package]
+name = "farstep-systemd"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+farstep-protocol = { path = "../protocol" }
+clap = { workspace = true, features = [
+  "std",
+  "derive",
+  "help",
+  "usage",
+  "error-context",
+] }
+futures-util.workspace = true
+serde_json.workspace = true
+zbus = { workspace = true, features = ["tokio", "proxy"] }
+zbus_systemd = { workspace = true, features = [
+  "login1",
+  "systemd1",
+  "zbus-async-tokio",
+] }

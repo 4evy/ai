@@ -1,0 +1,146 @@
+[package]
+name = "farstep-desktop-platform"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+farstep-protocol = { path = "../../protocol" }
+farstep-desktop-api = { path = "../api" }
+farstep-desktop-image = { path = "../image" }
+farstep-desktop-runtime = { path = "../runtime" }
+scopeguard.workspace = true
+clap = { workspace = true, features = [
+  "std",
+  "derive",
+  "help",
+  "usage",
+  "error-context",
+] }
+tokio = { workspace = true, features = [
+  "macros",
+  "rt-multi-thread",
+  "net",
+  "io-util",
+  "process",
+  "signal",
+  "sync",
+  "time",
+] }
+tokio-util = { workspace = true, features = ["rt"] }
+
+[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
+async-trait.workspace = true
+serde_json.workspace = true
+uuid = { workspace = true, features = ["v4"] }
+enigo.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+serde = { workspace = true, features = ["derive"] }
+axuielement.workspace = true
+command-fds.workspace = true
+objc2.workspace = true
+objc2-app-kit = { workspace = true, features = [
+  "std",
+  "libc",
+  "NSRunningApplication",
+  "NSWorkspace",
+] }
+objc2-core-graphics = { workspace = true, features = ["CGEvent"] }
+objc2-foundation = { workspace = true, features = [
+  "std",
+  "NSBundle",
+  "NSData",
+  "NSError",
+  "NSJSONSerialization",
+  "NSProcessInfo",
+  "NSString",
+  "NSURL",
+] }
+core-foundation.workspace = true
+core-graphics.workspace = true
+screencapturekit = { workspace = true, features = ["async", "macos_14_0"] }
+libc.workspace = true
+dlopen2.workspace = true
+rustix = { workspace = true, features = ["fs", "process"] }
+tempfile.workspace = true
+backon = { workspace = true, features = [
+  "std",
+  "std-blocking-sleep",
+  "tokio-sleep",
+] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+base64.workspace = true
+win-custody.workspace = true
+windows = { workspace = true, features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_Security",
+  "Win32_Security_Authorization",
+  "Win32_System_Memory",
+  "Win32_System_Threading",
+  "Win32_System_StationsAndDesktops",
+  "Win32_System_RemoteDesktop",
+  "Win32_UI_HiDpi",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_UI_Shell",
+  "Win32_Storage_FileSystem",
+  "Win32_Storage_Xps",
+  "Win32_System_JobObjects",
+  "Win32_UI_Input_KeyboardAndMouse",
+] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+async-io.workspace = true
+procfs.workspace = true
+backon = { workspace = true, features = [
+  "std",
+  "std-blocking-sleep",
+  "tokio-sleep",
+] }
+derive_more = { workspace = true, features = [
+  "deref",
+  "deref_mut",
+  "from",
+  "into",
+] }
+async-trait.workspace = true
+ashpd = { workspace = true, features = [
+  "tokio",
+  "remote_desktop",
+  "screencast",
+  "clipboard",
+  "open_uri",
+] }
+reis.workspace = true
+gstreamer.workspace = true
+gstreamer-app.workspace = true
+gstreamer-video.workspace = true
+enigo = { workspace = true, features = ["wayland"] }
+wl-clipboard-rs.workspace = true
+wayland-client.workspace = true
+wayland-protocols-misc = { workspace = true, features = ["client"] }
+wayland-protocols-wlr = { workspace = true, features = ["client"] }
+smithay-client-toolkit = { workspace = true, features = ["calloop"] }
+futures-util = { workspace = true, features = ["io"] }
+uuid = { workspace = true, features = ["v4"] }
+enumflags2.workspace = true
+zbus = { workspace = true, features = ["tokio", "proxy"] }
+zbus_systemd = { workspace = true, features = ["systemd1", "zbus-async-tokio"] }
+rustix = { workspace = true, features = ["process", "fs", "event", "net"] }
+wl-proxy = { workspace = true, features = [
+  "suite-wayland-protocols",
+  "suite-wlr-protocols",
+  "suite-external",
+  "suite-hyprland-protocols",
+  "suite-cosmic-protocols",
+] }
+xkbcommon.workspace = true
+tempfile.workspace = true
+dirs.workspace = true
+serde_json.workspace = true

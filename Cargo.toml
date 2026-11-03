@@ -1,8 +1,12 @@
 [workspace]
 members = [
   "farstep/native/protocol",
-  "farstep/native/desktop-runtime",
-  "farstep/native/desktop",
+  "farstep/native/desktop/api",
+  "farstep/native/desktop/image",
+  "farstep/native/desktop/runtime",
+  "farstep/native/desktop/cli",
+  "farstep/native/desktop/platform",
+  "farstep/native/systemd",
   "farstep/native/service",
 ]
 resolver = "3"
