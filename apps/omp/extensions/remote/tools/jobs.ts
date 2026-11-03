@@ -57,6 +57,8 @@ export function registerJobTools(
     api,
     compileTool({
       ...remoteDefinitions.run,
+      // Avoid a device JSON-string envelope around TypeScript source
+      loadMode: "essential",
       async execute(args, { signal, update: onUpdate, context: ctx }): Promise<Result> {
         const target = await execution(args.target ?? "local", ctx.cwd);
         return jobs.run(target, args, ctx, signal, onUpdate);
@@ -71,6 +73,7 @@ export function registerJobTools(
     api,
     compileTool({
       ...remoteDefinitions.batch,
+      loadMode: "essential",
       async execute(args, { signal, update: onUpdate, context: ctx }): Promise<Result> {
         const target = await execution(args.target ?? "local", ctx.cwd);
         return jobs.batch(target, args, ctx, signal, onUpdate);
