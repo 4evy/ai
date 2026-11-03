@@ -167,6 +167,32 @@ export const EXAMPLES = {
       },
       true,
     ),
+    argumentVector: example(
+      runParameters,
+      {
+        script:
+          "for (const argv of params.commands as string[][]) {\n  const result = await $`${argv}`;\n  console.log(result.stdout);\n}",
+        params: {
+          commands: [
+            ["printf", "%s\n", "a path with spaces", "$(not a command)"],
+            ["printf", "%s\n", "second command"],
+          ],
+        },
+        pty: false,
+      },
+      true,
+    ),
+    commandInput: example(
+      runParameters,
+      {
+        script:
+          "const rows = await $({ input: params.text })`sort`.lines();\nconsole.log(JSON.stringify(rows));",
+        params: { text: "pear\napple\npear\n" },
+        output: { format: "json", maxBytes: 4096, maxCaptureBytes: 1024 * 1024 },
+        pty: false,
+      },
+      true,
+    ),
     packageLoop: example(
       runParameters,
       {
