@@ -57,6 +57,31 @@ Replace the search text and path. `rg` returns 1 for no matches and 2 for
 errors. Handle expected nonzero exits with `nothrow` and check `exitCode`.
 Otherwise, a failed command throws and an uncaught exception fails the job.
 
+For a computed executable and arguments, interpolate one array instead of
+joining it into a shell command:
+
+{{argumentVector}}
+
+Every array element is a literal argument, including spaces, quotes, dollar
+signs and shell operators. An element containing `|` is not a pipeline. Use
+template text or zx `.pipe()` for shell composition.
+
+For stdin, use `$({ input: params.text })`, not `.stdin(text)`. `.stdin` is a
+writable stream, not a function. For commands without stderr output, zx
+`.lines()` avoids handwritten newline splitting:
+
+{{commandInput}}
+
+Keep multiline text, regular expressions, SQL and nested interpreter source in
+`params`, not quoted inside `script`. For example, send Python source through
+`$({ input: params.source })` followed by the tagged command `python3 -`. Never
+put secrets in source or params.
+
+If the harness only exposes a JSON device, construct its arguments as an object
+and serialize once with `JSON.stringify` in the harness's code tool. Do not
+hand-escape JSON around TypeScript around shell. This avoids an extra manual
+escaping layer, but does not change where the command executes.
+
 Await every command, including concurrent work with `Promise.all`. Returning
 with running zx commands fails the script and stops those commands. Use
 `try/finally` for normal cleanup, but do not rely on JavaScript cleanup during
@@ -86,12 +111,15 @@ For output parsing and control flow, this example collects positive counts:
 
 ### Capture command output without mixing it with progress
 
-zx captures command stdout for `.stdout`, `.json()` and `.lines()` without
-printing it by default. Use `console.log` for result stdout and `console.error`
-for progress. `$({ verbose: true })` streams command stdout to job stdout and
-command diagnostics to stderr. Piping suppresses the source's stdout echo.
-`quiet:true` suppresses zx diagnostics. Keep verbose command output out of
-parsed JSON or JSONL stdout.
+zx captures command stdout and stderr without printing stdout by default. Use
+`console.log` for result stdout and `console.error` for progress. For machine
+JSON, use `JSON.parse(result.stdout)`. The pinned zx `.json()` and `.lines()`
+parse combined stdout and stderr, so warnings can break parsing or become data.
+`quiet:true` suppresses diagnostics, but does not remove captured stderr.
+
+`$({ verbose: true })` streams command stdout to job stdout and command
+diagnostics to stderr. Piping suppresses the source's stdout echo. Keep verbose
+command output out of parsed JSON or JSONL stdout.
 
 `captureBytes` bounds combined stdout and stderr captured by each zx command.
 It defaults to {{captureMiB}} MiB. Exceeding it stops the command and fails the
