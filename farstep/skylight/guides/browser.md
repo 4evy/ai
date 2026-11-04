@@ -35,9 +35,16 @@ supported by every provider.
 
 ## Follow the selected provider's documentation
 
-Binding or creating a tab emits its initial state and documentation.
-Observations emit their own output too, so do not wrap them in
-`nodeRepl.write` or `nodeRepl.emitImage`. Use `var` for reusable REPL bindings.
+Binding or creating a tab emits its initial state and documentation. The CUA
+facade's `getAXState()`, `getScreenshot()` and `getAXStateAndScreenshot()` also
+emit output automatically. Do not wrap those methods in `nodeRepl.write` or
+`nodeRepl.emitImage`. Use `var` for reusable REPL bindings.
+
+Provider APIs return values without displaying them. For example, use
+`nodeRepl.write(await tab.playwright.domSnapshot())` to display a DOM snapshot,
+or `nodeRepl.emitImage(await tab.screenshot({}))` for a provider screenshot.
+Emit returned text and images explicitly unless the provider documents
+automatic output. An empty tool result does not mean the page is empty.
 
 Read state before input and observe afterward. DOM-only tabs have no numeric
 accessibility indices. Use their documented `tab.playwright` locators rather
