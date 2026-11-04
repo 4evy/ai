@@ -174,6 +174,9 @@ impl DesktopSession for Session {
     }
 
     async fn input(&mut self, request: Input) -> Result<Option<Receipt>> {
+        if !matches!(&request.action, Action::TypeText(_)) {
+            self.receipt = None;
+        }
         request.action.validate()?;
         if self.input.is_none() {
             return Err(Failure::new(
