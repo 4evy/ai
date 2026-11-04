@@ -89,9 +89,18 @@ fn tool_error(error: rmcp::ErrorData) -> CallToolResponse {
 
 impl ServerHandler for Channel {
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().build()).with_server_info(
-            Implementation::new("farstep-desktop", env!("CARGO_PKG_VERSION")),
-        )
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
+            .with_server_info(Implementation::new(
+                "farstep-desktop",
+                env!("CARGO_PKG_VERSION"),
+            ))
+            .with_instructions(
+                "Call helper.handshake before other operations on each connection. Capture alone \
+                 does not authorize input. Call desktop.authorize for control, use its returned \
+                 sessionId, and capture a fresh frame before pointer input. Release this \
+                 channel's session before changing capture source. Never replay input after an \
+                 uncertain outcome; observe first.",
+            )
     }
 
     async fn list_tools(

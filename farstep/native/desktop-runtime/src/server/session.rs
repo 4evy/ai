@@ -135,7 +135,8 @@ impl SessionOperations {
         {
             return Err(Failure::new(
                 "invalid-request",
-                "Requested source differs from the owned session",
+                "Requested source differs from the owned session; release this channel's session \
+                 before capturing another source",
             ));
         }
         let active = session
