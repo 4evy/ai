@@ -144,7 +144,14 @@ export function registerExchange(
       )
         throw new Error("Sky exchange content or SHA-256 mismatch");
       const destination = resolve(cwd, input.path);
-      const parent = await realpath(dirname(destination));
+      const parent = await realpath(dirname(destination)).catch((error: unknown) => {
+        if (isEnoent(error))
+          throw new Error(
+            `Sky exchange destination parent does not exist: ${dirname(destination)}. Create the directory on the destination target before syncing`,
+            { cause: error },
+          );
+        throw error;
+      });
       const path = join(parent, destination.slice(dirname(destination).length + 1));
       return await withFileLock(
         path,
