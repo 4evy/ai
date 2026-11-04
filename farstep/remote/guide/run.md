@@ -128,9 +128,11 @@ target file, or use inherited stdio to stream without zx capture. Retaining
 many command results still consumes script memory.
 
 Farstep's `output.maxBytes` and `output.maxCaptureBytes` separately bound result
-previews and retained artifacts. They do not limit script memory. The schema
-defines source and parameter limits. Source and params travel as data and are
-retained in launch arguments, so use `envFiles` for secrets.
+previews and retained artifacts. They do not limit script memory.
+`output.maxBytes` cannot exceed 64 KiB and `output.maxCaptureBytes` cannot
+exceed 16 MiB. These are not interchangeable with per-command `captureBytes`.
+The schema defines source and parameter limits. Source and params travel as
+data and are retained in launch arguments, so use `envFiles` for secrets.
 
 For a terminal program, await `$({ stdio: "inherit" })` with `pty:true`.
 Inherited stdio routes input and output directly through the Farstep terminal,
