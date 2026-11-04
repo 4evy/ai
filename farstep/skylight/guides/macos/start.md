@@ -19,10 +19,14 @@ var inventory = await cua.getState();
 ```
 
 Read returned documentation and state before another call. Inventory can include
-errors or apps without windows. Failure does not prove absence. Resolve the
-requested app to a unique ID before calling `cua.getApp` with it. Inspect
-missing or ambiguous matches. `getApp` launches in the background if needed.
-Actions can change focus. Apps are not isolated in another Space.
+errors or apps without windows. Failure does not prove absence. Inspect missing
+or ambiguous matches. If copies share a bundle ID, select the intended `.app`
+by its full path rather than retrying that ID. A bare executable is not
+necessarily a selectable app. Name lookup can find an installed copy instead
+of a development build, so verify the returned app and window.
+
+`getApp` launches in the background if needed, not just attaches. Actions can
+change focus. Apps are not isolated in another Space.
 
 Observations emit output automatically. `getAXStateAndScreenshot` also emits an
 image. Do not wrap observations in `nodeRepl.write` or `nodeRepl.emitImage`.

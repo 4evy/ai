@@ -18,6 +18,9 @@ Default observations may show only tree changes. Apply the latest diff to your
 current tree before choosing a target. If that baseline is unclear, request
 `app.getAXStateAndScreenshot({ disableDiffing: true })` and select from the full
 tree. A full tree may renumber controls, so discard earlier indices.
+For programmatic presence or value checks, request
+`app.getAXState({ disableDiffing: true })`. A diff can omit an unchanged control
+that is still present.
 
 For an editable element exposing text selection, `selectText` can select a
 phrase or position the cursor without replacing the whole field. Set
@@ -43,6 +46,12 @@ choice. Use documented key names. Prefer `app.paste` for multiline or formatted
 content. It uses the macOS pasteboard and restores the user's previous clipboard
 contents afterward. Verify focus and destination behavior first. Newlines may
 submit commands, forms or messages.
+
+`pressKey` accepts key names and chords, not arbitrary text or punctuation.
+Use `typeText` for literal text. If Unicode typing does not insert the intended
+characters, inspect the actual value before using a supported `setValue` or
+`app.paste(text, { format: "text" })`. Do not append a second full copy after
+partial input.
 
 Set the format with the content. This hypothetical example pastes rich HTML:
 
