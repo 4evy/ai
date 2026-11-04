@@ -3,6 +3,7 @@
 
   inputs = {
     nixpkgs.url = "https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.zst";
+    crane.url = "github:ipetkov/crane";
     bun2nix = {
       url = "github:nix-community/bun2nix";
       inputs = {

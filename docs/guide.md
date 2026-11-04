@@ -76,10 +76,16 @@ serialized journal writes, recovery and result finalization. Import record types
 and storage operations from their owning modules, not the workflow service.
 
 Keep native MCP schemas, tool metadata and response encoding in
-[`tools.rs`](../farstep/native/desktop-runtime/src/server/tools.rs). Session
+[`tools.rs`](../farstep/native/desktop/runtime/src/server/tools.rs). Session
 ownership, consent gates and input belong in
-[`session.rs`](../farstep/native/desktop-runtime/src/server/session.rs).
+[`session.rs`](../farstep/native/desktop/runtime/src/server/session.rs).
 Helper negotiation and workspace leases have separate modules alongside them.
+
+The [Rust workspace](../Cargo.toml) groups desktop crates under
+`farstep/native/desktop/{api,image,runtime,platform,cli}`. Backend contracts
+belong in `api`, bounded PNG processing in `image`, MCP routing in `runtime`,
+native implementations in `platform`, and the executable entry point in `cli`.
+The independent `farstep/native/systemd/` crate owns systemd commands.
 
 For execution changes, preserve these ownership and recovery rules:
 
@@ -401,10 +407,19 @@ assemblies, not Farstep or app module compilation.
 Some coupling remains explicit. JavaScript dependency installation shares the
 root lockfile, dependency declarations, and npm patches. Changes to those
 inputs can invalidate every JavaScript consumer, unlike source-only edits.
-Manifest scripts and exports do not enter the dependency install. Rust builds
-share workspace manifests and `Cargo.lock` for locked resolution, while each
-filtered source includes only its implementation closure. Build-tool changes
-and changes to actual shared dependencies still rebuild their consumers.
+Manifest scripts and exports do not enter the dependency install.
+
+The [native builder](../farstep/nix/native.nix) uses Crane to cache external
+Rust dependencies, protocol, backend API, image processing, MCP runtime, and
+host-platform implementation separately. CLI edits reuse every library cache.
+Image and MCP edits preserve each other's caches. Linux systemd edits rebuild
+systemd and the CLI, not the desktop backend. Platform sources for other hosts
+do not enter the build. The [service](../farstep/nix/service.nix) has a separate
+dependency cache without graphical libraries.
+
+Rust builds still share workspace manifests, `Cargo.lock`, and release
+settings. Changes to those inputs or actual shared dependencies can rebuild
+their consumers. Final executable linking retains release-profile LTO.
 
 The [module compiler](../tools/nix/javascript/modules.nix) selects Vite projects
 with `AI_BUILD_PROJECTS`. The

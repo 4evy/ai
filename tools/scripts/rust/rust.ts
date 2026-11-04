@@ -5,11 +5,12 @@ import { executeCommand } from "@ai/runtime/effect/process/process";
 const root = resolve(import.meta.dir, "../../..");
 const configurations = [
   ["farstep-protocol", []],
+  ["farstep-desktop-api", []],
+  ["farstep-desktop-image", []],
   ["farstep-desktop-runtime", []],
+  ["farstep-desktop-platform", []],
+  ["farstep-systemd", []],
   ["farstep-protocol", ["schema"]],
-  ["farstep-desktop-runtime", ["backend"]],
-  ["farstep-desktop-runtime", ["image"]],
-  ["farstep-desktop-runtime", ["server"]],
   ["farstep-desktop", []],
   ["farstep-desktop", ["cli"]],
   ["farstep-desktop", ["desktop"]],

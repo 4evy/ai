@@ -594,6 +594,36 @@ dependencies = [
 name = "farstep-desktop"
 version = "1.0.0"
 dependencies = [
+ "clap",
+ "farstep-desktop-platform",
+ "farstep-protocol",
+ "farstep-systemd",
+ "tokio",
+]
+
+[[package]]
+name = "farstep-desktop-api"
+version = "1.0.0"
+dependencies = [
+ "async-trait",
+ "farstep-protocol",
+ "serde_json",
+ "tokio-util",
+]
+
+[[package]]
+name = "farstep-desktop-image"
+version = "1.0.0"
+dependencies = [
+ "bytes",
+ "farstep-protocol",
+ "png",
+]
+
+[[package]]
+name = "farstep-desktop-platform"
+version = "1.0.0"
+dependencies = [
  "ashpd",
  "async-io",
  "async-trait",
@@ -609,6 +639,8 @@ dependencies = [
  "dlopen2",
  "enigo",
  "enumflags2",
+ "farstep-desktop-api",
+ "farstep-desktop-image",
  "farstep-desktop-runtime",
  "farstep-protocol",
  "futures-util",
@@ -648,11 +680,9 @@ dependencies = [
 name = "farstep-desktop-runtime"
 version = "1.0.0"
 dependencies = [
- "async-trait",
  "base64",
- "bytes",
+ "farstep-desktop-api",
  "farstep-protocol",
- "png",
  "rmcp",
  "serde_json",
  "tokio",
@@ -687,6 +717,18 @@ dependencies = [
  "win-custody",
  "windows 0.62.2",
  "windows-service",
+ "zbus_systemd",
+]
+
+[[package]]
+name = "farstep-systemd"
+version = "1.0.0"
+dependencies = [
+ "clap",
+ "farstep-protocol",
+ "futures-util",
+ "serde_json",
+ "zbus 6.2.1",
  "zbus_systemd",
 ]
 

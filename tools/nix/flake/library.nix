@@ -10,7 +10,7 @@ in
 {
   flake.lib = {
     inherit mkSettings;
-    packagesFor = import ../packages/packages.nix { inherit (inputs) bun2nix; };
+    packagesFor = import ../packages/packages.nix { inherit (inputs) bun2nix crane; };
     mkConfigs =
       {
         system,
