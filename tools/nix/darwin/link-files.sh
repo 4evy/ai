@@ -38,8 +38,14 @@ isForced() {
 
 isOwned() {
   local path="$1"
-  [[ -v oldLinks["$path"] && -L "$HOME/$path" &&
-    $(readlink -- "$HOME/$path") == "${oldLinks[$path]}" ]]
+  [[ -v oldLinks["$path"] ]] || return 1
+  if [[ -L "$HOME/$path" ]]; then
+    [[ $(readlink -- "$HOME/$path") == "${oldLinks[$path]}" ]]
+  else
+    # Apps may materialize a managed link without changing its contents
+    [[ -f "$HOME/$path" && -f "${oldLinks[$path]}" ]] &&
+      cmp -s -- "$HOME/$path" "${oldLinks[$path]}"
+  fi
 }
 
 checkTargets() {
@@ -53,7 +59,7 @@ checkTargets() {
     while [[ "$parent" == */* ]]; do
       parent="${parent%/*}"
       if [[ ! -v newLinks["$parent"] ]] && isOwned "$parent"; then
-        # Cleanup removes this old directory link before placing children
+        # Cleanup removes the old managed parent before placing children
         replacingParent=1
         break
       fi
@@ -95,7 +101,7 @@ if [[ "$1" != apply ]]; then
   exit 1
 fi
 
-# Remove obsolete links only while their recorded source still matches
+# Remove obsolete managed files only while their recorded source still matches
 for path in "${!oldLinks[@]}"; do
   if [[ ! -v newLinks["$path"] ]] && isOwned "$path"; then
     rm -- "$HOME/$path"
