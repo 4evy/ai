@@ -57,7 +57,8 @@ impl SessionOperations {
 
     #[rmcp::tool(
         name = "helper.handshake",
-        description = "Negotiate helper protocol and immutable installation identity"
+        description = "Call first on each connection to negotiate protocol and installation \
+                       identity"
     )]
     async fn handshake(
         &self,
@@ -79,7 +80,8 @@ impl SessionOperations {
 
     #[rmcp::tool(
         name = "desktop.inspect",
-        description = "Discover available, requestable and granted operations without consent"
+        description = "Call helper.handshake first, then discover available, requestable and \
+                       granted operations without consent"
     )]
     async fn inspect(
         &self,
@@ -120,7 +122,8 @@ impl SessionOperations {
 
     #[rmcp::tool(
         name = "desktop.authorize",
-        description = "Request combined control/capture authorization through the native backend"
+        description = "After helper.handshake, request combined control/capture authorization. \
+                       Replaces this channel's session; use the returned sessionId"
     )]
     async fn authorize(
         &self,
@@ -133,7 +136,8 @@ impl SessionOperations {
 
     #[rmcp::tool(
         name = "desktop.capture",
-        description = "Capture the selected source, returning one PNG and frame metadata"
+        description = "After helper.handshake, capture one PNG with frame metadata. Capture alone \
+                       grants no input; release this channel's session before changing source"
     )]
     async fn capture(
         &self,

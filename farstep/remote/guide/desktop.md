@@ -9,6 +9,13 @@ source and consent. macOS requests Screen Recording and Accessibility
 permissions. Windows uses the installed interactive desktop task. Locked or
 secure Windows desktops are unavailable. Read "screenshots" and "input" before
 acting.
+Capture alone does not grant input. Authorizing replaces this channel's
+capture session, so use the new returned session ID and capture again before
+pointer input. If another channel owns the control lease, coordinate a release
+with that owner rather than retrying authorization or taking over its session.
+
+The capture target does not switch an existing session between monitor and
+window sources. Release this channel's session before choosing another source.
 
 All three platforms support monitor and window capture. Native macOS and
 Windows text input sends Unicode events without changing the clipboard.
