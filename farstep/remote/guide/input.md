@@ -12,7 +12,8 @@ authorization or mapping is missing, resolve it and recapture before input.
 
 Inspect the app after partial or interrupted input. Success confirms backend
 submission, not app acceptance. Check text receipts for `mechanism`,
-`clipboardChanged`, `submittedBytes` and `partial`.
+`clipboardChanged`, `submittedBytes` and `partial`. A text receipt describes
+only that text action, not subsequent key or pointer input.
 
 Text delivery depends on the backend and may use clipboard paste. Verify the
 destination's paste chord and newline behavior. Paste may change the clipboard
