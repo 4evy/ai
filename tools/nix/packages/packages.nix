@@ -31,7 +31,8 @@ let
       ai-javascript-dependencies = self.callPackage ../javascript/dependencies.nix { };
       ai-shared = self.callPackage ../javascript/shared.nix { };
       ai-javascript = self.callPackage ../javascript/javascript.nix { };
-      ghidra-bin = (pkgs.ghidra-bin.override { openjdk21 = pkgs.openjdk25; }).overrideAttrs (old: {
+      # Nixpkgs now supplies Ghidra's JDK 25 runtime directly
+      ghidra-bin = pkgs.ghidra-bin.overrideAttrs (old: {
         inherit (ghidraNative.ghidra) version;
         versiondate = pkgs.lib.strings.removeSuffix ".zip" (
           pkgs.lib.lists.last (pkgs.lib.strings.splitString "_" ghidraNative.ghidra.url)
