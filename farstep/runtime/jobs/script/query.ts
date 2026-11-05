@@ -1,10 +1,6 @@
 import { run } from "@ai/runtime/effect/effect";
 import { Effect, Schema, Stream } from "effect";
 
-// Bun 1.4.4 provides this API, but TypeScript 7.0.2 has no declaration yet
-const sumPrecise = (Math as Math & { sumPrecise(values: Iterable<number>): number })
-  .sumPrecise;
-
 export interface QueryRunOptions {
   signal?: AbortSignal;
 }
@@ -186,7 +182,9 @@ export class Query<A, E = never, R = never> {
     options: QueryRunOptions = {},
   ): Promise<number> {
     return run(
-      Stream.runCollect(Stream.map(this.stream, value)).pipe(Effect.map(sumPrecise)),
+      Stream.runCollect(Stream.map(this.stream, value)).pipe(
+        Effect.map(Math.sumPrecise),
+      ),
       options.signal,
     );
   }

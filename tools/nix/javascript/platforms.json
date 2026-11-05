@@ -372,83 +372,31 @@
     "os": ["win32"],
     "cpu": ["x64"]
   },
-  "@typescript/typescript-aix-ppc64@7.0.2": {
-    "os": ["aix"],
-    "cpu": ["ppc64"]
-  },
-  "@typescript/typescript-darwin-arm64@7.0.2": {
+  "@typescript/typescript-darwin-arm64@7.1.0-dev.20261105.1": {
     "os": ["darwin"],
     "cpu": ["arm64"]
   },
-  "@typescript/typescript-darwin-x64@7.0.2": {
+  "@typescript/typescript-darwin-x64@7.1.0-dev.20261105.1": {
     "os": ["darwin"],
     "cpu": ["x64"]
   },
-  "@typescript/typescript-freebsd-arm64@7.0.2": {
-    "os": ["freebsd"],
-    "cpu": ["arm64"]
-  },
-  "@typescript/typescript-freebsd-x64@7.0.2": {
-    "os": ["freebsd"],
-    "cpu": ["x64"]
-  },
-  "@typescript/typescript-linux-arm@7.0.2": {
+  "@typescript/typescript-linux-arm@7.1.0-dev.20261105.1": {
     "os": ["linux"],
     "cpu": ["arm"]
   },
-  "@typescript/typescript-linux-arm64@7.0.2": {
+  "@typescript/typescript-linux-arm64@7.1.0-dev.20261105.1": {
     "os": ["linux"],
     "cpu": ["arm64"]
   },
-  "@typescript/typescript-linux-loong64@7.0.2": {
-    "os": ["linux"],
-    "cpu": ["none"]
-  },
-  "@typescript/typescript-linux-mips64el@7.0.2": {
-    "os": ["linux"],
-    "cpu": ["none"]
-  },
-  "@typescript/typescript-linux-ppc64@7.0.2": {
-    "os": ["linux"],
-    "cpu": ["ppc64"]
-  },
-  "@typescript/typescript-linux-riscv64@7.0.2": {
-    "os": ["linux"],
-    "cpu": ["none"]
-  },
-  "@typescript/typescript-linux-s390x@7.0.2": {
-    "os": ["linux"],
-    "cpu": ["s390x"]
-  },
-  "@typescript/typescript-linux-x64@7.0.2": {
+  "@typescript/typescript-linux-x64@7.1.0-dev.20261105.1": {
     "os": ["linux"],
     "cpu": ["x64"]
   },
-  "@typescript/typescript-netbsd-arm64@7.0.2": {
-    "os": ["none"],
-    "cpu": ["arm64"]
-  },
-  "@typescript/typescript-netbsd-x64@7.0.2": {
-    "os": ["none"],
-    "cpu": ["x64"]
-  },
-  "@typescript/typescript-openbsd-arm64@7.0.2": {
-    "os": ["openbsd"],
-    "cpu": ["arm64"]
-  },
-  "@typescript/typescript-openbsd-x64@7.0.2": {
-    "os": ["openbsd"],
-    "cpu": ["x64"]
-  },
-  "@typescript/typescript-sunos-x64@7.0.2": {
-    "os": ["sunos"],
-    "cpu": ["x64"]
-  },
-  "@typescript/typescript-win32-arm64@7.0.2": {
+  "@typescript/typescript-win32-arm64@7.1.0-dev.20261105.1": {
     "os": ["win32"],
     "cpu": ["arm64"]
   },
-  "@typescript/typescript-win32-x64@7.0.2": {
+  "@typescript/typescript-win32-x64@7.1.0-dev.20261105.1": {
     "os": ["win32"],
     "cpu": ["x64"]
   },
