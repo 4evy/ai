@@ -81,7 +81,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [ai-javascript, ai-shared, farstep-modules, farstep-javascript, farstep-desktop, farstep-service, ai-configs, farstep]
+        package:
+          [
+            ai-javascript,
+            ai-shared,
+            farstep-modules,
+            farstep-javascript,
+            farstep-desktop,
+            farstep-service,
+            ai-configs,
+            farstep,
+          ]
         platform:
           - runner: ubuntu-26.04
             system: x86_64-linux
