@@ -3,11 +3,7 @@
   "version": "7.0.0-unstable-2026-10-21",
   "hash": "sha256-0RWq1bX3fHY2DR0HQ75ylNCWQbKczvsk8m8/8eSW/Sk=",
   "upstreamVersion": "7.0.0",
-  "patches": [
-    "explicit-backend.patch",
-    "sdk-server.patch",
-    "sdk-transports.patch"
-  ],
+  "patches": ["explicit-backend.patch", "sdk-server.patch", "sdk-transports.patch"],
   "sdk": {
     "version": "2.3.0",
     "hash": "sha256-CnXi78zYxm0/R4fON/DzRYMSDYM/XM/9SE3s+Cf1BR0="
