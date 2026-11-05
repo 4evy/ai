@@ -47,10 +47,10 @@
     },
     {
       "customType": "regex",
-      "description": "Track Ghidra MCP at an exact upstream commit",
+      "description": "Track Ghidra MCP at an exact development-branch commit",
       "managerFilePatterns": ["/^apps/ghidra/mcp/source\\.json$/"],
       "matchStrings": ["\"rev\":\\s*\"(?<currentDigest>[a-f0-9]{40})\""],
-      "currentValueTemplate": "main",
+      "currentValueTemplate": "dev",
       "depNameTemplate": "bethington/ghidra-mcp",
       "packageNameTemplate": "https://github.com/bethington/ghidra-mcp",
       "datasourceTemplate": "git-refs",

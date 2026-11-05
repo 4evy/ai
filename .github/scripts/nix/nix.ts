@@ -83,6 +83,7 @@ switch (task) {
       "farstep-kde-bridge",
       "ai-configs",
       "farstep",
+      "ghidra-mcp",
     ]);
     const temporary = process.env.RUNNER_TEMP;
     if (!temporary) throw new Error("RUNNER_TEMP is required for package builds");
@@ -98,6 +99,8 @@ switch (task) {
     ]);
     if (name === "farstep-desktop" || name === "farstep-service") {
       await run([join(artifact, "bin", name), "--help"]);
+    } else if (name === "ghidra-mcp") {
+      await run([join(artifact, "libexec", "ghidra-mcp-headless"), "--help"]);
     } else if (name === "ai-configs") {
       const manifest = await Bun.file(join(artifact, "manifest.json")).json();
       if (

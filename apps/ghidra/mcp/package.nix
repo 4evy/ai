@@ -254,7 +254,7 @@ symlinkJoin {
         uv
       ];
       beforeUpdate = ''
-        set -- "--version=branch=''${GHIDRA_MCP_BRANCH:-main}" "$@"
+        set -- "--version=branch=''${GHIDRA_MCP_BRANCH:-dev}" "$@"
       '';
       afterUpdate = builtins.readFile ./update.sh;
     };

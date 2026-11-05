@@ -90,6 +90,7 @@ jobs:
           - farstep-service
           - ai-configs
           - farstep
+          - ghidra-mcp
         platform:
           - runner: ubuntu-26.04
             system: x86_64-linux

@@ -6,6 +6,6 @@ set default-list
 install *args:
     bun apps/ghidra/native/install.ts "$@"
 
-# Refresh the upstream commit and fetchFromGitHub hash; defaults to main
+# Refresh the upstream commit and fetchFromGitHub hash; defaults to dev
 update *args:
     {{ self }} nix update ghidra-mcp "$@"
