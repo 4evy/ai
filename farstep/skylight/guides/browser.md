@@ -1,8 +1,8 @@
 # Select a browser and work with its tabs
 
-Browser control is available on macOS, Windows, and X11, not the Wayland
-monitor bridge. Reading this guide does not start Sky. {{skylightTool}} starts
-the selected target's runtime with `cua` initialized automatically.
+Browser control uses the selected target's available CUA providers on macOS,
+Windows, X11, and Wayland. Reading this guide does not start Sky.
+{{skylightTool}} starts the runtime with `cua` initialized automatically.
 
 ## Select the requested browser and profile
 

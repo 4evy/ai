@@ -1,28 +1,22 @@
 import { run } from "@ai/runtime/effect/effect";
 import { Effect } from "effect";
 import { ensureRuntimeEffect } from "./install";
-import {
-  CODEX,
-  CUA_REPL,
-  MACOS,
-  MODULES,
-  NODE,
-  REPL,
-  SERVICE,
-  SKY_BACKEND,
-  WAYLAND,
-} from "./paths";
+import { CODEX, CUA_REPL, MACOS, MODULES, NODE, REPL, SERVICE, WAYLAND } from "./paths";
 
-const RUNTIME_LAUNCHERS = {
-  macos: {
-    // macOS authenticates sender ancestry, keep its signed Codex parent
-    command: CODEX,
-    args: ["sandbox", "-c", 'sandbox_mode="danger-full-access"', "--", NODE, CUA_REPL],
-  },
-  wayland: { command: REPL, args: [] },
-  upstream: { command: NODE, args: [CUA_REPL] },
-};
-const launcher = MACOS ? RUNTIME_LAUNCHERS.macos : RUNTIME_LAUNCHERS[SKY_BACKEND];
+const launcher = MACOS
+  ? {
+      // macOS authenticates sender ancestry, keep its signed Codex parent
+      command: CODEX,
+      args: [
+        "sandbox",
+        "-c",
+        'sandbox_mode="danger-full-access"',
+        "--",
+        NODE,
+        CUA_REPL,
+      ],
+    }
+  : { command: NODE, args: [CUA_REPL] };
 
 export const runtimeServerEffect = Effect.fnUntraced(function* (cwd: string) {
   yield* ensureRuntimeEffect();
@@ -32,12 +26,9 @@ export const runtimeServerEffect = Effect.fnUntraced(function* (cwd: string) {
     NODE_REPL_NODE_PATH: NODE,
     NODE_REPL_NODE_MODULE_DIRS: MODULES,
     NODE_REPL_TRUSTED_CODE_PATHS: MODULES,
-    ...(!WAYLAND
-      ? {
-          CUA_REPL_NODE_REPL_PATH: REPL,
-          CUA_REPL_ENABLED_SURFACES: "browser,computer",
-        }
-      : {}),
+    CUA_REPL_NODE_REPL_PATH: REPL,
+    // Wayland keeps Farstep's monitor adapter, not upstream app/window wrappers
+    CUA_REPL_ENABLED_SURFACES: WAYLAND ? "browser" : "browser,computer",
     ...(MACOS ? { CODEX_CLI_PATH: CODEX, SKY_CUA_SERVICE_PATH: SERVICE } : {}),
   };
   return {

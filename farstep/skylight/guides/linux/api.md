@@ -7,6 +7,10 @@ generated schemas describe the Skylight Linux adapter's supported methods,
 inputs and text receipts. Do not assume other upstream Sky methods are
 available.
 
+Browser providers use the separate `cua` API. Load "browser", discover a
+provider on this target, and read its returned documentation before using its
+methods.
+
 Use "screenshots" for display and "actions" for input. The adapter tracks the
 captured frame for pointer input. Act only on the latest image and recapture
 after display changes. Follow "start" for output choice and consent.

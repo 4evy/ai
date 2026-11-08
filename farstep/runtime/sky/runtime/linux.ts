@@ -48,7 +48,10 @@ export const installLinuxServiceEffect = Effect.fnUntraced(function* (
   }
   yield* attempt(() => Bun.write(servicePath, output), { awaitOnInterrupt: true });
   env.NODE_REPL_TRUSTED_CODE_PATHS = [MODULES, directory].join(delimiter);
-  env.NODE_REPL_TRUSTED_SERVICES = JSON.stringify({ sky: servicePath });
+  env.NODE_REPL_TRUSTED_SERVICES = JSON.stringify({
+    browser: "@oai/browser-desktop/service",
+    sky: servicePath,
+  });
   env.FARSTEP_SKY_HELPER_PATH = helper;
   env.FARSTEP_SKY_SESSION_DIR = directory;
 });

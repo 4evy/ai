@@ -22,6 +22,7 @@ Read skyBackend from the handshake and sky.reference for the selected API.
 upstream uses the bundled cua interface for native apps and available browser
 providers. Browser inventory is discovered on the selected target, not borrowed
 from the caller's machine. Read the selected browser's returned documentation
-and advertised capabilities. wayland exposes the narrower Farstep bridge through
-(await import("@oai/sky")).sky. The reference describes that backend's supported
-methods. Browser providers and app/window targeting are unavailable on Wayland.
+and advertised capabilities. wayland uses the same CUA browser providers and
+exposes the narrower Farstep monitor bridge through (await
+import("@oai/sky")).sky. The reference describes that bridge's supported
+methods. Native app/window targeting remains unavailable on Wayland.
