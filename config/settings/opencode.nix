@@ -10,7 +10,7 @@ in
     update = "auto";
     snapshots = true;
     plugins = [
-      "@slkiser/opencode-quota@6.0.0"
+      "@slkiser/opencode-quota@6.2.2"
     ];
     references = {
       opencode = {
@@ -163,7 +163,7 @@ in
     "$schema" = "https://opencode.ai/v2/cli.json";
     theme.name = "catppuccin-custom";
     plugins = [
-      "@slkiser/opencode-quota@6.0.0"
+      "@slkiser/opencode-quota@6.2.2"
     ];
     keybinds = {
       leader = "ctrl+space";
