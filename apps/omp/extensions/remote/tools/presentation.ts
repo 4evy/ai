@@ -1,5 +1,9 @@
 import { plainToolCard } from "@oh-my-pi/pi-tui/render";
-import { describeMCPResult, renderMCPResult } from "@oh-my-pi/pi-tui/tools/mcp";
+import {
+  describeMCPResult,
+  type MCPToolDetails,
+  renderMCPResult,
+} from "@oh-my-pi/pi-tui/tools/mcp";
 import type { ToolRenderer, ToolRenderResult } from "@oh-my-pi/pi-tui/tools/renderer";
 import { isRecord } from "@oh-my-pi/pi-utils";
 
@@ -12,10 +16,24 @@ export function farstepPresentation(title: string) {
       .filter((value): value is string => typeof value === "string")
       .join(" · ");
   };
-  const viewResult = (result: ToolRenderResult<unknown>) => ({
-    ...result,
-    details: { serverName: "Farstep", mcpToolName: title },
-  });
+  const views = new WeakMap<
+    ToolRenderResult<unknown>,
+    ToolRenderResult<MCPToolDetails>
+  >();
+  const viewResult = (result: ToolRenderResult<unknown>) => {
+    const cached = views.get(result);
+    if (cached) return cached;
+    const view = {
+      ...result,
+      details: {
+        ...(isRecord(result.details) ? result.details : {}),
+        serverName: "Farstep",
+        mcpToolName: title,
+      },
+    };
+    views.set(result, view);
+    return view;
+  };
   return {
     renderCall: (args, options, theme) =>
       plainToolCard(theme, () => ({
