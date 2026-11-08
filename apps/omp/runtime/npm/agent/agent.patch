@@ -1317,7 +1317,7 @@ diff --git a/src/ssh/transfer-compression.ts b/src/ssh/transfer-compression.ts
 new file mode 100644
 --- /dev/null
 +++ b/src/ssh/transfer-compression.ts
-@@ -0,0 +1,161 @@
+@@ -0,0 +1,162 @@
 +import { isIP } from "node:net";
 +import { networkInterfaces } from "node:os";
 +import {
@@ -1409,9 +1409,10 @@ new file mode 100644
 +        const [raw] = await Promise.all([
 +          boundedTransferBytes(decoder.stdout, limit),
 +          pipeTransferBytes(child.stdout, decoder.stdin),
-+          decoder.exitedCleanly,
 +          child.exitedCleanly,
 +        ]);
++        // Preserve remote exit codes before an empty decoder stream can fail
++        await decoder.exitedCleanly;
 +        return raw;
 +      }
 +      const [raw] = await Promise.all([

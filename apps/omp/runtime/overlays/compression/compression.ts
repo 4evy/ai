@@ -89,9 +89,10 @@ export async function createFileTransfer(
         const [raw] = await Promise.all([
           boundedTransferBytes(decoder.stdout, limit),
           pipeTransferBytes(child.stdout, decoder.stdin),
-          decoder.exitedCleanly,
           child.exitedCleanly,
         ]);
+        // Preserve remote exit codes before an empty decoder stream can fail
+        await decoder.exitedCleanly;
         return raw;
       }
       const [raw] = await Promise.all([
