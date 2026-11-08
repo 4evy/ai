@@ -9,7 +9,7 @@ import type {
 import type { JobSnapshot } from "farstep/protocol/jobs/protocol";
 import { isJobTerminal as terminal } from "farstep/protocol/jobs/states";
 import type { WorkflowResult } from "farstep/protocol/workflow/workflow";
-import { showWorkflow, workflowFailed, workflowText } from "./output/workflow";
+import { workflowFailed, workflowText } from "./output/workflow";
 import { jobNotices } from "./presentation";
 import type { JobRecord, Logs, Result } from "./types";
 
@@ -30,6 +30,7 @@ export interface JobResultOptions {
   finishedAt?: number | undefined;
   deliveredAt?: number | undefined;
   observedAt?: number | undefined;
+  completionId?: string | undefined;
   termination?: TerminationResult["termination"] | undefined;
   terminationStatus?: TerminationStatus | undefined;
   unreadCursor?: number | undefined;
@@ -141,15 +142,30 @@ function renderedOutput(
 
 function jobContext(snapshot: JobSnapshot, logs: Logs, options: JobResultOptions) {
   const terminationStatus = options.terminationStatus ?? logs.terminationStatus;
+  const size = terminalSize(snapshot);
+  const view = outputView(snapshot, logs, options);
+  const finishedAt = options.finishedAt ?? snapshot.exitedAt;
+  const termination = options.termination ?? terminationStatus?.termination;
+  const deadline = terminationStatus?.deadline;
+  const receipt = options.receipt ? publicReceipt(options.receipt) : undefined;
   return {
     finished: terminal(snapshot.state),
-    size: terminalSize(snapshot),
-    view: outputView(snapshot, logs, options),
-    finishedAt: options.finishedAt ?? snapshot.exitedAt,
-    termination: options.termination ?? terminationStatus?.termination,
-    deadline: terminationStatus?.deadline,
-    receipt: options.receipt ? publicReceipt(options.receipt) : undefined,
+    size,
+    view,
+    finishedAt,
+    termination,
+    deadline,
+    receipt,
     workflow: logs.workflow,
+    notices: jobNotices(
+      size,
+      view.showScreen,
+      finishedAt,
+      receipt,
+      termination,
+      deadline,
+      options,
+    ).filter((notice) => !notice.startsWith("Receipt (")),
   };
 }
 type JobContext = ReturnType<typeof jobContext>;
@@ -159,12 +175,89 @@ function jobHeader(
   job: JobRecord,
   snapshot: JobSnapshot,
   logs: Logs,
+  options: JobResultOptions,
   context: JobContext,
 ): string {
-  const summary = `Job ${job.name} · ${snapshot.state} · exit ${code ?? (context.finished ? "unknown" : "pending")} · cursor ${logs.cursor}`;
-  return context.view.compact
-    ? summary
-    : `${summary}\nConnection ${job.connectionId} · ${job.cwd} · interpreter ${job.interpreter ?? job.spec.application} · lifetime ${snapshot.persist ? "persist" : "session"}`;
+  const unreadCursor = options.unreadCursor ?? logs.cursor;
+  const readiness =
+    context.workflow?.kind === "job" ? context.workflow.steps[0]?.readiness : undefined;
+  const requiresReadiness = job.ready !== undefined;
+  const ready = requiresReadiness
+    ? readiness?.state === "ready"
+    : snapshot.state === "ready";
+  return JSON.stringify({
+    job: {
+      name: job.name,
+      connectionId: job.connectionId,
+      cwd: job.cwd,
+      owner: job.owner,
+      nativeId: job.nativeId,
+      installationId: job.installationId,
+      scopeId: job.scopeId,
+      interpreter: job.interpreter ?? job.spec.application,
+      lifetime: snapshot.persist ? "persist" : "session",
+      pty: job.pty,
+      timeoutSeconds: job.timeoutSeconds,
+      state: snapshot.state,
+      lifecycle:
+        snapshot.state === "unknown"
+          ? "unknown"
+          : context.finished
+            ? "terminal"
+            : ready
+              ? "ready"
+              : "running",
+      exitCode: code,
+      exitReason: snapshot.exitReason,
+      pid: snapshot.pid,
+      startedAt: snapshot.startedAt,
+      finishedAt: context.finishedAt,
+    },
+    observation: {
+      waitTimedOut: options.waitTimedOut,
+      readyTimedOut: options.readyTimedOut,
+      outputTimedOut: logs.timedOut || undefined,
+      matched: options.matched,
+      observedAt: options.observedAt,
+      deliveredAt: options.deliveredAt,
+      completionId: options.completionId,
+    },
+    readiness: {
+      required: requiresReadiness,
+      state: readiness?.state ?? (requiresReadiness ? "not-observed" : undefined),
+      readyAt: requiresReadiness
+        ? readiness?.state === "ready"
+          ? readiness.observedAt
+          : undefined
+        : snapshot.readyAt,
+      pending: requiresReadiness ? undefined : snapshot.readyPending,
+      match: requiresReadiness ? undefined : snapshot.readyMatch,
+    },
+    output: {
+      cursor: logs.cursor,
+      unreadCursor,
+      ...logs.outputRange,
+      state:
+        snapshot.state === "unknown"
+          ? "unknown"
+          : logs.outputGap || unreadCursor < snapshot.outputBytes
+            ? "incomplete"
+            : context.finished
+              ? "complete"
+              : "streaming",
+      replay: logs.replay || undefined,
+      view: context.view.showScreen ? "screen" : options.raw ? "raw" : "text",
+      gap: logs.outputGap,
+      screenVersion: options.screenVersion,
+      settled: options.settled,
+    },
+    receipt: context.receipt
+      ? { ...context.receipt, applicationAcknowledgement: "not-established" }
+      : undefined,
+    termination: context.termination,
+    deadline: context.deadline,
+    notice: options.notice,
+  });
 }
 
 function displayedOutput(view: JobContext["view"]): string | undefined {
@@ -172,7 +265,7 @@ function displayedOutput(view: JobContext["view"]): string | undefined {
     return view.terminalRows?.some((row) => row.trim().length > 0)
       ? view.output
       : "(empty screen)";
-  return view.output || "(no new output)";
+  return view.output || undefined;
 }
 
 function jobText(
@@ -184,20 +277,12 @@ function jobText(
   context: JobContext,
 ): string {
   const workflow = context.workflow;
-  const show = showWorkflow(workflow);
   return [
-    jobHeader(code, job, snapshot, logs, context),
-    ...(show ? [workflowText(workflow)] : []),
-    ...(job.pty || !show ? [displayedOutput(context.view)] : []),
-    ...jobNotices(
-      context.size,
-      context.view.showScreen,
-      context.finishedAt,
-      context.receipt,
-      context.termination,
-      context.deadline,
-      options,
-    ),
+    jobHeader(code, job, snapshot, logs, options, context),
+    ...(workflow ? [workflowText(workflow)] : []),
+    ...(job.pty || options.raw || !workflow?.steps.some((step) => step.output)
+      ? [displayedOutput(context.view)]
+      : []),
   ].join("\n");
 }
 
@@ -235,6 +320,7 @@ function timingDetails(
         ? Math.max(0, options.deliveredAt - finishedAt)
         : undefined,
     observedAt: options.observedAt,
+    completionId: options.completionId,
     remoteExitCode: code,
     exitCode: code,
     waitTimedOut: options.waitTimedOut,
@@ -294,15 +380,7 @@ function jobDetails(
     newOutput: context.view.newOutput,
     compact: context.view.compact,
     ...(context.workflow ? { workflow: context.workflow } : {}),
-    notices: jobNotices(
-      context.size,
-      context.view.showScreen,
-      context.finishedAt,
-      context.receipt,
-      context.termination,
-      context.deadline,
-      options,
-    ).filter((notice) => !notice.startsWith("Receipt (")),
+    notices: context.notices,
     interpreter: job.interpreter ?? job.spec.application,
     ...outputDetails(job, logs, options, context),
     ...timingDetails(code, options, context.finishedAt),

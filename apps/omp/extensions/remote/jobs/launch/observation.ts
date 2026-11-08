@@ -1,12 +1,13 @@
 import { attempt, run } from "@ai/runtime/effect/effect";
 import type { AgentToolUpdateCallback } from "@oh-my-pi/pi-coding-agent";
-import { Effect, Schedule } from "effect";
+import { Effect, Option, Schedule } from "effect";
 import type { Gateway } from "farstep/client/jobs/gateway";
 import { assertIdentity } from "farstep/client/jobs/recovery";
 import type { JobSnapshot } from "farstep/protocol/jobs/protocol";
 import { isJobTerminal as terminal } from "farstep/protocol/jobs/states";
+import type { WorkflowResult } from "farstep/protocol/workflow/workflow";
 import type { JobSession } from "../session";
-import type { JobRecord, RemoteJobDetails, RunInput, Scope } from "../types";
+import type { JobRecord, JobView, RemoteJobDetails, RunInput, Scope } from "../types";
 
 const FRAME_OBSERVATION = { waitForFrame: true, maxWaitMs: 1000 } as const;
 const READINESS_POLL_MS = 100;
@@ -22,13 +23,14 @@ export async function observeLaunch(
   signal?: AbortSignal,
   onUpdate?: AgentToolUpdateCallback<RemoteJobDetails>,
 ) {
+  let readyTimedOut = false;
   if (
     job.workflowFingerprint &&
     input.ready &&
     !terminal(snapshot.state) &&
     waitMs > 0
   ) {
-    snapshot = await waitReadiness(
+    ({ snapshot, readyTimedOut } = await waitReadiness(
       session,
       scope,
       client,
@@ -38,13 +40,13 @@ export async function observeLaunch(
       input,
       onUpdate,
       signal,
-    );
+    ));
   }
   if (!input.ready && !terminal(snapshot.state) && waitMs > 0) {
     const deadline = performance.now() + waitMs;
     do {
       if (onUpdate) {
-        snapshot = await progressUpdate(
+        ({ snapshot } = await progressUpdate(
           session,
           scope,
           client,
@@ -53,7 +55,7 @@ export async function observeLaunch(
           input,
           onUpdate,
           signal,
-        );
+        ));
       }
       const remaining = Math.ceil(deadline - performance.now());
       if (terminal(snapshot.state) || remaining <= 0) break;
@@ -73,8 +75,8 @@ export async function observeLaunch(
   const screen = job.pty && !input.raw && !terminal(snapshot.state);
   const view = screen
     ? await session.observe(scope, client, job, snapshot, FRAME_OBSERVATION, signal)
-    : await session.logs(scope, client, job, snapshot);
-  return { view, screen };
+    : await session.logs(scope, client, job, snapshot, {}, signal);
+  return { view, screen, readyTimedOut };
 }
 
 async function waitReadiness(
@@ -87,17 +89,16 @@ async function waitReadiness(
   input: Pick<RunInput, "ready" | "raw" | "compact">,
   onUpdate: AgentToolUpdateCallback<RemoteJobDetails> | undefined,
   signal?: AbortSignal,
-): Promise<JobSnapshot> {
+): Promise<{ snapshot: JobSnapshot; readyTimedOut: boolean }> {
   let first = true;
   let nextUpdate = 0;
-  await run(
+  const waited = await run(
     attempt(
       async (signal) => {
         if (terminal(snapshot.state)) return true;
-        if (!first) ({ snapshot } = await session.inspect(scope, client, job, signal));
-        first = false;
+        let workflow: WorkflowResult | undefined;
         if (onUpdate && performance.now() >= nextUpdate) {
-          snapshot = await progressUpdate(
+          const progress = await progressUpdate(
             session,
             scope,
             client,
@@ -107,10 +108,15 @@ async function waitReadiness(
             onUpdate,
             signal,
           );
+          snapshot = progress.snapshot;
+          workflow = progress.logs.workflow;
           nextUpdate = performance.now() + 1000;
+        } else if (!first) {
+          ({ snapshot } = await session.inspect(scope, client, job, signal));
         }
+        first = false;
         if (terminal(snapshot.state)) return true;
-        const workflow = await client.workflow(job.name, signal);
+        workflow ??= await client.workflow(job.name, signal);
         const readiness = workflow.steps[0]?.readiness;
         return readiness !== undefined && readiness.state !== "pending";
       },
@@ -124,7 +130,7 @@ async function waitReadiness(
     ),
     signal,
   );
-  return snapshot;
+  return { snapshot, readyTimedOut: Option.isNone(waited) };
 }
 async function progressUpdate(
   session: JobSession,
@@ -135,11 +141,11 @@ async function progressUpdate(
   input: Pick<RunInput, "ready" | "raw" | "compact">,
   onUpdate: AgentToolUpdateCallback<RemoteJobDetails>,
   signal?: AbortSignal,
-): Promise<JobSnapshot> {
+): Promise<JobView> {
   const initialScreen = job.pty && !input.raw;
   const initial = initialScreen
     ? await session.observe(scope, client, job, snapshot, FRAME_OBSERVATION, signal)
-    : await session.logs(scope, client, job, snapshot);
+    : await session.logs(scope, client, job, snapshot, {}, signal);
   snapshot = initial.snapshot;
   onUpdate(
     session.result(scope, job, snapshot, initial.logs, {
@@ -153,5 +159,5 @@ async function progressUpdate(
       compact: input.compact,
     }),
   );
-  return snapshot;
+  return initial;
 }

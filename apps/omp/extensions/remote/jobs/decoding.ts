@@ -72,6 +72,16 @@ export function decodeOutput(
       text: gap + truncation + plainTail,
       rawText,
       ...(gap || truncation ? { outputGap: gap + truncation } : {}),
+      outputRange: {
+        startCursor: read.startCursor,
+        requestedCursor: cursor,
+        availableStart: read.availableStart,
+        availableEnd: read.availableEnd,
+        retentionGap: cursor < read.availableStart,
+        responseTruncated:
+          Boolean(truncation) ||
+          read.startCursor > Math.max(cursor, read.availableStart),
+      },
     },
     pending,
     redrawing: Boolean(delivery.terminalRedraw || hasTerminalRedraw(text)),

@@ -1,4 +1,6 @@
+import { attempt, run } from "@ai/runtime/effect/effect";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import { Effect } from "effect";
 import type { Gateway } from "farstep/client/jobs/gateway";
 import { assertIdentity } from "farstep/client/jobs/recovery";
 import type { JobLogs } from "farstep/protocol/jobs/gateway";
@@ -86,15 +88,36 @@ export class SessionOutput {
       signal,
     );
     const logs = this.#outputLogs(job, output, screenLogs, options, requestedCursor);
-    if (!screenLogs) ({ snapshot } = await this.inspect(scope, client, job, signal));
-    assertIdentity(job, snapshot);
-    logs.terminationStatus = await client.termination(
-      { name: job.name, nativeId: job.nativeId },
+    // These are independent observations after the byte read, not commands
+    // Keep the identity refresh after output so completion cannot consume ahead
+    const observed = await run(
+      Effect.all(
+        {
+          current: screenLogs
+            ? Effect.succeed({ snapshot })
+            : attempt((signal) => this.inspect(scope, client, job, signal), {
+                awaitOnInterrupt: true,
+              }),
+          termination: attempt(
+            (signal) =>
+              client.termination({ name: job.name, nativeId: job.nativeId }, signal),
+            { awaitOnInterrupt: true },
+          ),
+          workflow: job.workflowFingerprint
+            ? attempt((signal) => client.workflow(job.name, signal), {
+                awaitOnInterrupt: true,
+              })
+            : Effect.succeed(undefined),
+        },
+        { concurrency: "unbounded" },
+      ),
       signal,
     );
+    snapshot = observed.current.snapshot;
+    assertIdentity(job, snapshot);
+    logs.terminationStatus = observed.termination;
+    if (observed.workflow) logs.workflow = observed.workflow;
     this.state.assertCurrent(scope);
-    if (job.workflowFingerprint)
-      logs.workflow = await client.workflow(job.name, signal);
     const decoded = this.#decode(scope, job, snapshot, logs);
     Object.assign(logs, decoded.logs);
     return { snapshot, logs };

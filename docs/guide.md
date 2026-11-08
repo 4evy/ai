@@ -217,6 +217,19 @@ results separately from command output. Foreground observation refreshes the
 card without consuming the final output. Background completion appears as a
 separate card when the job finishes.
 
+The [model-facing result](../apps/omp/extensions/remote/jobs/output.ts) starts
+with a JSON metadata line for job identity, lifecycle, observation, readiness,
+and output cursors. Workflow and step-output JSON lines follow. Successful
+non-PTY runs include stdout, stderr, and retained-file metadata. JSON and JSONL
+results expose parsed values or records without repeating raw stdout. Parse
+errors retain their raw preview. Large workflow previews report omitted output
+explicitly, with full workflow details kept in the card.
+
+An observation timeout does not imply command failure. Readiness wait expiry,
+readiness probe failure, incomplete output, and unknown process state remain
+distinct. Background completions include their stable completion ID. Processed
+input receipts establish broker acceptance, not application acknowledgement.
+
 Use **Ctrl+O** to expand output and inspect retained-file paths and job
 metadata. Parse errors, truncated capture, readiness failures, and uncertain
 process state stay visible without expansion. The

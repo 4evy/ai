@@ -1,5 +1,4 @@
 import { run } from "@ai/runtime/effect/effect";
-import { readText } from "@ai/toolkit/text/text";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { toError } from "@oh-my-pi/pi-utils/type-guards";
 import { Deferred } from "effect";
@@ -47,9 +46,10 @@ export async function deliverCompletion(
       consume: false,
       finishedAt,
       deliveredAt,
+      completionId: notification.completionId,
     });
   } else {
-    result = unavailableResult(scope, client, completed, unavailable, deliveredAt);
+    result = unavailableResult(scope, client, notification, unavailable, deliveredAt);
   }
 
   api.sendMessage(
@@ -122,36 +122,54 @@ async function completionView(
 function unavailableResult(
   scope: Scope,
   client: Gateway,
-  completed: JobSnapshot,
+  notification: JobCompletionNotification,
   unavailable: string,
   deliveredAt: number,
 ): Result {
+  const completed = notification.snapshot;
   const finishedAt = completed.exitedAt;
   const code = completed.exitCode;
   return {
     content: [
       {
         type: "text",
-        text: readText(
-          new URL("./completion/completion.md", import.meta.url),
-          "completion",
-          {
-            JOB: String(completed.name),
-            STATE: String(completed.state),
-            CODE: String(code ?? "unknown"),
-            UNAVAILABLE: String(unavailable),
-            JOB_TOOL: REMOTE_TOOLS.job,
-            FINISHED: String(
-              finishedAt === undefined
-                ? ""
-                : `\nFinished at ${new Date(finishedAt).toISOString()} · delivered at ${new Date(deliveredAt).toISOString()} · delay ${Math.max(0, deliveredAt - finishedAt)} ms`,
-            ),
+        text: JSON.stringify({
+          job: {
+            name: completed.name,
+            nativeId: completed.id,
+            owner: scope.owner,
+            installationId: client.installationId,
+            scopeId: scope.scopeId,
+            state: completed.state,
+            lifecycle: completed.state === "unknown" ? "unknown" : "terminal",
+            exitCode: code,
+            exitReason: completed.exitReason,
+            startedAt: completed.startedAt,
+            finishedAt,
+            lifetime: completed.persist ? "persist" : "session",
           },
-        ),
+          observation: {
+            completionId: notification.completionId,
+            deliveredAt,
+            ...(finishedAt === undefined
+              ? {}
+              : { deliveryDelayMs: Math.max(0, deliveredAt - finishedAt) }),
+          },
+          output: { state: "unavailable", reason: unavailable },
+          recovery: {
+            next: {
+              tool: REMOTE_TOOLS.job,
+              action: "status",
+              job: completed.name,
+            },
+            requiresCurrentBranchMetadata: true,
+          },
+        }),
       },
     ],
     details: {
       job: completed.name,
+      state: completed.state,
       nativeId: completed.id,
       owner: scope.owner,
       installationId: client.installationId,

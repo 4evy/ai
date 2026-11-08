@@ -1,4 +1,3 @@
-import { readText } from "@ai/toolkit/text/text";
 import type {
   AgentToolUpdateCallback,
   ExtensionContext,
@@ -125,7 +124,7 @@ async function executeLaunch(
       receipt = stopped.receipt;
       notice = `Caller canceled the observation. ${stopped.notice}`;
     }
-    const { view, screen } = await observeLaunch(
+    const { view, screen, readyTimedOut } = await observeLaunch(
       session,
       scope,
       client,
@@ -133,8 +132,8 @@ async function executeLaunch(
       snapshot,
       input,
       signal?.aborted ? 0 : waitMs,
-      signal,
-      onUpdate,
+      signal?.aborted ? undefined : signal,
+      signal?.aborted ? undefined : onUpdate,
     );
     return session.result(scope, job, view.snapshot, view.logs, {
       notice,
@@ -142,6 +141,7 @@ async function executeLaunch(
       termination,
       receipt,
       screen,
+      readyTimedOut,
       ...("screenVersion" in view
         ? { screenVersion: view.screenVersion, settled: view.settled }
         : {}),
@@ -155,11 +155,27 @@ async function executeLaunch(
       content: [
         {
           type: "text",
-          text: readText(new URL("./launch.md", import.meta.url), "unknown", {
-            JOB: String(name),
-            NOTICE: String(notice ? `${notice}\n` : ""),
-            ERROR: String(toError(error).message),
-            JOB_TOOL: REMOTE_TOOLS.job,
+          text: JSON.stringify({
+            job: {
+              name,
+              connectionId: intent.connectionId,
+              cwd,
+              owner: intent.owner,
+              installationId: client.installationId,
+              scopeId: scope.scopeId,
+              nativeId: job?.nativeId ?? intent.nativeId,
+              requestId: intent.requestId,
+              lifecycle: "unknown",
+            },
+            output: { state: "unavailable" },
+            error: toError(error).message,
+            notice,
+            recovery: {
+              replayed: false,
+              next: { tool: REMOTE_TOOLS.job, action: "status", job: name },
+              reason:
+                "Execution outcome is unknown. Inspect this exact handle before starting new work",
+            },
           }),
         },
       ],
@@ -167,6 +183,8 @@ async function executeLaunch(
         job: name,
         connectionId: intent.connectionId,
         cwd,
+        owner: intent.owner,
+        nativeId: job?.nativeId ?? intent.nativeId,
         installationId: client.installationId,
         scopeId: scope.scopeId,
         remoteState: "unknown",

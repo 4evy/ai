@@ -92,6 +92,16 @@ export type Logs = JobLogs & {
   rawText?: string | undefined;
   replay?: boolean | undefined;
   outputGap?: string | undefined;
+  outputRange?:
+    | {
+        startCursor: number;
+        requestedCursor: number;
+        availableStart: number;
+        availableEnd: number;
+        retentionGap: boolean;
+        responseTruncated: boolean;
+      }
+    | undefined;
   terminationStatus?: TerminationStatus | undefined;
   workflow?: WorkflowResult | undefined;
 };

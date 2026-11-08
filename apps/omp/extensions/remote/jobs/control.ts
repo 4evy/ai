@@ -390,6 +390,7 @@ function applyControlErrors(
 ): void {
   if (sequence) {
     result.details = { ...result.details, sequence };
+    result.content.push({ type: "text", text: JSON.stringify({ sequence }) });
     result.isError ||= sequence.error !== undefined;
   }
   result.isError ||= receipt !== undefined && receipt.state !== "processed";
