@@ -1,6 +1,6 @@
 {
   "name": "@oai/sky",
-  "version": "0.7.13",
+  "version": "0.7.17",
   "private": true,
   "type": "module",
   "exports": {
@@ -13,33 +13,33 @@
   },
   "types": "./upstream/index.d.ts",
   "skylight": {
-    "chatgptVersion": "26.1027.51404",
+    "chatgptVersion": "26.1103.32239",
     "archives": [
       {
         "platform": "darwin",
         "arch": "arm64",
-        "sha256": "a22e81ff9e52e7f3006c657ff2006c034982876a5a8a002bbf9c00fbf8307f23",
-        "skyVersion": "0.7.13"
+        "sha256": "0b30ce5cac787893bf574b549b1d32cf363f21302935538acd369c668df2fd1f",
+        "skyVersion": "0.7.17"
       },
       {
         "platform": "linux",
         "arch": "x64",
-        "sha256": "7b7cebf685e6ed70c35895a00d78ebc49cbd14dd900c159a636203b8ee0fa4a1",
-        "skyVersion": "0.7.13"
+        "sha256": "a5d7ef11eeaee5a12e9de3c3504204b3a780602b143b14247ac719692b940fbf",
+        "skyVersion": "0.7.17"
       },
       {
         "platform": "win32",
         "arch": "x64",
-        "sha256": "d442a3d7d5c229f45e5e11995711ac2619c8dbc89e3fa2bc185287dc8db8e76e",
-        "skyVersion": "0.7.13"
+        "sha256": "9a5fdf536327ce471f9594b0ac6e369244ec3ebfd5e09ec5a66524575dbaa60c",
+        "skyVersion": "0.7.17"
       },
       {
         "platform": "win32",
         "arch": "arm64",
-        "sha256": "954bc64d87ee327e0b3a64d678a7d350ac971b65e62fbc59ffbc32587f40cea6",
-        "skyVersion": "0.7.13"
+        "sha256": "2abe7abc7456c0e9ba28ddf7e3cd4bc906ab21d86913e5a23588a71577eb47f0",
+        "skyVersion": "0.7.17"
       }
     ],
-    "declarationsSha256": "79f3974a85b0d17c5a0fcd5bdd6fb245d88354a0e1a7028e949add21af8a01da"
+    "declarationsSha256": "0d99f3780e149a50df25a8979f8c5f9f9133e850ffd1e6c928d58f632d0d0a2b"
   }
 }

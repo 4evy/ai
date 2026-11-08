@@ -26,7 +26,8 @@ export async function readPackage(source: string, pin: typeof pins) {
     throw new Error("The runtime does not contain a valid Sky package");
   }
   const upstream = parsed.output;
-  const declarations = join(source, dirname(upstream.types));
+  // Windows packages publish backslash-separated declaration paths
+  const declarations = join(source, dirname(upstream.types.replaceAll("\\", "/")));
   const pending = [
     "index.d.ts",
     "sky.d.ts",
