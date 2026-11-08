@@ -1,3 +1,4 @@
+use std::fs::File;
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::path::PathBuf;
 
@@ -9,7 +10,7 @@ use super::{root, socket, uid};
 use crate::Result;
 
 struct Snapshot {
-    binary: Option<Vec<u8>>,
+    binary: Option<File>,
     unit: Option<Vec<u8>>,
     package: Option<PathBuf>,
     directory: bool,
@@ -18,7 +19,7 @@ struct Snapshot {
 struct Installation<'a> {
     owner: &'a str,
     dir: PathBuf,
-    binary: Vec<u8>,
+    binary: File,
     package: Option<PathBuf>,
     previous: Snapshot,
 }
@@ -42,7 +43,8 @@ impl<'a> Installation<'a> {
                 .ok_or("Service definition parent missing")?,
             true,
         )?;
-        let old_binary = std::fs::read(dir.join("farstep-service")).ok();
+        // Retain the old inode across atomic replacement without buffering it
+        let old_binary = File::open(dir.join("farstep-service")).ok();
         let old_unit = std::fs::read(unit(owner)).ok();
         let had_directory = dir.exists();
         let source = std::env::current_exe()?;
@@ -54,7 +56,7 @@ impl<'a> Installation<'a> {
             .ok_or("Install the system service from the Nix Farstep package")?;
         trusted(&source, false)?;
         let old_package = std::fs::read_link(dir.join("package")).ok();
-        let binary = std::fs::read(source)?;
+        let binary = File::open(source)?;
         Ok(Self {
             owner,
             dir,
@@ -100,19 +102,17 @@ impl<'a> Installation<'a> {
             systemd::manage(self.owner, systemd::Action::Disable, true)?;
         }
         pin(&self.dir.join("package"), self.previous.package.as_deref())?;
-        for (path, bytes, mode) in [
-            (
-                self.dir.join("farstep-service"),
-                self.previous.binary.as_deref(),
-                0o755,
-            ),
-            (unit(self.owner), self.previous.unit.as_deref(), 0o644),
-        ] {
-            if let Some(bytes) = bytes {
-                write(&path, bytes, mode)?;
-            } else {
-                pin(&path, None)?;
-            }
+        let path = self.dir.join("farstep-service");
+        if let Some(binary) = &self.previous.binary {
+            write(&path, binary, 0o755)?;
+        } else {
+            pin(&path, None)?;
+        }
+        let path = unit(self.owner);
+        if let Some(bytes) = &self.previous.unit {
+            write(&path, bytes.as_slice(), 0o644)?;
+        } else {
+            pin(&path, None)?;
         }
         if self.previous.binary.is_some() && self.previous.unit.is_some() {
             labels(self.owner)?;

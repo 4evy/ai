@@ -97,11 +97,10 @@ pub(super) fn pin(path: &Path, package: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn write(path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
-    use std::io::Write;
+pub(super) fn write(path: &Path, mut source: impl std::io::Read, mode: u32) -> Result<()> {
     let mut file =
         tempfile::NamedTempFile::new_in(path.parent().ok_or("Service file parent missing")?)?;
-    file.write_all(bytes)?;
+    std::io::copy(&mut source, file.as_file_mut())?;
     file.as_file()
         .set_permissions(std::fs::Permissions::from_mode(mode))?;
     file.as_file().sync_all()?;
