@@ -463,6 +463,12 @@ registries. Keep their policy in
 shared SDK profile. Shell layout, transcript framing, and awaited MCP lifecycle
 handling still require core patches.
 
+The [MCP extension](../apps/omp/extensions/mcp/index.ts) registers once and
+uses the current session's manager. Status is read-only and includes disabled
+configurations without starting servers. Lifecycle actions await the native
+handshake and catalog refresh. An accepted start, stop, or restart finishes
+even if its caller cancels observation, so cancellation is not rollback.
+
 `just omp patches check` verifies source hunks at their exact pinned
 coordinates, applies both profiles, and checks generated npm patches. Regenerate
 edited hunks against pristine source rather than retaining coordinates from
