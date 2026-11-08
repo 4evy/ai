@@ -1,7 +1,7 @@
 {
-  "rev": "61a1fbc8ad1078c64a4fa99e05dfbe2d092f82f0",
-  "version": "7.0.0-unstable-2026-10-31",
-  "hash": "sha256-Vxh/J2lBm5G25YME8yWhzTMX4+NWvfT/64cp68oXmso=",
+  "rev": "5f6c416ffe973e834644609aff1a2f7f1b93668e",
+  "version": "7.0.0-unstable-2026-11-08",
+  "hash": "sha256-LZM6Hc2itWoeeeUzzA/6DHG3yb18Bi4nclKuQtXSNyI=",
   "upstreamVersion": "7.0.0",
   "patches": ["explicit-backend.patch", "sdk-server.patch", "sdk-transports.patch"],
   "sdk": {
