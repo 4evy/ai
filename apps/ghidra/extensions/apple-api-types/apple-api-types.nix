@@ -16,6 +16,8 @@ in
     owner = "PoomSmart";
     repo = "IDAObjcTypes";
     inherit (pin) rev hash;
+    # GitHub's archive endpoint returns 504 for this pinned revision
+    forceFetchGit = true;
   };
   # Empty include paths let nested Types.h imports resolve to their own files
   inherit (types)
