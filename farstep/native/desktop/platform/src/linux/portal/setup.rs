@@ -52,8 +52,8 @@ impl CastSetup {
         }
         drop(registered);
         let source_type = match source {
-            Source::Monitor => SourceType::Monitor,
-            Source::Window => SourceType::Window,
+            Source::Monitor => SourceType::MONITOR,
+            Source::Window => SourceType::WINDOW,
         };
         if !cast.available_source_types().await?.contains(source_type) {
             return Err(Failure::new(
@@ -64,11 +64,11 @@ impl CastSetup {
         let cursor = if cast
             .available_cursor_modes()
             .await?
-            .contains(CursorMode::Embedded)
+            .contains(CursorMode::EMBEDDED)
         {
-            CursorMode::Embedded
+            CursorMode::EMBEDDED
         } else {
-            CursorMode::Hidden
+            CursorMode::HIDDEN
         };
         Ok(Self {
             cast,
@@ -80,7 +80,7 @@ impl CastSetup {
 
     fn source_options(&self) -> SelectSourcesOptions {
         SelectSourcesOptions::default()
-            .set_sources(enumflags2::BitFlags::from(self.source_type))
+            .set_sources(self.source_type)
             .set_multiple(false)
             .set_cursor_mode(self.cursor)
     }
@@ -116,7 +116,7 @@ impl CastSetup {
         let mut clipboard_denied = false;
         let session = Arc::new(remote.create_session(Default::default()).await?);
         let handle = Handle::Remote(session.clone(), Arc::new(AtomicBool::new(false)));
-        let devices = DeviceType::Keyboard | DeviceType::Pointer;
+        let devices = DeviceType::KEYBOARD | DeviceType::POINTER;
         if !remote.available_device_types().await?.contains(devices) {
             return Err(Failure::new(
                 "missing-protocol",
@@ -191,7 +191,7 @@ impl CastSetup {
         output_name: Option<&str>,
         token: Option<&str>,
     ) -> Result<SelectedSession> {
-        if control && self.source_type == SourceType::Window {
+        if control && self.source_type == SourceType::WINDOW {
             return Err(Failure::new(
                 "mapping-unavailable",
                 "Direct input cannot bind a window capture",

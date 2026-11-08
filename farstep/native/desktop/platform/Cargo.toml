@@ -129,7 +129,6 @@ wayland-protocols-wlr = { workspace = true, features = ["client"] }
 smithay-client-toolkit = { workspace = true, features = ["calloop"] }
 futures-util = { workspace = true, features = ["io"] }
 uuid = { workspace = true, features = ["v4"] }
-enumflags2.workspace = true
 zbus = { workspace = true, features = ["tokio", "proxy"] }
 zbus_systemd = { workspace = true, features = ["systemd1", "zbus-async-tokio"] }
 rustix = { workspace = true, features = ["process", "fs", "event", "net"] }

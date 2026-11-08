@@ -70,8 +70,8 @@ pub async fn discover() -> Result<Discovery> {
         Ok(cast) => {
             let mask = cast.available_source_types().await?;
             [
-                (SourceType::Monitor, Source::Monitor),
-                (SourceType::Window, Source::Window),
+                (SourceType::MONITOR, Source::Monitor),
+                (SourceType::WINDOW, Source::Window),
             ]
             .into_iter()
             .filter_map(|(flag, source)| mask.contains(flag).then_some(source))
