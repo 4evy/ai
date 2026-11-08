@@ -1,21 +1,7 @@
 diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-line/segments.ts
 --- a/packages/tui/src/status-line/segments.ts
 +++ b/packages/tui/src/status-line/segments.ts
-@@ -20,12 +20,7 @@
- import { formatMetric } from "../components/metric";
- import { formatBillingSummary } from "./metrics";
- import { sanitizeStatusText } from "../chrome/shared";
--import {
--	formatContextUsage,
--	getContextUsageLevel,
--	getContextUsageThemeColor,
--	getContextUsageTone,
--} from "../chrome/context-thresholds";
-+import { getContextUsageLevel, getContextUsageThemeColor, getContextUsageTone } from "../chrome/context-thresholds";
- import type { TspSpan, TspTone } from "@oh-my-pi/pi-wire";
- import { node, span } from "../native/describe";
- import { thinkingLevelToken } from "../theme/theme-class";
-@@ -305,11 +300,33 @@
+@@ -305,11 +305,33 @@
  	return state.thinkingLevel ?? ThinkingLevel.Off;
  }
  
@@ -49,7 +35,7 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
  	if (ctx.session.isAutoThinking) {
  		// Pending (no turn classified yet / classifying) shows a symbol-theme
  		// question-box marker; once resolved it shows `<level>`.
-@@ -398,7 +415,8 @@
+@@ -398,7 +420,8 @@
  		if (advisor) spans.push(span(` ${advisor.icon}`, advisor.color));
  		if (ctx.session.isFastModeActive() && theme.icon.fast) spans.push(span(` ${theme.icon.fast}`, token));
  		const level = ctx.options.model?.showThinkingLevel === false ? undefined : thinkingLevelWord(ctx.session);
@@ -59,22 +45,7 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
  		const slowModeLabel = ctx.session.getAnthropicSlowModeLabel?.();
  		if (slowModeLabel) spans.push(span(`${theme.sep.dot}${slowModeLabel}`, "warning"));
  		return segView(spans, "model", slowModeLabel ? "warning" : undefined);
-@@ -727,12 +745,12 @@
- 		if (ctx.subagentCount === 0) {
- 			return { content: "", visible: false };
- 		}
--		const content = withIcon(theme.icon.agents, `${ctx.subagentCount}`);
-+		const content = `Agt ${ctx.subagentCount}`;
- 		return { content: theme.fg("statusLineSubagents", content), visible: true };
- 	},
- 	describe(ctx) {
- 		if (ctx.subagentCount === 0) return null;
--		return segView([span(`${ctx.subagentCount}`, "statusLineSubagents")], "agents");
-+		return segView([span(`Agt ${ctx.subagentCount}`, "statusLineSubagents")]);
- 	},
- };
- 
-@@ -818,6 +836,7 @@
+@@ -818,6 +841,7 @@
  			usingSubscription,
  			premiumRequests,
  			fractionDigits: 2,
@@ -82,257 +53,17 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
  			pricingPeriod,
  			advisor: advisorCost
  				? { cost: advisorCost, usingSubscription: ctx.session.isAdvisorUsingSubscription?.() ?? false }
-@@ -851,25 +870,17 @@
- 		// Async-compaction indicator: pulse the auto icon while a background
- 		// speculation runs, hold it in accent once a result is armed.
- 		let autoIcon = "";
--		if (ctx.autoCompactEnabled && theme.icon.auto) {
-+		if (
-+			ctx.autoCompactEnabled &&
-+			theme.icon.auto &&
-+			(ctx.compactionSpeculation === "running" || ctx.compactionSpeculation === "armed")
-+		) {
- 			const speculation = ctx.compactionSpeculation;
- 			const accentIcon = accentFg(ctx, "accent", theme.icon.auto);
--			autoIcon = ` ${
--				speculation === "running"
--					? ctx.speculationBlinkOn
--						? accentIcon
--						: theme.fg("muted", theme.icon.auto)
--					: speculation === "armed"
--						? accentIcon
--						: theme.fg(color, theme.icon.auto)
--			}`;
-+			autoIcon = ` ${speculation === "running" && !ctx.speculationBlinkOn ? theme.fg("muted", theme.icon.auto) : accentIcon}`;
- 		}
--		// A known window with unknown usage (startup prepaint) shows the window alone.
--		const text = theme.fg(
--			color,
--			pct === null && window > 0 ? formatNumber(window) : formatContextUsage(pct, window, ctx.contextTokens),
--		);
--		const content = withIcon(theme.icon.context, `${text}${autoIcon}`);
-+		const text = theme.fg(color, pct === null ? "?" : `${Math.round(pct)}%`);
-+		const content = `${theme.fg("muted", "Ctx ")}${text}${autoIcon}`;
- 
- 		return { content, visible: true };
- 	},
-@@ -878,23 +889,22 @@
- 		const window = ctx.contextWindow;
- 		const level = getContextUsageLevel(pct ?? 0, window);
- 		const color = getContextUsageThemeColor(level);
--		const spans: TspSpan[] = [
--			span(
--				pct === null && window > 0 ? formatNumber(window) : formatContextUsage(pct, window, ctx.contextTokens),
--				color,
--			),
--		];
--		if (ctx.autoCompactEnabled && theme.icon.auto) {
-+		const spans: TspSpan[] = [span("Ctx ", "muted"), span(pct === null ? "?" : `${Math.round(pct)}%`, color)];
-+		if (
-+			ctx.autoCompactEnabled &&
-+			theme.icon.auto &&
-+			(ctx.compactionSpeculation === "running" || ctx.compactionSpeculation === "armed")
-+		) {
- 			// Async-compaction indicator: the terminal pulses the auto icon while a
- 			// background speculation runs; an armed result holds it in accent.
- 			const speculation = ctx.compactionSpeculation;
- 			if (speculation === "running") {
- 				spans.push(span(` ${theme.icon.auto}`, accentToken(ctx, "accent"), { fx: "pulse" }));
- 			} else {
--				spans.push(span(` ${theme.icon.auto}`, speculation === "armed" ? accentToken(ctx, "accent") : color));
-+				spans.push(span(` ${theme.icon.auto}`, accentToken(ctx, "accent")));
- 			}
- 		}
--		return segView(spans, "context", getContextUsageTone(level));
-+		return segView(spans, undefined, getContextUsageTone(level));
- 	},
- };
- 
-@@ -1176,30 +1186,28 @@
- 	},
- };
- 
--function pickUsageColor(percent: number): "muted" | "warning" | "error" {
-+function pickUsageColor(percent: number): "text" | "warning" | "error" {
- 	if (percent >= 80) return "error";
- 	if (percent >= 50) return "warning";
--	return "muted";
-+	return "text";
- }
- 
- /**
-- * One quota window (`5h`, `1d`, `7d`, `mo`). The integer policy (round vs
-- * floor) and the reset unit (minutes vs hours) stay explicit at each call site:
-- * monthly floors like the Cursor/OpenCode dashboards, the rest round, and
-- * short windows reset in minutes while long windows reset in hours.
-+ * Quota percentages are remaining capacity, while provider inputs are usage
-+ * Keep labels and reset countdowns compact in the persistent footer
-  */
- function formatQuotaWindow(
--	ctx: SegmentContext,
- 	label: string,
- 	percent: number,
- 	reset: number | undefined,
- 	resetUnit: "m" | "h",
- 	integer: "round" | "floor",
- ): string {
--	const whole = integer === "floor" ? Math.floor(percent) : Math.round(percent);
-+	const whole = integer === "floor" ? Math.floor(100 - percent) : Math.round(100 - percent);
- 	const pctText = theme.fg(pickUsageColor(percent), `${whole}%`);
--	const resetText = reset !== undefined ? theme.fg("muted", ` (${formatUsageReset(reset, resetUnit)})`) : "";
--	return `${label} ${pctText}${resetText}`;
-+	const resetText =
-+		reset !== undefined ? theme.fg("muted", `${theme.sep.dot}${formatUsageReset(reset, resetUnit)}`) : "";
-+	return `${theme.fg("muted", `${label} `)}${pctText}${resetText}`;
- }
- 
- /** Native twin of {@link formatQuotaWindow}. */
-@@ -1210,9 +1218,9 @@
- 	resetUnit: "m" | "h",
- 	integer: "round" | "floor",
- ): TspSpan[] {
--	const whole = integer === "floor" ? Math.floor(percent) : Math.round(percent);
--	const spans = [span(`${label} `), span(`${whole}%`, pickUsageColor(percent))];
--	if (reset !== undefined) spans.push(span(` (${formatUsageReset(reset, resetUnit)})`, "muted"));
-+	const whole = integer === "floor" ? Math.floor(100 - percent) : Math.round(100 - percent);
-+	const spans = [span(`${label} `, "muted"), span(`${whole}%`, pickUsageColor(percent))];
-+	if (reset !== undefined) spans.push(span(`${theme.sep.dot}${formatUsageReset(reset, resetUnit)}`, "muted"));
- 	return spans;
- }
- 
-@@ -1234,7 +1242,7 @@
- /** Expiring saved resets outrank the usable/unusable color: red within 24 hours, yellow within 7 days. */
- function resetCreditsColor(resets: NonNullable<NonNullable<SegmentContext["usage"]>["resetCredits"]>): ThemeColor {
- 	if (resets.expiring) return resets.expiring.tier === "imminent" ? "error" : "warning";
--	return resets.redeemableCount > 0 ? "success" : "warning";
-+	return resets.redeemableCount > 0 ? "text" : "warning";
- }
- 
- const usageSegment: StatusLineSegment = {
-@@ -1245,82 +1253,83 @@
- 			return { content: "", visible: false };
- 		}
- 		const parts: string[] = [];
--		if (u.tier) {
--			const tier = truncateToWidth(sanitizeStatusText(u.tier), TRUNCATE_LENGTHS.SHORT);
--			if (tier) parts.push(accentFg(ctx, "accent", tier));
--		}
- 		if (u.fiveHour) {
--			parts.push(formatQuotaWindow(ctx, "5h", u.fiveHour.percent, u.fiveHour.resetMinutes, "m", "round"));
-+			parts.push(formatQuotaWindow("5h", u.fiveHour.percent, u.fiveHour.resetMinutes, "m", "round"));
- 		}
- 		if (u.daily) {
--			parts.push(formatQuotaWindow(ctx, "1d", u.daily.percent, u.daily.resetMinutes, "m", "round"));
-+			parts.push(formatQuotaWindow("1d", u.daily.percent, u.daily.resetMinutes, "m", "round"));
- 		}
- 		if (u.sevenDay) {
--			parts.push(formatQuotaWindow(ctx, "7d", u.sevenDay.percent, u.sevenDay.resetHours, "h", "round"));
-+			parts.push(formatQuotaWindow("Wk", u.sevenDay.percent, u.sevenDay.resetHours, "h", "round"));
- 		}
- 		if (u.monthly) {
- 			// Monthly-subscription providers only (the normalizer gates the class).
- 			// Cursor and QwenCloud floor used percents upstream (Cursor's dashboard
- 			// shows 1.88 → "1% used"; OpenCode's endpoint emits floored integers).
--			parts.push(formatQuotaWindow(ctx, "mo", u.monthly.percent, u.monthly.resetHours, "h", "floor"));
-+			parts.push(formatQuotaWindow("mo", u.monthly.percent, u.monthly.resetHours, "h", "floor"));
- 		}
- 		if (u.resetCredits) {
- 			const resets = u.resetCredits;
--			let resetText = `✦ ${resets.bankedCount}`;
-+			let resetText = `${theme.fg("muted", "Rs ")}${theme.fg("text", `${resets.bankedCount}`)}`;
- 			if (resets.redeemableCount !== resets.bankedCount) {
--				resetText += ` (${resets.redeemableCount} usable)`;
-+				resetText += theme.fg("muted", ` (${resets.redeemableCount} usable)`);
- 			}
- 			if (resets.expiryHours !== undefined) {
--				const expiring = resets.expiring ? `▲ ${resets.expiring.count} ` : "";
--				resetText += ` ${expiring}exp ${formatUsageReset(resets.expiryHours, "h")}`;
-+				const expiring = resets.expiring ? `${resets.expiring.count} ` : "";
-+				resetText += theme.fg(
-+					resetCreditsColor(resets),
-+					`${theme.sep.dot}${expiring}exp ${formatUsageReset(resets.expiryHours, "h")}`,
-+				);
- 			} else if (resets.expired) {
--				resetText += " expired";
-+				resetText += theme.fg("error", " expired");
- 			}
- 			if (resets.redeemableCount === 0 && resets.unavailableReason) {
- 				const reason = truncateToWidth(sanitizeStatusText(resets.unavailableReason), TRUNCATE_LENGTHS.SHORT);
--				if (reason) resetText += ` ${reason}`;
-+				if (reason) resetText += theme.fg("warning", ` ${reason}`);
- 			}
--			parts.push(theme.fg(resetCreditsColor(resets), resetText));
-+			parts.push(resetText);
- 		}
--		const content = withIcon(theme.icon.time, parts.join(theme.sep.dot));
-+		const content = parts.join("   ");
- 		return { content, visible: true };
- 	},
- 	describe(ctx) {
- 		const u = ctx.usage;
- 		if (!u || (!u.fiveHour && !u.daily && !u.sevenDay && !u.monthly && !u.resetCredits)) return null;
- 		const parts: TspSpan[][] = [];
--		if (u.tier) {
--			const tier = sanitizeStatusText(u.tier);
--			if (tier) parts.push([span(tier, accentToken(ctx, "accent"))]);
--		}
- 		if (u.fiveHour) {
- 			parts.push(describeQuotaWindow("5h", u.fiveHour.percent, u.fiveHour.resetMinutes, "m", "round"));
- 		}
- 		if (u.daily) parts.push(describeQuotaWindow("1d", u.daily.percent, u.daily.resetMinutes, "m", "round"));
- 		if (u.sevenDay) {
--			parts.push(describeQuotaWindow("7d", u.sevenDay.percent, u.sevenDay.resetHours, "h", "round"));
-+			parts.push(describeQuotaWindow("Wk", u.sevenDay.percent, u.sevenDay.resetHours, "h", "round"));
- 		}
- 		if (u.monthly) parts.push(describeQuotaWindow("mo", u.monthly.percent, u.monthly.resetHours, "h", "floor"));
- 		if (u.resetCredits) {
- 			const resets = u.resetCredits;
--			let resetText = `✦ ${resets.bankedCount}`;
--			if (resets.redeemableCount !== resets.bankedCount) resetText += ` (${resets.redeemableCount} usable)`;
-+			const resetSpans = [span("Rs ", "muted"), span(`${resets.bankedCount}`, "text")];
-+			if (resets.redeemableCount !== resets.bankedCount)
-+				resetSpans.push(span(` (${resets.redeemableCount} usable)`, "muted"));
- 			if (resets.expiryHours !== undefined) {
--				const expiring = resets.expiring ? `▲ ${resets.expiring.count} ` : "";
--				resetText += ` ${expiring}exp ${formatUsageReset(resets.expiryHours, "h")}`;
--			} else if (resets.expired) resetText += " expired";
-+				const expiring = resets.expiring ? `${resets.expiring.count} ` : "";
-+				resetSpans.push(
-+					span(
-+						`${theme.sep.dot}${expiring}exp ${formatUsageReset(resets.expiryHours, "h")}`,
-+						resetCreditsColor(resets),
-+					),
-+				);
-+			} else if (resets.expired) resetSpans.push(span(" expired", "error"));
- 			if (resets.redeemableCount === 0 && resets.unavailableReason) {
--				const reason = sanitizeStatusText(resets.unavailableReason);
--				if (reason) resetText += ` ${reason}`;
-+				const reason = truncateToWidth(sanitizeStatusText(resets.unavailableReason), TRUNCATE_LENGTHS.SHORT);
-+				if (reason) resetSpans.push(span(` ${reason}`, "warning"));
- 			}
--			parts.push([span(resetText, resetCreditsColor(resets))]);
-+			parts.push(resetSpans);
- 		}
- 		const spans: TspSpan[] = [];
- 		for (const part of parts) {
--			if (spans.length > 0) spans.push(span(theme.sep.dot, "dim"));
-+			if (spans.length > 0) spans.push(span("   "));
- 			spans.push(...part);
- 		}
--		return segView(spans, "time");
-+		return segView(spans);
- 	},
- };
- 
 diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status-line/component.ts
 --- a/packages/tui/src/status-line/component.ts
 +++ b/packages/tui/src/status-line/component.ts
 @@ -2795,7 +2795,7 @@
  
- 	#subagentBadgeText(): string | undefined {
- 		if (this.#subagentCount === 0) return undefined;
+-	#subagentBadgeText(): string | undefined {
+-		if (this.#subagentCount === 0) return undefined;
 -		return theme.fg("statusLineSubagents", `${theme.icon.agents} ${this.#subagentCount}`);
-+		return theme.fg("statusLineSubagents", `Agt ${this.#subagentCount}`);
++	#subagentBadgeText(ctx: SegmentContext): string | undefined {
++		const rendered = renderSegment("subagents", ctx);
++		return rendered.visible ? rendered.content : undefined;
  	}
  
  	/**
@@ -360,6 +91,15 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  	 * - `plain-left`: left segments only (claude composer; the right group
  	 *   lives in the editor's top rule).
  	 * - `plain-right`: right segments only (claude composer's top rule).
+@@ -3140,7 +3140,7 @@
+ 		const transparentBg = bgAnsi === TRANSPARENT_BG_ANSI;
+ 		const fgAnsi = theme.getFgAnsi("text");
+ 		const sepAnsi = theme.getFgAnsi("statusLineSep");
+-		const subagentBadge = this.#subagentBadgeText();
++		const subagentBadge = this.#subagentBadgeText(ctx);
+ 
+ 		// Collect visible segment contents
+ 		const leftParts: string[] = [];
 @@ -3188,8 +3188,12 @@
  				const glance = widget ? formatJobWidgetGlance(widget.view, theme, JOBS_SEGMENT_SPARK_CELLS) : "";
  				const count = theme.fg("statusLineSubagents", `${theme.icon.job} ${runningBackgroundJobs}`);
@@ -465,16 +205,27 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  		}
  
  		const renderGroup = (parts: string[], direction: "left" | "right"): string => {
-@@ -3953,8 +3974,7 @@
+@@ -3943,7 +3964,7 @@
+ 			if (action) props.actions = { click: action };
+ 			segs.push(describeSeg(key, props, view, dim));
+ 		};
+-		const subagentBadge = this.#subagentCount > 0;
++		const subagentBadge = describeSegment("subagents", ctx);
+ 		leftSegments.forEach((id, index) => {
+ 			if (subagentBadge && id === "subagents") return;
+ 			const view = describeSegment(id, ctx);
+@@ -3953,10 +3974,5 @@
  		// the inner edge, so they drop before any configured segment.
- 		if (subagentBadge) {
- 			push("subagent-badge", "right", 0, {
+-		if (subagentBadge) {
+-			push("subagent-badge", "right", 0, {
 -				spans: [{ t: `${this.#subagentCount}`, s: "statusLineSubagents" }],
 -				icon: "agents",
-+				spans: [{ t: `Agt ${this.#subagentCount}`, s: "statusLineSubagents" }],
- 			});
- 		}
+-			});
+-		}
++		if (subagentBadge) push("subagent-badge", "right", 0, subagentBadge);
  		const runningBackgroundJobs = this.runningBackgroundJobCount();
+ 		if (runningBackgroundJobs > 0) {
+ 			push("jobs", "right", 0, {
 diff --git a/packages/tui/src/status-line/metrics.ts b/packages/tui/src/status-line/metrics.ts
 --- a/packages/tui/src/status-line/metrics.ts
 +++ b/packages/tui/src/status-line/metrics.ts

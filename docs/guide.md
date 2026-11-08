@@ -456,6 +456,13 @@ extensions for tools and presentation. The
 runtime-only preferences. Keep HUD, tool-card, clipboard, keybinding-tip, and
 terminal-color changes in their own patches.
 
+The [compact extension](../apps/omp/extensions/compact/index.ts) installs footer
+segments, eval history, and queued-script presentation through renderer
+registries. Keep their policy in
+[`lib/compact`](../apps/omp/lib/compact/), with reusable renderer hooks in the
+shared SDK profile. Shell layout, transcript framing, and awaited MCP lifecycle
+handling still require core patches.
+
 `just omp patches check` verifies source hunks at their exact pinned
 coordinates, applies both profiles, and checks generated npm patches. Regenerate
 edited hunks against pristine source rather than retaining coordinates from

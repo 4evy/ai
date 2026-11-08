@@ -6,11 +6,18 @@ import {
 } from "@oh-my-pi/pi-tui/tools/todo";
 import { sanitizeText } from "@oh-my-pi/pi-utils";
 
+export interface TodoSummary {
+  total: number;
+  closed: number;
+  blocked: number;
+  current: string | undefined;
+}
+
 /** Counts and current work shared by the compact HUD and transcript result */
 export function summarizeTodos(
   phases: readonly TodoPhase[],
   isMatched: (task: TodoItem) => boolean = () => false,
-): { total: number; closed: number; blocked: number; current: string | undefined } {
+): TodoSummary {
   let total = 0;
   let closed = 0;
   let blocked = 0;

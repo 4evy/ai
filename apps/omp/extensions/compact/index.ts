@@ -2,11 +2,15 @@ import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { TruncatedText } from "@oh-my-pi/pi-tui/components/truncated-text";
 import { renderStatusLine } from "@oh-my-pi/pi-tui/render";
 import { toolRenderers } from "@oh-my-pi/pi-tui/tools";
+import { createEvalRenderer } from "@oh-my-pi/pi-tui/tools/eval";
 import {
   getActiveTodoDescriptions,
   todoMatchesAnyDescription,
   todoToolRenderer,
 } from "@oh-my-pi/pi-tui/tools/todo";
+import { compactEvalHistory } from "../../lib/compact/eval-history";
+import { installCompactFooterSegments } from "../../lib/compact/footer";
+import { queuedScriptRenderer } from "../../lib/compact/queued-script";
 import { summarizeTodos } from "../../lib/todo/summary";
 
 const compactTodoRenderer = {
@@ -53,8 +57,13 @@ const compactTodoRenderer = {
   },
 } satisfies typeof todoToolRenderer;
 
+const compactEvalRenderer = createEvalRenderer(compactEvalHistory);
+
 export default function compact(_api: ExtensionAPI) {
   // The public renderer catalog is process-wide, just like the replaced policy
   // Rebinding a child installs the same object, never another wrapper
+  installCompactFooterSegments();
   toolRenderers.todo = compactTodoRenderer;
+  toolRenderers.eval = compactEvalRenderer;
+  toolRenderers["xdev:queued"] = queuedScriptRenderer;
 }

@@ -1,9 +1,11 @@
 import { Text, truncateToWidth, visibleWidth } from "@oh-my-pi/pi-tui";
-import { text } from "@oh-my-pi/pi-tui/native/describe";
+import { node, text } from "@oh-my-pi/pi-tui/native/describe";
 import type { NativeNode } from "@oh-my-pi/pi-tui/native/node";
 import { styledSpans } from "@oh-my-pi/pi-tui/native/spans";
 import type { ObservableSession } from "@oh-my-pi/pi-tui/overlays/session-observer-registry";
 import { theme } from "@oh-my-pi/pi-tui/theme";
+import type { TspChecklistPhase } from "@oh-my-pi/pi-wire";
+import type { TodoSummary } from "../todo/summary";
 
 /** One responsive overview row, with details yielding space to counts and hints */
 export class CompactHudComponent extends Text {
@@ -63,10 +65,58 @@ export class CompactHudComponent extends Text {
   }
 }
 
+/** Share one compact todo presentation between ANSI and native terminals */
+export function compactTodoHud(
+  summary: TodoSummary,
+  phases: TspChecklistPhase[],
+  agents: CompactSubagentState | undefined,
+  hubKey: string,
+) {
+  const progress = `${summary.closed}/${summary.total}`;
+  const head = [
+    `${theme.bold(theme.fg("accent", "TODO"))} ${progress}`,
+    ...(summary.blocked > 0 ? [theme.fg("warning", `${summary.blocked} blocked`)] : []),
+  ].join(" · ");
+  const smallHead = `${progress}${summary.blocked > 0 ? ` ${summary.blocked}blocked` : ""}`;
+  const agentHint = agents && hubKey ? `${hubKey} agents` : "";
+  const hints = [
+    ["/todo expand", agentHint].filter(Boolean).join(" · "),
+    ["/todo", agents ? hubKey : ""].filter(Boolean).join(" · "),
+    agents && hubKey ? hubKey : "/todo",
+  ];
+  const heads = agents
+    ? [
+        `${head} · ${agents.full}`,
+        `${head} · ${agents.compact}`,
+        `${smallHead} ${agents.essential}`,
+        agents.essential,
+      ]
+    : [head, smallHead];
+  const component = new CompactHudComponent(heads, summary.current, hints);
+  return {
+    component,
+    native: {
+      checklist: node(
+        "checklist",
+        { phases, mode: "hud", role: "omp.hud.todo" },
+        undefined,
+        "todo",
+      ),
+      fallback: component.describe(),
+    },
+  };
+}
+
+export interface CompactSubagentState {
+  full: string;
+  compact: string;
+  essential: string;
+}
+
 /** Keep lifecycle failures and interactive waits visible without listing agents */
 export function compactSubagentState(
   sessions: readonly ObservableSession[],
-): { full: string; compact: string; essential: string } | undefined {
+): CompactSubagentState | undefined {
   let running = 0;
   let completed = 0;
   let failed = 0;

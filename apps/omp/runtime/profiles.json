@@ -9,6 +9,7 @@
       "quota/quota.patch",
       "schema/schema.patch",
       "ui/hud.patch",
+      "ui/renderer-hooks.patch",
       "ui/tool-cards.patch",
       "ui/clipboard.patch",
       "ui/keybinding-tips.patch",
@@ -23,7 +24,8 @@
       "mcp/mcp.patch",
       "ui/todo.patch",
       "ui/session-model.patch",
-      "ui/ribbon.patch"
+      "ui/ribbon.patch",
+      "ui/renderer-hooks.patch"
     ]
   },
   "dependencies": {},
@@ -40,12 +42,12 @@
     },
     {
       "source": "../lib/todo/summary.ts",
-      "target": "packages/tui/src/tools/todo-summary.ts",
+      "target": "packages/tui/src/lib/todo/summary.ts",
       "profiles": ["runtime"]
     },
     {
       "source": "../lib/compact/hud.ts",
-      "target": "packages/tui/src/tools/compact-hud.ts",
+      "target": "packages/tui/src/lib/compact/hud.ts",
       "profiles": ["runtime"]
     }
   ]

@@ -29,8 +29,8 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
 +	todoChecklistPhases,
  	todoMatchesAnyDescription,
  } from "@oh-my-pi/pi-tui/tools/todo";
-+import { summarizeTodos } from "@oh-my-pi/pi-tui/tools/todo-summary";
-+import { CompactHudComponent, compactSubagentHud, compactSubagentState } from "@oh-my-pi/pi-tui/tools/compact-hud";
++import { summarizeTodos } from "@oh-my-pi/pi-tui/lib/todo/summary";
++import { compactTodoHud, compactSubagentHud, compactSubagentState } from "@oh-my-pi/pi-tui/lib/compact/hud";
  import { vocalizer } from "../tts/vocalizer";
  import { applyFileLinkSetting, applyHyperlinkSetting, fileHyperlink } from "@oh-my-pi/pi-tui/render/hyperlink";
  import {
@@ -173,7 +173,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		this.subagentContainer = new AnchoredLiveContainer();
  		this.btwContainer = new AnchoredLiveContainer();
  		this.omfgContainer = new AnchoredLiveContainer();
-@@ -5299,9 +5263,60 @@
+@@ -5299,9 +5263,31 @@
  		this.#todoHudNative = undefined;
  		const activeDescs = this.#getActiveSubagentDescriptions();
  		this.#todoHudSubagentKey = activeDescs.join("\n");
@@ -193,42 +193,13 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
 +			const isMatched = (todo: TodoItem): boolean =>
 +				activeDescs.length > 0 && todoMatchesAnyDescription(todo.content, activeDescs);
 +			const summary = summarizeTodos(phases, isMatched);
-+			const progress = `${summary.closed}/${summary.total}`;
-+			const head = [
-+				`${theme.bold(theme.fg("accent", "TODO"))} ${progress}`,
-+				...(summary.blocked > 0 ? [theme.fg("warning", `${summary.blocked} blocked`)] : []),
-+			].join(" · ");
-+			const smallHead = `${progress}${summary.blocked > 0 ? ` ${summary.blocked}blocked` : ""}`;
 +			const mode = cfgDisplayPinnedAgents.get(settings);
 +			const compactAgents = mode !== "off" && !(this.#pinnedHudOverride ?? mode === "full");
 +			const agents = compactAgents ? compactSubagentState(this.#observerRegistry.getSessions()) : undefined;
 +			const hubKey = appKey(this.keybindings, "app.agents.hub") || appKey(this.keybindings, "app.session.observe");
-+			const agentHint = agents && hubKey ? `${hubKey} agents` : "";
-+			const hint = ["/todo expand", agentHint].filter(Boolean).join(" · ");
-+			const hints = [
-+				hint,
-+				["/todo", agents ? hubKey : ""].filter(Boolean).join(" · "),
-+				agents && hubKey ? hubKey : "/todo",
-+			];
-+			const heads = agents
-+				? [
-+						`${head} · ${agents.full}`,
-+						`${head} · ${agents.compact}`,
-+						`${smallHead} ${agents.essential}`,
-+						agents.essential,
-+					]
-+				: [head, smallHead];
-+			const hud = new CompactHudComponent(heads, summary.current, hints);
-+			this.todoContainer.addChild(hud);
-+			this.#todoHudNative = {
-+				checklist: node(
-+					"checklist",
-+					{ phases: todoChecklistPhases(phases, isMatched), mode: "hud", role: "omp.hud.todo" },
-+					undefined,
-+					"todo",
-+				),
-+				fallback: hud.describe(),
-+			};
++			const hud = compactTodoHud(summary, todoChecklistPhases(phases, isMatched), agents, hubKey);
++			this.todoContainer.addChild(hud.component);
++			this.#todoHudNative = hud.native;
 +			if (compactAgents) this.subagentContainer.clear();
 +			else this.#renderSubagentList();
 +			return;
@@ -236,7 +207,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		const expanded = this.todoExpanded;
  		const multiPhase = phases.length > 1;
  		const activeIdx = phases.indexOf(this.#getActivePhase(phases) ?? phases[0]);
-@@ -5470,29 +5485,7 @@
+@@ -5470,29 +5456,7 @@
  			"todo",
  		);
  		// A `checklist` HUD is a pill with the whole plan as its popover.
@@ -267,7 +238,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		this.#todoHudNative = {
  			checklist: node(
  				"checklist",
-@@ -5502,72 +5495,9 @@
+@@ -5502,72 +5466,9 @@
  			),
  			fallback,
  		};
@@ -341,7 +312,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  	async #loadTodoList(source: AgentViewSession = this.session): Promise<void> {
  		this.todoPhases = source.getTodoPhases();
  		this.#todoPhasesOwner = source;
-@@ -5619,6 +5549,24 @@
+@@ -5619,6 +5520,24 @@
  	 */
  	#renderSubagentList(): boolean {
  		this.#cancelSubagentPreviewTick();
@@ -366,7 +337,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		const view = this.#buildSubagentHudView();
  		if (!view) {
  			const changed = this.subagentContainer.children.length > 0;
-@@ -5632,7 +5580,10 @@
+@@ -5632,7 +5551,10 @@
  		this.#subagentHudKey = key;
  		const hud = this.subagentContainer.children[0];
  		if (hud instanceof SubagentHudComponent) hud.update(view.lines, view.order, view.toggleRow);
@@ -378,7 +349,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		return true;
  	}
  
-@@ -8916,7 +8867,7 @@
+@@ -8916,7 +8838,7 @@
  				// status rows so the interrupt glyph reads as indented.
  				[` ${appKey(this.keybindings, "app.interrupt")}`],
  			);

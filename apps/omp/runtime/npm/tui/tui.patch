@@ -27,6 +27,92 @@ diff --git a/dist/types/theme/theme-class.d.ts b/dist/types/theme/theme-class.d.
      /** True when the active theme has a light status-line background. */
      get isLight(): boolean;
      /**
+diff --git a/dist/types/tools/eval.d.ts b/dist/types/tools/eval.d.ts
+--- a/dist/types/tools/eval.d.ts
++++ b/dist/types/tools/eval.d.ts
+@@ -1,5 +1,6 @@
+ import type { Component } from "../index.js";
+ import type { NativeToolView, RenderResultContextOptions, RenderResultOptions } from "./renderer.js";
++import type { NativeNode } from "../native/node.js";
+ import { type Theme } from "../theme/theme.js";
+ import type { ImageContent } from "@oh-my-pi/pi-ai";
+ import type { OutputMeta } from "./output-meta.js";
+@@ -88,7 +89,7 @@
+         type: "eval";
+     };
+ }
+-/** Default collapsed eval output preview height; kept as a named alias (consumed by chat/tool-execution). */
++/** Default collapsed eval output preview height in visual screen rows */
+ export declare const EVAL_DEFAULT_PREVIEW_LINES: number;
+ interface EvalRenderCellArg {
+     language?: string;
+@@ -105,6 +106,7 @@
+     previewLines?: number;
+     timeout?: number;
+ }
++type AgentEventStatus = "pending" | "running" | "completed" | "failed" | "aborted";
+ /**
+  * Coalescing key of a progress-snapshot event: `agent`, `judge_batch`, and `mcp_progress`
+  * events keyed by `id`, where only the newest snapshot matters. Discrete
+@@ -138,6 +140,17 @@
+  * events behind an "… N earlier" row.
+  */
+ export declare function recordStatusEvent(log: StatusEventLog, event: EvalStatusEvent): void;
++export declare function agentEventStatus(value: unknown): AgentEventStatus;
++/**
++ * Render coalesced `agent()` progress as a Task-tool-style tree, one entry per
++ * subagent: a status line (icon · id · stats) plus, while running, the current
++ * tool/intent. Drawn below the cell box so progress streams live.
++ */
++export declare function renderAgentProgressEvents(events: EvalStatusEvent[], theme: Theme, width: number, spinnerFrame?: number): string[];
++/** Format a status event as a single line for display. */
++export declare function formatStatusEvent(event: EvalStatusEvent, theme: Theme): string;
++/** Format status event with expanded detail lines. */
++export declare function formatStatusEventExpanded(event: EvalStatusEvent, theme: Theme): string[];
+ /** One ordered piece of a cell's output: printed text, or a view shown in place of the text it matched. */
+ export type EvalOutputPart = {
+     kind: "text";
+@@ -152,7 +165,39 @@
+  * blank text between views is dropped (newlines bordering a view trimmed).
+  */
+ export declare function splitEvalOutput(output: string, views: readonly EvalViewEntry[] | undefined): EvalOutputPart[];
+-/** Render eval code cells, structured display output, and progress events. */
++/** Terminal and native status history supplied together by a renderer policy */
++export interface EvalStatusRenderer {
++    render(events: EvalStatusEvent[], theme: Theme, expanded: boolean, elided?: number, width?: number, spinnerFrame?: number): string[];
++    describe(log: StatusEventLog, expanded: boolean): NativeNode | undefined;
++}
++/** Render eval code cells, structured display output, and progress events */
++export declare const createEvalRenderer: (statusRenderer?: EvalStatusRenderer) => {
++    animatedPendingPreview: true;
++    animatedPartialResult: true;
++    renderCall(args: EvalRenderArgs, options: RenderResultOptions, uiTheme: Theme): Component;
++    renderResult(result: {
++        content: Array<{
++            type: string;
++            text?: string;
++        }>;
++        details?: EvalToolDetails;
++    }, options: RenderResultOptions & {
++        renderContext?: EvalRenderContext;
++    }, uiTheme: Theme, _args?: EvalRenderArgs): Component;
++    describeCall(args: EvalRenderArgs, options: RenderResultOptions): NativeToolView;
++    describeResult(result: {
++        content: Array<{
++            type: string;
++            text?: string;
++        }>;
++        details?: EvalToolDetails;
++        isError?: boolean;
++    }, options: RenderResultContextOptions & {
++        renderContext?: EvalRenderContext;
++    }, args?: EvalRenderArgs): NativeToolView;
++    mergeCallAndResult: true;
++    inline: true;
++};
+ export declare const evalToolRenderer: {
+     animatedPendingPreview: true;
+     animatedPartialResult: true;
 diff --git a/dist/types/tools/todo.d.ts b/dist/types/tools/todo.d.ts
 --- a/dist/types/tools/todo.d.ts
 +++ b/dist/types/tools/todo.d.ts
@@ -39,6 +125,21 @@ diff --git a/dist/types/tools/todo.d.ts b/dist/types/tools/todo.d.ts
  /**
   * Checklist phases for native terminals: plain phase titles (no roman
   * numerals — the terminal numbers nothing), completed phases folded.
+diff --git a/dist/types/tools/xdev.d.ts b/dist/types/tools/xdev.d.ts
+--- a/dist/types/tools/xdev.d.ts
++++ b/dist/types/tools/xdev.d.ts
+@@ -42,6 +42,11 @@
+  * surface their first line instead.
+  */
+ export declare function xdevActivitySummary(name: string, content: unknown, resolveMounted?: (name: string) => XdevMountedRenderer | undefined): ToolActivitySummary;
++/** Arguments passed to the optional `xdev:queued` renderer catalog entry */
++export interface XdevQueuedArgs {
++    label: string;
++    args: Record<string, unknown>;
++}
+ /**
+  * Streaming-safe call preview for an `xd://` write. Until the write actually
+  * executes (`executionStarted` / `tool_execution_start`), show a queued/planning
 diff --git a/src/chrome/dynamic-border.ts b/src/chrome/dynamic-border.ts
 --- a/src/chrome/dynamic-border.ts
 +++ b/src/chrome/dynamic-border.ts
@@ -258,6 +359,486 @@ diff --git a/src/theme/theme-schema.json b/src/theme/theme-schema.json
  		"colors": {
  			"type": "object",
  			"description": "Theme color definitions (all required except thinkingMax and assistantMessageText)",
+diff --git a/src/tools/eval.ts b/src/tools/eval.ts
+--- a/src/tools/eval.ts
++++ b/src/tools/eval.ts
+@@ -9,10 +9,10 @@
+ 	ToolRenderer,
+ } from "./renderer";
+ import type { TspSpan } from "@oh-my-pi/pi-wire";
+-import { code, compact, keyed, md, node, span, text } from "../native/describe";
++import { ansi, code, compact, keyed, md, node, span, text } from "../native/describe";
+ import type { NativeChild, NativeNode } from "../native/node";
+ import { plainText } from "../native/spans";
+-import { resultText, runBox, runFoot, type RunFootInput, runInput, runOutput, type RunState } from "./native-view";
++import { resultText, runBox, runFoot, type RunFootInput, type RunState } from "./native-view";
+ import { renderAgentTreeRow } from "./agent-tree";
+ import { truncateToVisualLines } from "../chrome/visual-truncate";
+ import { getMarkdownTheme, type Theme } from "../theme/theme";
+@@ -38,7 +38,6 @@
+ import { formatMCPProgress, parseMCPProgress } from "./mcp";
+ import { splitPathAndSel } from "./read";
+ import {
+-	DEFAULT_TERMINAL_PREVIEW_LINES,
+ 	PREVIEW_LIMITS,
+ 	cappedHeadLines,
+ 	formatTitle,
+@@ -52,7 +51,7 @@
+ } from "../render/render-utils";
+ import type { ImageContent } from "@oh-my-pi/pi-ai";
+ import type { OutputMeta } from "./output-meta";
+-import { type ConfiguredThinkingLevel, expandKeyHint } from "../render/render-utils";
++import { type ConfiguredThinkingLevel, expandKeyHint, formatExpandHint } from "../render/render-utils";
+ 
+ /** Runtime backend that an eval cell dispatches to. */
+ export type EvalLanguage = "python" | "js";
+@@ -138,8 +137,8 @@
+ 	};
+ }
+ 
+-/** Default collapsed eval output preview height; kept as a named alias (consumed by chat/tool-execution). */
+-export const EVAL_DEFAULT_PREVIEW_LINES: number = DEFAULT_TERMINAL_PREVIEW_LINES;
++/** Default collapsed eval output preview height in visual screen rows */
++export const EVAL_DEFAULT_PREVIEW_LINES: number = 6;
+ 
+ function languageForHighlighter(language: EvalLanguage | undefined): "python" | "javascript" {
+ 	if (language === "js") return "javascript";
+@@ -296,7 +295,7 @@
+ 	return typeof value === "number" && Number.isFinite(value) ? value : 0;
+ }
+ 
+-function agentEventStatus(value: unknown): AgentEventStatus {
++export function agentEventStatus(value: unknown): AgentEventStatus {
+ 	switch (value) {
+ 		case "pending":
+ 		case "running":
+@@ -314,7 +313,7 @@
+  * subagent: a status line (icon · id · stats) plus, while running, the current
+  * tool/intent. Drawn below the cell box so progress streams live.
+  */
+-function renderAgentProgressEvents(
++export function renderAgentProgressEvents(
+ 	events: EvalStatusEvent[],
+ 	theme: Theme,
+ 	width: number,
+@@ -380,7 +379,7 @@
+ }
+ 
+ /** Format a status event as a single line for display. */
+-function formatStatusEvent(event: EvalStatusEvent, theme: Theme): string {
++export function formatStatusEvent(event: EvalStatusEvent, theme: Theme): string {
+ 	const { op, ...data } = event;
+ 
+ 	type AvailableIcon = "icon.file" | "icon.folder" | "icon.git" | "icon.package" | "cmd.globe" | "cmd.computer";
+@@ -527,7 +526,7 @@
+ }
+ 
+ /** Format status event with expanded detail lines. */
+-function formatStatusEventExpanded(event: EvalStatusEvent, theme: Theme): string[] {
++export function formatStatusEventExpanded(event: EvalStatusEvent, theme: Theme): string[] {
+ 	const lines: string[] = [];
+ 	const { op, ...data } = event;
+ 
+@@ -638,12 +637,8 @@
+ 		return { lines: [], hiddenCount: 0 };
+ 	}
+ 
+-	// Cell output lands in renderCodeCell → renderOutputBlock, which re-wraps it
+-	// at the box's inner content width. Bound the collapsed tail by VISUAL rows
+-	// at that width so a long-line tail can't wrap into more rows than budgeted
+-	// and scroll its mutating preview above the live-region window — the
+-	// duplicate "ctrl+o to expand" scrollback spray. The caller appends its own
+-	// exact hidden-count row, so the pane marker stays off here.
++	// Bound screen rows at the code cell's content width, not logical lines
++	// Structured output starts at its root; ordinary logs follow their tail
+ 	const innerWidth = outputBlockContentWidth(width);
+ 
+ 	const isError = cell.status === "error";
+@@ -653,11 +648,13 @@
+ 		output,
+ 		cell.views?.filter(entry => entry.view.kind !== "table"),
+ 	);
++	const hasStructuredValue = parts.some(part => part.kind === "view" && part.view.kind === "json");
+ 	if (parts.some(part => part.kind === "view")) {
+ 		// Printed text keeps its place; json and markdown views replace theirs with a tree / rendered Markdown.
+-		const treeDepth = expanded ? JSON_TREE_MAX_DEPTH_EXPANDED : JSON_TREE_MAX_DEPTH_COLLAPSED;
+-		const treeLineCap = expanded ? JSON_TREE_MAX_LINES_EXPANDED : JSON_TREE_MAX_LINES_COLLAPSED;
+-		const treeScalarLen = expanded ? JSON_TREE_SCALAR_LEN_EXPANDED : JSON_TREE_SCALAR_LEN_COLLAPSED;
++		const fullOutput = expanded || isError;
++		const treeDepth = fullOutput ? JSON_TREE_MAX_DEPTH_EXPANDED : JSON_TREE_MAX_DEPTH_COLLAPSED;
++		const treeLineCap = fullOutput ? JSON_TREE_MAX_LINES_EXPANDED : JSON_TREE_MAX_LINES_COLLAPSED;
++		const treeScalarLen = fullOutput ? JSON_TREE_SCALAR_LEN_EXPANDED : JSON_TREE_SCALAR_LEN_COLLAPSED;
+ 		const allLines: string[] = [];
+ 		for (const part of parts) {
+ 			if (part.kind === "text") {
+@@ -666,7 +663,12 @@
+ 			}
+ 			const view = part.view;
+ 			if (view.kind === "json") {
+-				const tree = renderJsonTreeLines(view.value, theme, treeDepth, treeLineCap, treeScalarLen);
++				const tree = renderJsonTreeLines(view.value, theme, {
++					maxDepth: treeDepth,
++					maxLines: treeLineCap,
++					maxScalarLen: treeScalarLen,
++					hiddenRootKeys: [],
++				});
+ 				allLines.push(...tree.lines);
+ 				if (tree.truncated) allLines.push(theme.fg("dim", "…"));
+ 			} else if (view.kind === "markdown") {
+@@ -676,9 +678,9 @@
+ 		const formatted = formatOutputPaneLines(
+ 			{
+ 				lines: allLines,
+-				expanded,
++				expanded: expanded || isError,
+ 				collapsedMaxLines: previewLines,
+-				edge: "tail",
++				edge: hasStructuredValue && !isError ? "head" : "tail",
+ 				visual: true,
+ 				width: innerWidth,
+ 				showHiddenMarker: false,
+@@ -690,7 +692,7 @@
+ 	const formatted = formatOutputPaneLines(
+ 		{
+ 			lines: output.split("\n"),
+-			expanded,
++			expanded: expanded || isError,
+ 			collapsedMaxLines: previewLines,
+ 			edge: "tail",
+ 			visual: true,
+@@ -820,25 +822,30 @@
+ }
+ 
+ /**
+- * One cell's outputs in order: printed text (following its tail, clamped to
+- * the last `previewLines` while folded) with each view in place of its text.
+- * A json view is the host's own JSON viewer (`json`), top-level entries
+- * listed and containers folded, when it draws the kind; else a JSON tree.
++ * Ordered output parts, with a head preview for structured values and a tail
++ * preview for ordinary text logs. JSON views use the host's JSON viewer when
++ * supported, otherwise a JSON tree
+  */
+ function evalOutputNodes(
+ 	output: string,
+ 	views: readonly EvalViewEntry[] | undefined,
+ 	previewLines: number,
+ 	json: boolean,
++	isError = false,
+ ): NativeNode[] {
+ 	if (output.trim().length === 0) return [];
+-	return splitEvalOutput(output, views).map((part, i) => {
++	const parts = splitEvalOutput(output, views);
++	const structured = parts.some(part => part.kind === "view" && part.view.kind === "json");
++	const outputs = parts.map((part, i) => {
+ 		if (part.kind === "text") {
+-			return runOutput(part.text, {
+-				role: "omp.tool.eval.output",
+-				previewLines,
+-				key: i === 0 ? "output" : `output-${i}`,
+-			});
++			return keyed(
++				ansi(part.text, {
++					role: "omp.tool.eval.output",
++					follow: structured ? undefined : true,
++					preview: isError || structured ? undefined : { lines: previewLines },
++				}),
++				i === 0 ? "output" : `output-${i}`,
++			);
+ 		}
+ 		const view = part.view;
+ 		if (view.kind === "table") return evalTableNode(view, `table-${i}`);
+@@ -847,6 +854,11 @@
+ 		}
+ 		return keyed(md(view.text), `markdown-${i}`);
+ 	});
++	// A bare native card clamps the ordered structured output from its head
++	// while retaining its full children for the existing disclosure action
++	return structured && !isError
++		? [node("card", { variant: "bare", preview: { lines: previewLines } }, outputs, "output")]
++		: outputs;
+ }
+ 
+ /** Status lines a folded cell keeps: the newest ones. */
+@@ -915,11 +927,15 @@
+ 		[
+ 			caption,
+ 			cell.code.trim().length > 0 &&
+-				runInput(cell.code, {
+-					role: "omp.tool.eval.input",
+-					lang: languageForHighlighter(cell.language),
+-					wrap: false,
+-				}),
++				keyed(
++					code(cell.code.trimEnd(), {
++						role: "omp.tool.eval.input",
++						lang: languageForHighlighter(cell.language),
++						wrap: true,
++						preview: { lines: 2 },
++					}),
++					"input",
++				),
+ 			...(cell.outputs ?? []),
+ 			cell.status,
+ 			cell.foot && runFoot(cell.foot),
+@@ -928,8 +944,21 @@
+ 	);
+ }
+ 
+-/** Render eval code cells, structured display output, and progress events. */
+-export const evalToolRenderer = {
++/** Terminal and native status history supplied together by a renderer policy */
++export interface EvalStatusRenderer {
++	render(
++		events: EvalStatusEvent[],
++		theme: Theme,
++		expanded: boolean,
++		elided?: number,
++		width?: number,
++		spinnerFrame?: number,
++	): string[];
++	describe(log: StatusEventLog, expanded: boolean): NativeNode | undefined;
++}
++
++/** Render eval code cells, structured display output, and progress events */
++export const createEvalRenderer = (statusRenderer?: EvalStatusRenderer) => ({
+ 	animatedPendingPreview: true,
+ 	animatedPartialResult: true,
+ 	renderCall(args: EvalRenderArgs, options: RenderResultOptions, uiTheme: Theme): Component {
+@@ -970,11 +999,7 @@
+ 								status: spinnerFrame !== undefined ? "running" : "pending",
+ 								spinnerFrame,
+ 								width,
+-								// Viewport-sized tail window following the newest streamed code
+-								// line; renderResult keeps the same cap so the cell never snaps
+-								// open on completion. Only ctrl+o uncaps.
+-								codeTail: true,
+-								codeMaxLines: windowRows,
++								codeMaxLines: 2,
+ 								expanded: options.expanded,
+ 							};
+ 							return { options: cellOptions, lines: renderCodeCell(cellOptions, uiTheme) };
+@@ -1032,24 +1057,21 @@
+ 		if (cellResults && cellResults.length > 0) {
+ 			const displayCells = cellResults.map(cell => {
+ 				const language = cell.language ?? details?.language ?? "python";
+-				const allEvents = cell.statusEvents ?? [];
+-				const agentEvents = allEvents.filter(e => e.op === "agent");
+ 				return {
+ 					cell,
+ 					code: formatEvalCodeForDisplay(cell.code, language),
+ 					language,
+-					agentEvents,
+-					otherEvents: agentEvents.length > 0 ? allEvents.filter(e => e.op !== "agent") : allEvents,
+-					// Running agent rows carry the spinner; settled ones are frame-independent.
+-					agentLive: agentEvents.some(e => agentEventStatus(e.status) === "running"),
+ 				};
+ 			});
+-			// Per-cell rows keyed by everything but the spinner frame: a tick only
+-			// redraws running headers and running agent rows.
++			const hasLiveAgent = cellResults.some(cell =>
++				cell.statusEvents?.some(event => event.op === "agent" && agentEventStatus(event.status) === "running"),
++			);
++			let outputMemo: { key: string; cells: { lines: readonly string[]; hiddenCount: number }[] } | undefined;
++			// Header-only ticks reuse cells; live agents rebuild only history and layout
+ 			let bodies:
+ 				| {
+ 						key: string;
+-						cells: { codeCell: RenderedCodeCell; agentLines: string[]; agentFrame: number | undefined }[];
++						cells: RenderedCodeCell[];
+ 				  }
+ 				| undefined;
+ 			let cached: { key: string; result: string[] } | undefined;
+@@ -1063,31 +1085,40 @@
+ 						options.renderContext?.previewLines ?? EVAL_DEFAULT_PREVIEW_LINES,
+ 						windowRows,
+ 					);
+-					const bodyKey = `${width}|${expanded}|${previewLines}|${windowRows}`;
++					const outputKey = `${width}|${expanded}|${previewLines}|${windowRows}`;
++					const bodyKey = `${outputKey}|${hasLiveAgent ? spinnerFrame : ""}`;
+ 					const key = `${bodyKey}|${spinnerFrame}`;
+ 					if (cached?.key === key) {
+ 						return cached.result;
+ 					}
+ 
++					if (outputMemo?.key !== outputKey) {
++						outputMemo = {
++							key: outputKey,
++							cells: displayCells.map(({ cell }) =>
++								formatCellOutputLines(cell, expanded, previewLines, uiTheme, width),
++							),
++						};
++					}
+ 					if (bodies?.key !== bodyKey) {
+ 						bodies = {
+ 							key: bodyKey,
+-							cells: displayCells.map(({ cell, code, language, agentEvents, otherEvents }, i) => {
+-								const statusLines = renderStatusEvents(otherEvents, uiTheme, expanded, cell.statusEventsElided);
+-								const outputContent = formatCellOutputLines(cell, expanded, previewLines, uiTheme, width);
++							cells: displayCells.map(({ cell, code, language }, i) => {
++								const statusLines = (statusRenderer?.render ?? renderStatusEvents)(
++									cell.statusEvents ?? [],
++									uiTheme,
++									expanded,
++									cell.statusEventsElided,
++									outputBlockContentWidth(width),
++									spinnerFrame,
++								);
++								const outputContent = outputMemo!.cells[i]!;
+ 								const outputLines = [...outputContent.lines];
+ 								if (!expanded && outputContent.hiddenCount > 0) {
+-									outputLines.push(
+-										uiTheme.fg(
+-											"dim",
+-											`… ${outputContent.hiddenCount} more lines (${expandKeyHint()} to expand)`,
+-										),
+-									);
++									outputLines.push(uiTheme.fg("dim", `More output ${formatExpandHint(uiTheme, false, true)}`));
+ 								}
+ 								if (statusLines.length > 0) {
+-									if (outputLines.length > 0) {
+-										outputLines.push(uiTheme.fg("dim", "Status"));
+-									}
++									// History has its own muted heading and bounded latest row
+ 									outputLines.push(...statusLines);
+ 								}
+ 								const cellOptions: CodeCellOptions = {
+@@ -1102,36 +1133,19 @@
+ 									duration: cell.durationMs,
+ 									output: outputLines.length > 0 ? outputLines.join("\n") : undefined,
+ 									outputMaxLines: outputLines.length,
+-									// Same viewport-sized tail window as the pending preview so the
+-									// cell never snaps open on completion; only ctrl+o uncaps.
+-									// `output` keeps its own preview cap from above.
+-									codeTail: true,
+-									codeMaxLines: windowRows,
++									codeMaxLines: 2,
+ 									expanded,
+ 									width,
+ 								};
+-								return {
+-									codeCell: { options: cellOptions, lines: renderCodeCell(cellOptions, uiTheme) },
+-									agentLines:
+-										agentEvents.length > 0
+-											? renderAgentProgressEvents(agentEvents, uiTheme, width, spinnerFrame)
+-											: [],
+-									agentFrame: spinnerFrame,
+-								};
++								return { options: cellOptions, lines: renderCodeCell(cellOptions, uiTheme) };
+ 							}),
+ 						};
+ 					}
+ 
+ 					const lines: string[] = [];
+ 					for (let i = 0; i < displayCells.length; i++) {
+-						const { agentEvents, agentLive } = displayCells[i]!;
+ 						const body = bodies.cells[i]!;
+-						pushCodeCellLines(lines, body.codeCell, spinnerFrame, uiTheme);
+-						if (agentLive && body.agentFrame !== spinnerFrame) {
+-							body.agentLines = renderAgentProgressEvents(agentEvents, uiTheme, width, spinnerFrame);
+-							body.agentFrame = spinnerFrame;
+-						}
+-						lines.push(...body.agentLines);
++						pushCodeCellLines(lines, body, spinnerFrame, uiTheme);
+ 						if (i < cellResults.length - 1) {
+ 							lines.push("");
+ 						}
+@@ -1152,6 +1166,7 @@
+ 					return lines;
+ 				},
+ 				invalidate: () => {
++					outputMemo = undefined;
+ 					bodies = undefined;
+ 					cached = undefined;
+ 				},
+@@ -1159,7 +1174,7 @@
+ 		}
+ 
+ 		const statusEvents = details?.statusEvents ?? [];
+-		const statusLines = renderStatusEvents(
++		const statusLines = (statusRenderer?.render ?? renderStatusEvents)(
+ 			statusEvents,
+ 			uiTheme,
+ 			options.renderContext?.expanded ?? options.expanded,
+@@ -1172,30 +1187,18 @@
+ 		}
+ 
+ 		if (!output && statusLines.length > 0) {
+-			const lines = [
+-				uiTheme.fg("dim", "Status"),
+-				...statusLines,
+-				timeoutLine,
+-				noticeLine,
+-				asyncLine,
+-				warningLine,
+-			].filter(Boolean) as string[];
++			const lines = [...statusLines, timeoutLine, noticeLine, asyncLine, warningLine].filter(Boolean) as string[];
+ 			return new Text(lines.join("\n"), 0, 0);
+ 		}
+ 
+-		if (options.renderContext?.expanded ?? options.expanded) {
++		if ((options.renderContext?.expanded ?? options.expanded) || result.isError || details?.isError) {
+ 			const styledOutput = output
+ 				.split("\n")
+ 				.map(line => uiTheme.fg("toolOutput", line))
+ 				.join("\n");
+-			const lines = [
+-				styledOutput,
+-				...(statusLines.length > 0 ? [uiTheme.fg("dim", "Status"), ...statusLines] : []),
+-				timeoutLine,
+-				noticeLine,
+-				asyncLine,
+-				warningLine,
+-			].filter(Boolean) as string[];
++			const lines = [styledOutput, ...statusLines, timeoutLine, noticeLine, asyncLine, warningLine].filter(
++				Boolean,
++			) as string[];
+ 			return new Text(lines.join("\n"), 0, 0);
+ 		}
+ 
+@@ -1234,7 +1237,6 @@
+ 				}
+ 				outputLines.push(...cachedLines);
+ 				if (statusLines.length > 0) {
+-					outputLines.push(truncateToWidth(uiTheme.fg("dim", "Status"), width));
+ 					for (const statusLine of statusLines) {
+ 						outputLines.push(truncateToWidth(statusLine, width));
+ 					}
+@@ -1314,8 +1316,14 @@
+ 						language,
+ 						code: formatEvalCodeForDisplay(cell.code, language),
+ 						title: cell.title,
+-						outputs: [...evalOutputNodes(cell.output, cell.views, previewLines, options.json === true)],
+-						status: evalStatusSection(cell, expanded),
++						outputs: evalOutputNodes(
++							cell.output,
++							cell.views,
++							previewLines,
++							options.json === true,
++							cell.status === "error",
++						),
++						status: (statusRenderer?.describe ?? evalStatusSection)(cell, expanded),
+ 						foot: state && {
+ 							state,
+ 							exitCode: cell.exitCode,
+@@ -1344,8 +1352,9 @@
+ 				undefined,
+ 				previewLines,
+ 				options.json === true,
++				result.isError === true || details?.isError === true,
+ 			),
+-			status: evalStatusSection(details ?? {}, expanded),
++			status: (statusRenderer?.describe ?? evalStatusSection)(details ?? {}, expanded),
+ 			foot: { state, elapsedMs: options.elapsedMs, ...callFacts },
+ 		};
+ 		const runs: EvalCellRun[] =
+@@ -1366,4 +1375,6 @@
+ 
+ 	mergeCallAndResult: true,
+ 	inline: true,
+-} satisfies ToolRenderer<EvalRenderArgs, EvalToolDetails>;
++} satisfies ToolRenderer<EvalRenderArgs, EvalToolDetails>);
++
++export const evalToolRenderer = createEvalRenderer();
 diff --git a/src/tools/todo.ts b/src/tools/todo.ts
 --- a/src/tools/todo.ts
 +++ b/src/tools/todo.ts
@@ -286,3 +867,40 @@ diff --git a/src/tools/todo.ts b/src/tools/todo.ts
  }
  
  /**
+diff --git a/src/tools/xdev.ts b/src/tools/xdev.ts
+--- a/src/tools/xdev.ts
++++ b/src/tools/xdev.ts
+@@ -119,6 +119,12 @@
+ 	return rest;
+ }
+ 
++/** Arguments passed to the optional `xdev:queued` renderer catalog entry */
++export interface XdevQueuedArgs {
++	label: string;
++	args: Record<string, unknown>;
++}
++
+ /** Pre-execution card so a streamed `xd://` write does not look like a hung MCP call. */
+ function renderQueuedXdevCall(
+ 	label: string,
+@@ -126,6 +132,8 @@
+ 	options: RenderResultOptions,
+ 	theme: Theme,
+ ): Component {
++	const queued = rendererLookup?.("xdev:queued")?.renderCall({ label, args: displayDeviceArgs(args) }, options, theme);
++	if (queued) return queued;
+ 	return renderDefaultToolExecution(
+ 		{
+ 			label: `queued ${label}`,
+@@ -185,6 +193,11 @@
+ 	const mounted = resolveMounted?.(name);
+ 	const args = decodeInnerArgs(content);
+ 	if (!options.executionStarted) {
++		const queued = rendererLookup?.("xdev:queued")?.describeCall?.(
++			{ label: displayDeviceLabel(name, mounted), args: displayDeviceArgs(args) },
++			options,
++		);
++		if (queued) return queued;
+ 		return describeDefaultToolExecution({
+ 			label: `queued ${displayDeviceLabel(name, mounted)}`,
+ 			args: displayDeviceArgs(args),
