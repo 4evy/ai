@@ -27,7 +27,8 @@
 let
   bridgePython = python3Packages.overrideScope (
     _self: super: {
-      mcp = super.mcp.overridePythonAttrs (old: {
+      # Preserve Nixpkgs' check inputs so matching SDK pins reuse its binaries
+      mcp = super.mcp.overridePythonAttrs (_: {
         inherit (pin.sdk) version;
         src = fetchFromGitHub {
           owner = "modelcontextprotocol";
@@ -35,7 +36,6 @@ let
           tag = "v${pin.sdk.version}";
           inherit (pin.sdk) hash;
         };
-        nativeCheckInputs = old.nativeCheckInputs ++ [ python3Packages.blockbuster ];
       });
     }
   );
