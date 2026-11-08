@@ -127,22 +127,15 @@ export default function improve(api: ExtensionAPI) {
       const configured = api.getFlag("improve-model");
       const selector =
         typeof configured === "string" ? configured : DEFAULT_REWRITE_MODEL;
-      const resolved = ctx.models.resolve(selector);
-      const available = ctx.models.list();
-      const model =
-        resolved &&
-        available.find(
-          (candidate) =>
-            candidate.provider === resolved.provider && candidate.id === resolved.id,
-        );
+      const model = ctx.models.resolve(selector);
       if (!model) {
         ctx.ui.notify(`Rewrite model is unavailable: ${selector}`, "error");
         return;
       }
       const fast = api.getFlag("improve-fast") === true;
-      const modelLabels = available.map((candidate) =>
-        modelMentionChipLabel(modelMentionDisplayName(candidate)),
-      );
+      const modelLabels = ctx.models
+        .list()
+        .map((candidate) => modelMentionChipLabel(modelMentionDisplayName(candidate)));
 
       const result = await ctx.ui.custom<
         { text: string } | { error: unknown } | undefined

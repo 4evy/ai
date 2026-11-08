@@ -25,7 +25,7 @@ export default function quick(api: ExtensionAPI) {
       const model = ctx.models
         .list()
         .find((candidate) => candidate.provider === PROVIDER && candidate.id === MODEL);
-      if (!model || !ctx.modelRegistry.hasConfiguredAuth(model)) {
+      if (!model) {
         ctx.ui.notify(`Quick model is unavailable: ${PROVIDER}/${MODEL}`, "error");
         return;
       }
