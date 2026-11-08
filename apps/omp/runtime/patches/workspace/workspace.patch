@@ -1,7 +1,7 @@
 diff --git a/packages/coding-agent/src/tools/browser/launch.ts b/packages/coding-agent/src/tools/browser/launch.ts
 --- a/packages/coding-agent/src/tools/browser/launch.ts
 +++ b/packages/coding-agent/src/tools/browser/launch.ts
-@@ -38,6 +38,7 @@
+@@ -40,6 +40,7 @@
  import stealthPluginsScript from "../puppeteer/10_stealth_plugins.txt" with { type: "text" };
  import stealthHardwareScript from "../puppeteer/11_stealth_hardware.txt" with { type: "text" };
  import stealthCodecsScript from "../puppeteer/12_stealth_codecs.txt" with { type: "text" };
@@ -9,8 +9,8 @@ diff --git a/packages/coding-agent/src/tools/browser/launch.ts b/packages/coding
  import stealthWorkerScript from "../puppeteer/13_stealth_worker.txt" with { type: "text" };
  import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
  import { withDownload } from "../../downloads/activity";
-@@ -671,7 +672,7 @@
- 	try {
+@@ -709,7 +710,7 @@
+ 		const staleActivePort = pipe ? await readActivePort(activePortFile) : undefined;
  		if (userDataDir) await seedOwnedProfilePreferences(userDataDir);
  		const executablePath = await ensureChromiumExecutable();
 -		const browser = await puppeteer.launch({
@@ -18,7 +18,7 @@ diff --git a/packages/coding-agent/src/tools/browser/launch.ts b/packages/coding
  			headless: opts.headless,
  			defaultViewport: opts.headless ? initialViewport : null,
  			executablePath,
-@@ -782,10 +783,11 @@
+@@ -865,10 +866,11 @@
  		args: buildHeadlessLaunchArgs(vp),
  		userDataDir: opts.userDataDir,
  	});
@@ -36,7 +36,7 @@ diff --git a/packages/coding-agent/src/tools/browser/launch.ts b/packages/coding
 diff --git a/packages/coding-agent/src/tools/browser/registry.ts b/packages/coding-agent/src/tools/browser/registry.ts
 --- a/packages/coding-agent/src/tools/browser/registry.ts
 +++ b/packages/coding-agent/src/tools/browser/registry.ts
-@@ -23,6 +23,7 @@
+@@ -24,6 +24,7 @@
  import { ensureSharedBrowser } from "./shared-daemon";
  import type { TernKind } from "./tern/kind";
  import { TernSocketClient } from "./tern/wire";
@@ -44,7 +44,7 @@ diff --git a/packages/coding-agent/src/tools/browser/registry.ts b/packages/codi
  
  export type PuppeteerBrowserKind =
  	| {
-@@ -335,6 +336,9 @@
+@@ -334,6 +335,9 @@
  	}
  	const appArgs = kind.args ?? [];
  	const reused = await findReusableCdp(exe, { signal: opts.signal, appArgs });
@@ -54,7 +54,7 @@ diff --git a/packages/coding-agent/src/tools/browser/registry.ts b/packages/codi
  	let cdpUrl: string;
  	let pid: number;
  	let subprocess: Subprocess | undefined;
-@@ -345,7 +349,8 @@
+@@ -344,7 +348,8 @@
  	} else {
  		const port = await findFreeCdpPort();
  		const launchArgs = [...appArgs, `--remote-debugging-port=${port}`];

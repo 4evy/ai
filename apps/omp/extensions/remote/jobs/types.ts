@@ -25,7 +25,6 @@ export interface RemoteJobDetails extends BashToolDetails {
   notices?: string[] | undefined;
   job?: string | undefined;
   connectionId?: string | undefined;
-  cwd?: string | undefined;
   remoteExitCode?: number | undefined;
   remoteState?: "running" | "completed" | "unknown" | undefined;
   state?: JobSnapshot["state"] | undefined;

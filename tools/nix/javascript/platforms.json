@@ -39,125 +39,27 @@
     "os": ["win32"],
     "cpu": ["x64"]
   },
-  "@img/sharp-darwin-arm64@0.35.5": {
+  "@oh-my-pi/pi-natives-darwin-arm64@18.18.1": {
     "os": ["darwin"],
     "cpu": ["arm64"]
   },
-  "@img/sharp-darwin-x64@0.35.5": {
+  "@oh-my-pi/pi-natives-darwin-x64@18.18.1": {
     "os": ["darwin"],
     "cpu": ["x64"]
   },
-  "@img/sharp-freebsd-wasm32@0.35.5": {
-    "os": ["freebsd"]
-  },
-  "@img/sharp-libvips-darwin-arm64@1.3.4": {
-    "os": ["darwin"],
-    "cpu": ["arm64"]
-  },
-  "@img/sharp-libvips-darwin-x64@1.3.4": {
-    "os": ["darwin"],
-    "cpu": ["x64"]
-  },
-  "@img/sharp-libvips-linux-arm@1.3.4": {
-    "os": ["linux"],
-    "cpu": ["arm"]
-  },
-  "@img/sharp-libvips-linux-arm64@1.3.4": {
+  "@oh-my-pi/pi-natives-linux-arm64@18.18.1": {
     "os": ["linux"],
     "cpu": ["arm64"]
   },
-  "@img/sharp-libvips-linux-ppc64@1.3.4": {
-    "os": ["linux"],
-    "cpu": ["ppc64"]
-  },
-  "@img/sharp-libvips-linux-riscv64@1.3.4": {
-    "os": ["linux"],
-    "cpu": ["none"]
-  },
-  "@img/sharp-libvips-linux-s390x@1.3.4": {
-    "os": ["linux"],
-    "cpu": ["s390x"]
-  },
-  "@img/sharp-libvips-linux-x64@1.3.4": {
+  "@oh-my-pi/pi-natives-linux-x64@18.18.1": {
     "os": ["linux"],
     "cpu": ["x64"]
   },
-  "@img/sharp-libvips-linuxmusl-arm64@1.3.4": {
-    "os": ["linux"],
-    "cpu": ["arm64"]
-  },
-  "@img/sharp-libvips-linuxmusl-x64@1.3.4": {
-    "os": ["linux"],
-    "cpu": ["x64"]
-  },
-  "@img/sharp-linux-arm@0.35.5": {
-    "os": ["linux"],
-    "cpu": ["arm"]
-  },
-  "@img/sharp-linux-arm64@0.35.5": {
-    "os": ["linux"],
-    "cpu": ["arm64"]
-  },
-  "@img/sharp-linux-ppc64@0.35.5": {
-    "os": ["linux"],
-    "cpu": ["ppc64"]
-  },
-  "@img/sharp-linux-riscv64@0.35.5": {
-    "os": ["linux"],
-    "cpu": ["none"]
-  },
-  "@img/sharp-linux-s390x@0.35.5": {
-    "os": ["linux"],
-    "cpu": ["s390x"]
-  },
-  "@img/sharp-linux-x64@0.35.5": {
-    "os": ["linux"],
-    "cpu": ["x64"]
-  },
-  "@img/sharp-linuxmusl-arm64@0.35.5": {
-    "os": ["linux"],
-    "cpu": ["arm64"]
-  },
-  "@img/sharp-linuxmusl-x64@0.35.5": {
-    "os": ["linux"],
-    "cpu": ["x64"]
-  },
-  "@img/sharp-webcontainers-wasm32@0.35.5": {
-    "cpu": ["none"]
-  },
-  "@img/sharp-win32-arm64@0.35.5": {
+  "@oh-my-pi/pi-natives-win32-arm64@18.18.1": {
     "os": ["win32"],
     "cpu": ["arm64"]
   },
-  "@img/sharp-win32-ia32@0.35.5": {
-    "os": ["win32"],
-    "cpu": ["ia32"]
-  },
-  "@img/sharp-win32-x64@0.35.5": {
-    "os": ["win32"],
-    "cpu": ["x64"]
-  },
-  "@oh-my-pi/pi-natives-darwin-arm64@18.16.0": {
-    "os": ["darwin"],
-    "cpu": ["arm64"]
-  },
-  "@oh-my-pi/pi-natives-darwin-x64@18.16.0": {
-    "os": ["darwin"],
-    "cpu": ["x64"]
-  },
-  "@oh-my-pi/pi-natives-linux-arm64@18.16.0": {
-    "os": ["linux"],
-    "cpu": ["arm64"]
-  },
-  "@oh-my-pi/pi-natives-linux-x64@18.16.0": {
-    "os": ["linux"],
-    "cpu": ["x64"]
-  },
-  "@oh-my-pi/pi-natives-win32-arm64@18.16.0": {
-    "os": ["win32"],
-    "cpu": ["arm64"]
-  },
-  "@oh-my-pi/pi-natives-win32-x64@18.16.0": {
+  "@oh-my-pi/pi-natives-win32-x64@18.18.1": {
     "os": ["win32"],
     "cpu": ["x64"]
   },
@@ -444,33 +346,6 @@
     "cpu": ["arm64"]
   },
   "lightningcss-win32-x64-msvc@1.33.0": {
-    "os": ["win32"],
-    "cpu": ["x64"]
-  },
-  "onnxruntime-node@1.30.0": {
-    "os": ["linux", "win32", "darwin"]
-  },
-  "sherpa-onnx-darwin-arm64@1.13.8": {
-    "os": ["darwin"],
-    "cpu": ["arm64"]
-  },
-  "sherpa-onnx-darwin-x64@1.13.8": {
-    "os": ["darwin"],
-    "cpu": ["x64"]
-  },
-  "sherpa-onnx-linux-arm64@1.13.8": {
-    "os": ["linux"],
-    "cpu": ["arm64"]
-  },
-  "sherpa-onnx-linux-x64@1.13.8": {
-    "os": ["linux"],
-    "cpu": ["x64"]
-  },
-  "sherpa-onnx-win-ia32@1.13.8": {
-    "os": ["win32"],
-    "cpu": ["ia32"]
-  },
-  "sherpa-onnx-win-x64@1.13.8": {
     "os": ["win32"],
     "cpu": ["x64"]
   }

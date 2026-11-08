@@ -1,7 +1,7 @@
 diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-line/segments.ts
 --- a/packages/tui/src/status-line/segments.ts
 +++ b/packages/tui/src/status-line/segments.ts
-@@ -19,12 +19,7 @@
+@@ -20,12 +20,7 @@
  import { formatMetric } from "../components/metric";
  import { formatBillingSummary } from "./metrics";
  import { sanitizeStatusText } from "../chrome/shared";
@@ -15,7 +15,7 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
  import type { TspSpan, TspTone } from "@oh-my-pi/pi-wire";
  import { node, span } from "../native/describe";
  import { thinkingLevelToken } from "../theme/theme-class";
-@@ -304,11 +299,33 @@
+@@ -305,11 +300,33 @@
  	return state.thinkingLevel ?? ThinkingLevel.Off;
  }
  
@@ -49,7 +49,7 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
  	if (ctx.session.isAutoThinking) {
  		// Pending (no turn classified yet / classifying) shows a symbol-theme
  		// question-box marker; once resolved it shows `<level>`.
-@@ -397,7 +414,8 @@
+@@ -398,7 +415,8 @@
  		if (advisor) spans.push(span(` ${advisor.icon}`, advisor.color));
  		if (ctx.session.isFastModeActive() && theme.icon.fast) spans.push(span(` ${theme.icon.fast}`, token));
  		const level = ctx.options.model?.showThinkingLevel === false ? undefined : thinkingLevelWord(ctx.session);
@@ -59,7 +59,7 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
  		const slowModeLabel = ctx.session.getAnthropicSlowModeLabel?.();
  		if (slowModeLabel) spans.push(span(`${theme.sep.dot}${slowModeLabel}`, "warning"));
  		return segView(spans, "model", slowModeLabel ? "warning" : undefined);
-@@ -726,12 +744,12 @@
+@@ -727,12 +745,12 @@
  		if (ctx.subagentCount === 0) {
  			return { content: "", visible: false };
  		}
@@ -74,7 +74,7 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
  	},
  };
  
-@@ -815,6 +833,7 @@
+@@ -818,6 +836,7 @@
  			usingSubscription,
  			premiumRequests,
  			fractionDigits: 2,
@@ -82,7 +82,7 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
  			pricingPeriod,
  			advisor: advisorCost
  				? { cost: advisorCost, usingSubscription: ctx.session.isAdvisorUsingSubscription?.() ?? false }
-@@ -848,25 +867,17 @@
+@@ -851,25 +870,17 @@
  		// Async-compaction indicator: pulse the auto icon while a background
  		// speculation runs, hold it in accent once a result is armed.
  		let autoIcon = "";
@@ -116,7 +116,7 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
  
  		return { content, visible: true };
  	},
-@@ -875,23 +886,22 @@
+@@ -878,23 +889,22 @@
  		const window = ctx.contextWindow;
  		const level = getContextUsageLevel(pct ?? 0, window);
  		const color = getContextUsageThemeColor(level);
@@ -148,7 +148,7 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
  	},
  };
  
-@@ -1146,30 +1156,28 @@
+@@ -1176,30 +1186,28 @@
  	},
  };
  
@@ -187,7 +187,7 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
  }
  
  /** Native twin of {@link formatQuotaWindow}. */
-@@ -1180,9 +1188,9 @@
+@@ -1210,9 +1218,9 @@
  	resetUnit: "m" | "h",
  	integer: "round" | "floor",
  ): TspSpan[] {
@@ -200,7 +200,7 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
  	return spans;
  }
  
-@@ -1204,7 +1212,7 @@
+@@ -1234,7 +1242,7 @@
  /** Expiring saved resets outrank the usable/unusable color: red within 24 hours, yellow within 7 days. */
  function resetCreditsColor(resets: NonNullable<NonNullable<SegmentContext["usage"]>["resetCredits"]>): ThemeColor {
  	if (resets.expiring) return resets.expiring.tier === "imminent" ? "error" : "warning";
@@ -209,7 +209,7 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
  }
  
  const usageSegment: StatusLineSegment = {
-@@ -1215,82 +1223,83 @@
+@@ -1245,82 +1253,83 @@
  			return { content: "", visible: false };
  		}
  		const parts: string[] = [];
@@ -327,7 +327,7 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
 diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status-line/component.ts
 --- a/packages/tui/src/status-line/component.ts
 +++ b/packages/tui/src/status-line/component.ts
-@@ -2682,7 +2682,7 @@
+@@ -2795,7 +2795,7 @@
  
  	#subagentBadgeText(): string | undefined {
  		if (this.#subagentCount === 0) return undefined;
@@ -336,7 +336,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  	}
  
  	/**
-@@ -2951,10 +2951,10 @@
+@@ -3067,10 +3067,10 @@
  	#separatorMetrics(plain: boolean, style: StatusLineSeparatorStyle): SeparatorMetrics {
  		const themeEpoch = getThemeEpoch();
  		const memo = plain ? this.#plainSeparatorMetrics : this.#styledSeparatorMetrics;
@@ -349,7 +349,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  		const metrics: SeparatorMetrics = {
  			themeRef: theme,
  			themeEpoch,
-@@ -2977,8 +2977,8 @@
+@@ -3093,8 +3093,8 @@
  	 *   (embedded in the editor's top border).
  	 * - `band`: the box layout opened by a soft flush-left cap, for the band
  	 *   composer's frameless full-width top row.
@@ -360,7 +360,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  	 * - `plain-left`: left segments only (claude composer; the right group
  	 *   lives in the editor's top rule).
  	 * - `plain-right`: right segments only (claude composer's top rule).
-@@ -3072,8 +3072,12 @@
+@@ -3188,8 +3188,12 @@
  				const glance = widget ? formatJobWidgetGlance(widget.view, theme, JOBS_SEGMENT_SPARK_CELLS) : "";
  				const count = theme.fg("statusLineSubagents", `${theme.icon.job} ${runningBackgroundJobs}`);
  				rightParts.unshift(glance ? `${count} ${glance}` : count);
@@ -374,7 +374,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  		}
  		const topFillWidth = Math.max(0, width);
  		// These arrays are local to this render; overflow handling can mutate them.
-@@ -3124,14 +3128,20 @@
+@@ -3240,14 +3244,20 @@
  		const totalWidth = () => leftWidth + rightWidth + minimumGapWidth();
  
  		if (topFillWidth > 0) {
@@ -399,7 +399,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  				const currentNameVW = rightWidths[nameIdx];
  				const minNameVW = 8;
  				const shrinkBy = Math.min(Math.max(0, currentNameVW - minNameVW), totalWidth() - topFillWidth);
-@@ -3142,23 +3152,17 @@
+@@ -3258,23 +3268,17 @@
  					rightWidths[nameIdx] = nameWidth;
  				}
  			}
@@ -425,7 +425,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  					const pathCtx = (maxLen: number): SegmentContext => ({
  						...ctx,
  						options: { ...ctx.options, path: { ...ctx.options.path, maxLength: maxLen } },
-@@ -3170,7 +3174,7 @@
+@@ -3286,7 +3290,7 @@
  						for (let i = 0; i < 8; i++) {
  							const saved = currentPathVW - pathWidth;
  							if (saved >= shrinkBy) break;
@@ -434,7 +434,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  							if (nextMaxLen >= newMaxLen) break; // no progress or hit floor
  							newMaxLen = nextMaxLen;
  							const adjusted = renderSegment("path", pathCtx(newMaxLen));
-@@ -3184,6 +3188,15 @@
+@@ -3300,6 +3304,15 @@
  					}
  				}
  			}
@@ -450,7 +450,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  			const leftOverflowDropIndex = (): number => {
  				// Preserve the current working directory as long as possible. The
  				// previous right-to-left pop could collapse a normal-width bar to
-@@ -3203,6 +3216,14 @@
+@@ -3319,6 +3332,14 @@
  				leftSegIds.splice(dropIdx, 1);
  				leftWidth = left.length > 0 ? leftWidth - removedWidth - leftSepWidth - 2 : 0;
  			}
@@ -465,7 +465,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  		}
  
  		const renderGroup = (parts: string[], direction: "left" | "right"): string => {
-@@ -3836,8 +3857,7 @@
+@@ -3953,8 +3974,7 @@
  		// the inner edge, so they drop before any configured segment.
  		if (subagentBadge) {
  			push("subagent-badge", "right", 0, {

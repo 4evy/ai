@@ -13,7 +13,7 @@ diff --git a/packages/coding-agent/src/modes/controllers/input-controller.ts b/p
  				if (this.ctx.keybindings.matches(data, "app.history.search")) {
  					if (this.ctx.ui.hasOverlay() || this.ctx.ui.getFocused() instanceof HistorySearchComponent) {
  						return undefined;
-@@ -3010,6 +3015,25 @@
+@@ -3017,6 +3022,25 @@
  		}
  	}
  

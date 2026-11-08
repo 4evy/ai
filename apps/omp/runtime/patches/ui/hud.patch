@@ -1,7 +1,7 @@
 diff --git a/packages/coding-agent/src/modes/controllers/todo-command-controller.ts b/packages/coding-agent/src/modes/controllers/todo-command-controller.ts
 --- a/packages/coding-agent/src/modes/controllers/todo-command-controller.ts
 +++ b/packages/coding-agent/src/modes/controllers/todo-command-controller.ts
-@@ -18,7 +18,7 @@
+@@ -17,7 +17,7 @@
  	"  /todo edit                         Open todos in $EDITOR",
  	"  /todo copy                         Copy todos as Markdown to clipboard",
  	"  /todo expand                       Show every phase and task in the HUD",
@@ -13,7 +13,7 @@ diff --git a/packages/coding-agent/src/modes/controllers/todo-command-controller
 diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/coding-agent/src/modes/interactive-mode.ts
 --- a/packages/coding-agent/src/modes/interactive-mode.ts
 +++ b/packages/coding-agent/src/modes/interactive-mode.ts
-@@ -54,7 +54,7 @@
+@@ -56,7 +56,7 @@
  import type { WorkingRowSpec } from "@oh-my-pi/pi-tui/components/loader";
  import { formatDoubleTap } from "@oh-my-pi/pi-tui/key-hint-format";
  import { thinkingLevelWord } from "@oh-my-pi/pi-tui/status-line/segments";
@@ -22,7 +22,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  import { isInsideTerminalMultiplexer } from "@oh-my-pi/pi-tui/terminal-capabilities";
  import {
  	$env,
-@@ -211,8 +211,11 @@
+@@ -222,8 +222,11 @@
  	isClosedTodo,
  	selectCollapsedTodos,
  	setActiveTodoDescriptionsProvider,
@@ -34,7 +34,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  import { vocalizer } from "../tts/vocalizer";
  import { applyFileLinkSetting, applyHyperlinkSetting, fileHyperlink } from "@oh-my-pi/pi-tui/render/hyperlink";
  import {
-@@ -333,7 +336,6 @@
+@@ -360,7 +363,6 @@
  	SessionObserverRegistry,
  } from "@oh-my-pi/pi-tui/overlays/session-observer-registry";
  import { createSessionTeardown, type SessionTeardown } from "./session-teardown";
@@ -42,7 +42,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  import { invokeSkillCommandFromText, isKnownSkillCommand } from "./skill-command";
  import { clearMermaidCache } from "@oh-my-pi/pi-tui/theme/mermaid-cache";
  import { type ShimmerPalette, shimmerEnabled, shimmerText } from "@oh-my-pi/pi-tui/theme/shimmer";
-@@ -683,8 +685,6 @@
+@@ -718,8 +720,6 @@
  	initialMessages?: string[];
  }
  
@@ -51,7 +51,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  /** Holds mutable HUD and editor-adjacent chrome outside transcript history. */
  class AnchoredLiveContainer extends Container {}
  
-@@ -711,19 +711,6 @@
+@@ -746,19 +746,6 @@
  	}
  }
  
@@ -71,7 +71,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  /**
   * Native-only dock row (§8.1), right-aligned above the activity line, holding
   * the running-work counter: one pill with an agents segment and a
-@@ -930,14 +917,11 @@
+@@ -965,14 +952,11 @@
  
  	#renderLines(width: number): readonly string[] {
  		const childLines = super.render(width);
@@ -90,7 +90,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  	}
  }
  
-@@ -1114,7 +1098,7 @@
+@@ -1149,7 +1133,7 @@
   * rows and hit-testing can never disagree.
   */
  export function layoutPinnedHud(runningTotal: number, expanded: boolean): PinnedHudLayout {
@@ -99,7 +99,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		return { itemRows: runningTotal, toggle: undefined, toggleRow: undefined };
  	}
  	if (!expanded) {
-@@ -1489,14 +1473,6 @@
+@@ -1523,16 +1507,6 @@
  	#workingMessageAccentCacheKey?: WorkingMessageAccentCacheKey;
  	#workingMessageAccentCacheValue?: WorkingMessageAccent;
  	#workingMessageAccentCacheHasValue = false;
@@ -109,12 +109,14 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
 -		if (cfgComposerShape.get(settings) !== "band") return undefined;
 -		const name = this.sessionManager.getSessionName();
 -		if (!name) return undefined;
--		return `\x1b[2;3m${sanitizeStatusText(name)}\x1b[23;22m`;
+-		const pin = this.statusLine.isSessionPinned(this.sessionManager.getSessionId()) && theme.icon.pin;
+-		const styledTitle = `\x1b[2;3m${sanitizeStatusText(name)}\x1b[23;22m`;
+-		return pin ? `${theme.fg("accent", pin)} ${styledTitle}` : styledTitle;
 -	}
  	/** Live gen tok/s for the working row: the viewed session's own meter, so a
  	 * focused subagent shows its own reading and the main session's survives
  	 * focus round-trips. */
-@@ -1511,18 +1487,8 @@
+@@ -1547,22 +1521,12 @@
  		if (rate === null) return undefined;
  		return theme.fg("dim", `${theme.icon.throughput} ${rate.toFixed(1)} tok/s`);
  	}
@@ -125,6 +127,10 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
 -		if (rate && title) return `${rate}  ${title}`;
 -		return rate ?? title;
 -	}
+ 	#resolveModelMentionChip(selector: string): { label: string; selector: string } | undefined {
+ 		const resolved = this.session.resolveModelMention(selector);
+ 		return resolved && { label: modelMentionChipLabel(resolved.name), selector: resolved.selector };
+ 	}
 -	/** Idle stand-in for the working row: the last tok/s reading and the
 -	 * band-mode title stay readable between turns, docked where the loader's
 -	 * trailer was. */
@@ -134,7 +140,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		if (!trailer) return undefined;
  		return ["", " ".repeat(Math.max(0, width - visibleWidth(trailer))) + trailer];
  	}
-@@ -1909,12 +1875,12 @@
+@@ -1962,12 +1926,12 @@
  		return this.composer.viewportClickCandidates(index);
  	}
  
@@ -149,7 +155,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		this.ui.requestRender();
  	}
  
-@@ -1923,7 +1889,7 @@
+@@ -1976,7 +1940,7 @@
  		// An explicit settings change wins over click state: without the reset,
  		// reselecting the current value would keep showing the old override.
  		this.#pinnedHudOverride = undefined;
@@ -158,7 +164,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		this.ui.requestRender();
  	}
  
-@@ -2135,7 +2101,7 @@
+@@ -2211,7 +2175,7 @@
  		this.progressHudContainer.addChild(this.#downloadActivityHud);
  		this.#eventBusUnsubscribers.push(onDownloadActivity(activity => this.#downloadActivityHud.update(activity)));
  		this.statusContainer = new StatusHudContainer(this);
@@ -167,7 +173,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		this.subagentContainer = new AnchoredLiveContainer();
  		this.btwContainer = new AnchoredLiveContainer();
  		this.omfgContainer = new AnchoredLiveContainer();
-@@ -5018,9 +4984,60 @@
+@@ -5299,9 +5263,60 @@
  		this.#todoHudNative = undefined;
  		const activeDescs = this.#getActiveSubagentDescriptions();
  		this.#todoHudSubagentKey = activeDescs.join("\n");
@@ -230,7 +236,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		const expanded = this.todoExpanded;
  		const multiPhase = phases.length > 1;
  		const activeIdx = phases.indexOf(this.#getActivePhase(phases) ?? phases[0]);
-@@ -5189,29 +5206,7 @@
+@@ -5470,29 +5485,7 @@
  			"todo",
  		);
  		// A `checklist` HUD is a pill with the whole plan as its popover.
@@ -261,7 +267,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		this.#todoHudNative = {
  			checklist: node(
  				"checklist",
-@@ -5221,72 +5216,9 @@
+@@ -5502,72 +5495,9 @@
  			),
  			fallback,
  		};
@@ -332,10 +338,10 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
 -		return [...leadingLines, combinedLine];
 -	}
 -
- 	async #loadTodoList(source: AgentSession = this.session): Promise<void> {
+ 	async #loadTodoList(source: AgentViewSession = this.session): Promise<void> {
  		this.todoPhases = source.getTodoPhases();
  		this.#todoPhasesOwner = source;
-@@ -5338,6 +5270,24 @@
+@@ -5619,6 +5549,24 @@
  	 */
  	#renderSubagentList(): boolean {
  		this.#cancelSubagentPreviewTick();
@@ -360,7 +366,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		const view = this.#buildSubagentHudView();
  		if (!view) {
  			const changed = this.subagentContainer.children.length > 0;
-@@ -5351,7 +5301,10 @@
+@@ -5632,7 +5580,10 @@
  		this.#subagentHudKey = key;
  		const hud = this.subagentContainer.children[0];
  		if (hud instanceof SubagentHudComponent) hud.update(view.lines, view.order, view.toggleRow);
@@ -372,7 +378,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		return true;
  	}
  
-@@ -8580,7 +8533,7 @@
+@@ -8916,7 +8867,7 @@
  				// status rows so the interrupt glyph reads as indented.
  				[` ${appKey(this.keybindings, "app.interrupt")}`],
  			);
@@ -384,7 +390,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
 diff --git a/packages/coding-agent/src/modes/settings.ts b/packages/coding-agent/src/modes/settings.ts
 --- a/packages/coding-agent/src/modes/settings.ts
 +++ b/packages/coding-agent/src/modes/settings.ts
-@@ -631,10 +631,10 @@
+@@ -735,10 +735,10 @@
  		group: "Display",
  		label: "Pinned Agents",
  		description:

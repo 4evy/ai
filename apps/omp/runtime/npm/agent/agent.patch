@@ -52,20 +52,20 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
  import type { LocalProtocolOptions } from "../../internal-urls/local-protocol.js";
  import type { LoopLimitConfig } from "../../modes/loop-limit.js";
  import type { MemoryRuntimeContext } from "../../memory-backend/index.js";
-+import type { MCPManager } from "../../mcp/manager.js";
++import type { MCPManagerApi } from "../../mcp/manager.js";
  import type { CustomEditor } from "@oh-my-pi/pi-tui/prompt/custom-editor";
  import type { Theme } from "@oh-my-pi/pi-tui/theme";
  import type { NativeToolView } from "@oh-my-pi/pi-tui/tools/renderer";
-@@ -553,6 +554,8 @@
+@@ -561,6 +562,8 @@
      sessionManager: ReadonlySessionManager;
      /** Model registry for API key resolution */
      modelRegistry: ModelRegistry;
 +    /** This session's MCP manager, absent when MCP is disabled */
-+    mcpManager?: MCPManager | undefined;
++    mcpManager?: MCPManagerApi | undefined;
      /** Calling session's `local://` root mapping for external tool bridges. */
      localProtocolOptions?: LocalProtocolOptions;
      /** Current model (may be undefined) */
-@@ -1551,8 +1554,13 @@
+@@ -1606,8 +1609,13 @@
      setActiveTools(toolNames: string[]): Promise<void>;
      /** Get available slash commands in the current session. */
      getCommands(): SlashCommandInfo[];
@@ -81,7 +81,7 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
      /** Get current thinking level. */
      getThinkingLevel(): ThinkingLevel | undefined;
      /** Set thinking level for the current session. */
-@@ -1746,7 +1754,7 @@
+@@ -1801,7 +1809,7 @@
  export type GetAllToolsHandler = () => ToolInfo[];
  export type GetCommandsHandler = () => SlashCommandInfo[];
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
@@ -93,16 +93,46 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
 diff --git a/dist/types/mcp/manager.d.ts b/dist/types/mcp/manager.d.ts
 --- a/dist/types/mcp/manager.d.ts
 +++ b/dist/types/mcp/manager.d.ts
-@@ -233,7 +233,7 @@
+@@ -99,6 +99,7 @@
+ }
+ /** Handles an MCP `WWW-Authenticate` challenge and returns refreshed config. */
+ export type MCPAuthHandler = (serverName: string, challenge: MCPAuthChallenge) => Promise<MCPServerConfig | undefined>;
++export type MCPConnectionStatus = "connected" | "connecting" | "disconnected";
+ /**
+  * Surface of an {@link MCPManager} that sessions reusing a manager (subagents, `mcp://` and
+  * `skill://` handlers) use. Subagent worker threads receive a remote implementation whose calls
+@@ -131,6 +132,12 @@
+     addNotificationListener(listener: (serverName: string, method: string, params: unknown) => void): () => void;
+     /** Names of currently connected servers. */
+     getConnectedServers(): string[];
++    /** Configured servers, including manual servers not yet started */
++    getAllServerNames(): string[];
++    getServerConfig(name: string): MCPServerConfig | undefined;
++    getConnectionStatus(name: string): MCPConnectionStatus;
++    /** Lifecycle requests always execute on the connection-owning main thread */
++    controlServer(name: string, action: "start" | "stop" | "restart"): Promise<void>;
+     /** Cached resources/templates of one server. */
+     getServerResources(name: string): {
+         resources: MCPResource[];
+@@ -304,7 +311,7 @@
       * Interactive enable (`/mcp enable`, `/extensions`) can pass a single
       * `{ [name]: config }` without wiping the rest of the registry.
       */
 -    connectServers(configs: Record<string, MCPServerConfig>, sources: Record<string, SourceMeta>, onStatus?: (event: McpConnectionStatusEvent) => void, startupTimeoutMs?: number): Promise<MCPLoadResult>;
 +    connectServers(configs: Record<string, MCPServerConfig>, sources: Record<string, SourceMeta>, onStatus?: (event: McpConnectionStatusEvent) => void, startupTimeoutMs?: number, explicitStart?: boolean): Promise<MCPLoadResult>;
+     openToolScope(scope: MCPToolScope, seed?: MCPToolScope): void;
+     trackToolCall(scope: MCPToolScope, toolCallId: string): () => void;
+     getTools(scope?: MCPToolScope): CustomTool<TSchema, MCPToolDetails>[];
+@@ -322,7 +329,7 @@
      /**
-      * Get all loaded tools.
+      * Get current connection status for a server.
       */
-@@ -282,6 +282,10 @@
+-    getConnectionStatus(name: string): "connected" | "connecting" | "disconnected";
++    getConnectionStatus(name: string): MCPConnectionStatus;
+     /**
+      * Get the source metadata for a server.
+      */
+@@ -352,6 +359,10 @@
       * starting a fresh one against the new definition.
       */
      updateServerConfig(name: string, config: MCPServerConfig): Promise<MCPServerConnection | null> | undefined;
@@ -113,7 +143,7 @@ diff --git a/dist/types/mcp/manager.d.ts b/dist/types/mcp/manager.d.ts
      /**
       * Wait for a connection to complete (or fail).
       */
-@@ -315,9 +319,11 @@
+@@ -385,9 +396,11 @@
       */
      getAllServerNames(): string[];
      /**
@@ -130,7 +160,7 @@ diff --git a/dist/types/mcp/manager.d.ts b/dist/types/mcp/manager.d.ts
 diff --git a/dist/types/mcp/tool-bridge.d.ts b/dist/types/mcp/tool-bridge.d.ts
 --- a/dist/types/mcp/tool-bridge.d.ts
 +++ b/dist/types/mcp/tool-bridge.d.ts
-@@ -10,12 +10,15 @@
+@@ -10,7 +10,7 @@
  import type { CustomTool, CustomToolContext, CustomToolResult, RenderResultOptions } from "../extensibility/custom-tools/types.js";
  import type { Theme } from "@oh-my-pi/pi-tui/theme";
  import { formatApprovalArguments } from "../tools/approval.js";
@@ -139,7 +169,9 @@ diff --git a/dist/types/mcp/tool-bridge.d.ts b/dist/types/mcp/tool-bridge.d.ts
  /** Reconnect callback: tears down a stale connection, optionally authorizing first. */
  export type MCPReconnect = (options?: {
      authChallenge?: MCPAuthChallenge;
- }) => Promise<MCPServerConnection | null>;
+@@ -22,6 +22,9 @@
+  */
+ export type MCPToolCallObserver = (toolCallId: string) => () => Promise<void>;
  export declare function isRetriableConnectionError(error: unknown): boolean;
 +export { buildResult as buildMCPToolResult };
 +/** Build a CustomToolResult from a callTool response. */
@@ -176,7 +208,7 @@ diff --git a/dist/types/modes/components/extensions/mcp-runtime.d.ts b/dist/type
 diff --git a/dist/types/session/agent-session-types.d.ts b/dist/types/session/agent-session-types.d.ts
 --- a/dist/types/session/agent-session-types.d.ts
 +++ b/dist/types/session/agent-session-types.d.ts
-@@ -404,6 +404,8 @@
+@@ -409,6 +409,8 @@
      advisorConfigWarnings?: string[];
      /** Disconnect the MCP manager owned by this session during disposal. */
      disconnectOwnedMcpManager?: () => Promise<void>;
@@ -188,7 +220,7 @@ diff --git a/dist/types/session/agent-session-types.d.ts b/dist/types/session/ag
 diff --git a/dist/types/session/agent-session.d.ts b/dist/types/session/agent-session.d.ts
 --- a/dist/types/session/agent-session.d.ts
 +++ b/dist/types/session/agent-session.d.ts
-@@ -1146,6 +1146,7 @@
+@@ -1194,6 +1194,7 @@
      /** Selects a model for this session without updating persisted model settings. */
      setModelTemporary(model: Model, thinkingLevel?: ConfiguredThinkingLevel, options?: {
          ephemeral?: boolean;
@@ -199,7 +231,7 @@ diff --git a/dist/types/session/agent-session.d.ts b/dist/types/session/agent-se
 diff --git a/dist/types/session/model-controls.d.ts b/dist/types/session/model-controls.d.ts
 --- a/dist/types/session/model-controls.d.ts
 +++ b/dist/types/session/model-controls.d.ts
-@@ -95,6 +95,7 @@
+@@ -112,6 +112,7 @@
      setModelTemporary(model: Model, thinkingLevel?: ConfiguredThinkingLevel, options?: {
          ephemeral?: boolean;
          prewalk?: boolean;
@@ -231,6 +263,42 @@ new file mode 100644
 +}>;
 +/** Drain without allowing a remote decoder to exceed the requested byte bound */
 +export declare function boundedTransferBytes(stream: ReadableStream<Uint8Array>, limit: number): Promise<Uint8Array>;
+diff --git a/dist/types/thread/services/mcp-remote.d.ts b/dist/types/thread/services/mcp-remote.d.ts
+--- a/dist/types/thread/services/mcp-remote.d.ts
++++ b/dist/types/thread/services/mcp-remote.d.ts
+@@ -7,8 +7,8 @@
+ import type { TSchema } from "@oh-my-pi/pi-ai";
+ import type { MCPToolDetails } from "@oh-my-pi/pi-tui/tools/mcp";
+ import type { CustomTool } from "../../extensibility/custom-tools/types.js";
+-import type { MCPManagerApi, MCPToolScope } from "../../mcp/manager.js";
+-import type { MCPRequestOptions, MCPResource, MCPResourceReadResult, MCPResourceTemplate } from "../../mcp/types.js";
++import type { MCPConnectionStatus, MCPManagerApi, MCPToolScope } from "../../mcp/manager.js";
++import type { MCPRequestOptions, MCPResource, MCPResourceReadResult, MCPResourceTemplate, MCPServerConfig } from "../../mcp/types.js";
+ import type { RemoteObject, RpcMethod } from "../rpc.js";
+ /** Remote-object kind of a main-thread `MCPManager`. */
+ export declare const MCP_MANAGER_KIND = "mcp-manager";
+@@ -32,6 +32,10 @@
+     onToolsChanged: RpcMethod<[listener: () => void], () => void>;
+     onNotification: RpcMethod<[listener: McpNotificationListener], () => void>;
+     connectedServers: RpcMethod<[], string[]>;
++    allServerNames: RpcMethod<[], string[]>;
++    serverConfig: RpcMethod<[name: string], MCPServerConfig | undefined>;
++    connectionStatus: RpcMethod<[name: string], MCPConnectionStatus>;
++    controlServer: RpcMethod<[name: string, action: "start" | "stop" | "restart"], void>;
+     serverResources: RpcMethod<[
+         name: string
+     ], {
+@@ -59,6 +63,10 @@
+     addToolsChangedListener(listener: () => void): () => void;
+     addNotificationListener(listener: McpNotificationListener): () => void;
+     getConnectedServers(): string[];
++    getAllServerNames(): string[];
++    getServerConfig(name: string): MCPServerConfig | undefined;
++    getConnectionStatus(name: string): MCPConnectionStatus;
++    controlServer(name: string, action: "start" | "stop" | "restart"): Promise<void>;
+     getServerResources(name: string): {
+         resources: MCPResource[];
+         templates: MCPResourceTemplate[];
 diff --git a/src/capability/mcp.ts b/src/capability/mcp.ts
 --- a/src/capability/mcp.ts
 +++ b/src/capability/mcp.ts
@@ -391,7 +459,7 @@ diff --git a/src/extensibility/extensions/compact-handler.ts b/src/extensibility
 diff --git a/src/extensibility/extensions/loader.ts b/src/extensibility/extensions/loader.ts
 --- a/src/extensibility/extensions/loader.ts
 +++ b/src/extensibility/extensions/loader.ts
-@@ -374,8 +374,8 @@
+@@ -404,8 +404,8 @@
  		return this.runtime.getCommands();
  	}
  
@@ -405,7 +473,7 @@ diff --git a/src/extensibility/extensions/loader.ts b/src/extensibility/extensio
 diff --git a/src/extensibility/extensions/runner.ts b/src/extensibility/extensions/runner.ts
 --- a/src/extensibility/extensions/runner.ts
 +++ b/src/extensibility/extensions/runner.ts
-@@ -516,6 +516,7 @@
+@@ -529,6 +529,7 @@
  });
  
  export class ExtensionRunner {
@@ -413,7 +481,7 @@ diff --git a/src/extensibility/extensions/runner.ts b/src/extensibility/extensio
  	#uiContext: ExtensionUIContext;
  	#mode: ExtensionMode = "print";
  	#toolApprovalPreviewWaiter?: (toolCallId: string) => Promise<void>;
-@@ -1607,6 +1608,7 @@
+@@ -1736,6 +1737,7 @@
  			cwd: this.cwd,
  			sessionManager: this.sessionManager,
  			modelRegistry: this.modelRegistry,
@@ -424,24 +492,24 @@ diff --git a/src/extensibility/extensions/runner.ts b/src/extensibility/extensio
 diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extensions/types.ts
 --- a/src/extensibility/extensions/types.ts
 +++ b/src/extensibility/extensions/types.ts
-@@ -88,6 +88,7 @@
+@@ -93,6 +93,7 @@
  import type { LocalProtocolOptions } from "../../internal-urls/local-protocol";
  import type { LoopLimitConfig } from "../../modes/loop-limit";
  import type { MemoryRuntimeContext } from "../../memory-backend";
-+import type { MCPManager } from "../../mcp/manager";
++import type { MCPManagerApi } from "../../mcp/manager";
  import type { CustomEditor } from "@oh-my-pi/pi-tui/prompt/custom-editor";
  import type { Theme } from "@oh-my-pi/pi-tui/theme";
  import type { NativeToolView } from "@oh-my-pi/pi-tui/tools/renderer";
-@@ -762,6 +763,8 @@
+@@ -776,6 +777,8 @@
  	sessionManager: ReadonlySessionManager;
  	/** Model registry for API key resolution */
  	modelRegistry: ModelRegistry;
 +	/** This session's MCP manager, absent when MCP is disabled */
-+	mcpManager?: MCPManager | undefined;
++	mcpManager?: MCPManagerApi | undefined;
  	/** Calling session's `local://` root mapping for external tool bridges. */
  	localProtocolOptions?: LocalProtocolOptions;
  	/** Current model (may be undefined) */
-@@ -2079,8 +2082,11 @@
+@@ -2138,8 +2141,11 @@
  	/** Get available slash commands in the current session. */
  	getCommands(): SlashCommandInfo[];
  
@@ -455,7 +523,7 @@ diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extension
  
  	/** Get current thinking level. */
  	getThinkingLevel(): ThinkingLevel | undefined;
-@@ -2311,7 +2317,7 @@
+@@ -2370,7 +2376,7 @@
  
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
  
@@ -501,7 +569,29 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  import type { EffectiveExtensionRoots, SourceMeta } from "../capability/types";
  import { resolveConfigValue } from "../config/resolve-config-value";
  import type { CustomTool } from "../extensibility/custom-tools/types";
-@@ -328,6 +328,9 @@
+@@ -248,6 +248,8 @@
+ 	return signal.aborted && error instanceof Error && error.name === "AbortError";
+ }
+ 
++export type MCPConnectionStatus = "connected" | "connecting" | "disconnected";
++
+ /**
+  * Surface of an {@link MCPManager} that sessions reusing a manager (subagents, `mcp://` and
+  * `skill://` handlers) use. Subagent worker threads receive a remote implementation whose calls
+@@ -280,6 +282,12 @@
+ 	addNotificationListener(listener: (serverName: string, method: string, params: unknown) => void): () => void;
+ 	/** Names of currently connected servers. */
+ 	getConnectedServers(): string[];
++	/** Configured servers, including manual servers not yet started */
++	getAllServerNames(): string[];
++	getServerConfig(name: string): MCPServerConfig | undefined;
++	getConnectionStatus(name: string): MCPConnectionStatus;
++	/** Lifecycle requests always execute on the connection-owning main thread */
++	controlServer(name: string, action: "start" | "stop" | "restart"): Promise<void>;
+ 	/** Cached resources/templates of one server. */
+ 	getServerResources(name: string): { resources: MCPResource[]; templates: MCPResourceTemplate[] } | undefined;
+ 	/** Wait until one server's resource catalog is loaded. */
+@@ -407,6 +415,9 @@
  	#pendingReconnections = new Map<string, Promise<MCPServerConnection | null>>();
  	/** Preserved configs for reconnection after connection loss. */
  	#serverConfigs = new Map<string, MCPServerConfig>();
@@ -511,7 +601,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  	#discoverOptions: MCPDiscoverOptions | undefined;
  	#browserFilterMutationTail: Promise<void> = Promise.resolve();
  	/** Settles when the latest {@link MCPManager.discoverAndConnect} call does; reconciles wait on it. */
-@@ -779,6 +782,7 @@
+@@ -883,6 +894,7 @@
  		sources: Record<string, SourceMeta>,
  		onStatus?: (event: McpConnectionStatusEvent) => void,
  		startupTimeoutMs?: number,
@@ -519,7 +609,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  	): Promise<MCPLoadResult> {
  		const notify = (event: McpConnectionStatusEvent) => {
  			onStatus?.(event);
-@@ -803,7 +807,6 @@
+@@ -907,7 +919,6 @@
  		const connectionTasks: ConnectionTask[] = [];
  
  		for (const [name, config] of Object.entries(configs)) {
@@ -527,7 +617,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  			if (sources[name]) {
  				this.#sources.set(name, sources[name]);
  				const existing = this.#connections.get(name);
-@@ -811,6 +814,10 @@
+@@ -915,6 +926,10 @@
  					existing._source = sources[name];
  				}
  			}
@@ -538,7 +628,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  
  			// Skip if already connected
  			if (this.#connections.has(name)) {
-@@ -838,13 +845,12 @@
+@@ -942,13 +957,12 @@
  				continue;
  			}
  
@@ -557,7 +647,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  
  			// Resolve auth config before connecting, but do so per-server in parallel.
  			const connectionPromise = (async () => {
-@@ -867,7 +873,7 @@
+@@ -971,7 +985,7 @@
  						connection._source = sources[name];
  					}
  
@@ -566,7 +656,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  						this.#detachConnection(name, connection);
  						void disconnectServer(connection).catch(() => {});
  						throw new Error(`Server "${name}" was disconnected during initial connection`);
-@@ -915,7 +921,8 @@
+@@ -1019,7 +1033,8 @@
  
  			const toolsPromise = connectionPromise.then(async connection => {
  				try {
@@ -576,7 +666,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  					return { connection, serverTools };
  				} catch (error) {
  					// Detach and delete synchronously, then close in the background:
-@@ -935,13 +942,14 @@
+@@ -1039,13 +1054,14 @@
  
  			const startupUpdate = toolsPromise
  				.then(async ({ connection, serverTools }) => {
@@ -585,14 +675,14 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  					this.#pendingToolLoads.delete(name);
  					const reconnect = (options?: { authChallenge?: MCPAuthChallenge }) =>
  						this.reconnectServer(name, options);
- 					const customTools = MCPTool.fromTools(connection, serverTools, reconnect);
+ 					const customTools = MCPTool.fromTools(connection, serverTools, reconnect, this.#observeToolCall(name));
  					this.#replaceServerTools(name, customTools);
  					await this.#notifyOwnerToolsChanged();
 +					if (connectSignal.aborted) return;
  					void this.toolCache?.set(name, config, serverTools);
  
  					notify({ type: "connected", serverName: name });
-@@ -1016,6 +1024,7 @@
+@@ -1120,6 +1136,7 @@
  			for (const task of connectionTasks) {
  				const { name } = task;
  				if (task.tracked.status === "fulfilled") {
@@ -600,7 +690,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  					const value = task.tracked.value;
  					if (!value) continue;
  					const { connection, serverTools } = value;
-@@ -1030,6 +1039,7 @@
+@@ -1137,6 +1154,7 @@
  					errors.set(name, message);
  					reportedErrors.add(name);
  				} else {
@@ -608,7 +698,16 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  					const cached = cachedTools.get(name);
  					if (cached) {
  						const source = this.#sources.get(name);
-@@ -1285,6 +1295,60 @@
+@@ -1424,7 +1442,7 @@
+ 	/**
+ 	 * Get current connection status for a server.
+ 	 */
+-	getConnectionStatus(name: string): "connected" | "connecting" | "disconnected" {
++	getConnectionStatus(name: string): MCPConnectionStatus {
+ 		if (this.#connections.has(name)) return "connected";
+ 		if (
+ 			this.#pendingConnections.has(name) ||
+@@ -1477,6 +1495,60 @@
  		return this.#pendingReconnections.get(name);
  	}
  
@@ -669,7 +768,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  	/**
  	 * Wait for a connection to complete (or fail).
  	 */
-@@ -1348,9 +1412,7 @@
+@@ -1540,9 +1612,7 @@
  	 * Get all known server names (connected, connecting, or discovered).
  	 */
  	getAllServerNames(): string[] {
@@ -680,7 +779,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  	}
  
  	/**
-@@ -1382,17 +1444,21 @@
+@@ -1574,17 +1644,21 @@
  	}
  
  	/**
@@ -706,7 +805,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  		this.#pendingResourceRefresh.delete(name);
  		this.#reconnectHistory.delete(name);
  		this.#forgetLostServer(name);
-@@ -1405,9 +1471,7 @@
+@@ -1599,9 +1673,7 @@
  		}
  		this.#subscribedResources.delete(name);
  
@@ -717,7 +816,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  
  		// Remove tools from this server and notify consumers
  		const hadTools = this.#tools.some(t => t.mcpServerName === name);
-@@ -1419,6 +1483,7 @@
+@@ -1613,6 +1685,7 @@
  
  		// Notify prompt consumers so stale commands are cleared
  		if (connection?.prompts?.length) this.#onPromptsChanged?.(name);
@@ -725,7 +824,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  	}
  
  	/**
-@@ -1434,6 +1499,9 @@
+@@ -1628,6 +1701,9 @@
  		this.#epoch++;
  		this.#connectAbort.abort();
  		this.#connectAbort = new AbortController();
@@ -735,7 +834,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  		for (const name of this.#lostRemoteServers.keys()) this.#forgetLostServer(name);
  		const promises = Array.from(this.#connections, ([name, connection]) => this.#discardConnection(name, connection));
  		await Promise.allSettled(promises);
-@@ -1474,8 +1542,10 @@
+@@ -1670,8 +1746,10 @@
  		options?: { manual?: boolean; authChallenge?: MCPAuthChallenge },
  	): Promise<MCPServerConnection | null> {
  		if (options?.manual) {
@@ -746,7 +845,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  
  		const pending = this.#pendingReconnections.get(name);
  		if (pending) return pending;
-@@ -1594,7 +1664,12 @@
+@@ -1790,7 +1868,12 @@
  		const oldConnection = this.#connections.get(name);
  		let config = oldConnection?.config ?? this.#serverConfigs.get(name);
  		const source = this.#sources.get(name) ?? oldConnection?._source;
@@ -760,7 +859,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  
  		if (authChallenge) {
  			if (!this.#authHandler) {
-@@ -1605,7 +1680,7 @@
+@@ -1801,7 +1884,7 @@
  			}
  			try {
  				const refreshedConfig = await this.#authHandler(name, authChallenge);
@@ -769,7 +868,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  				config = refreshedConfig;
  				this.#serverConfigs.set(name, config);
  			} catch (error) {
-@@ -1621,7 +1696,6 @@
+@@ -1817,7 +1900,6 @@
  		// Fire-and-forget: don't await the close — HttpTransport.close() sends a
  		// DELETE with config.timeout (30s default), and blocking here delays the
  		// reconnect loop by that amount on every server restart.
@@ -777,7 +876,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  		if (oldConnection) {
  			// From here the live remote connection is gone: the server is lost
  			// until a reconnect succeeds, and the schedule outlives this attempt.
-@@ -1640,7 +1714,7 @@
+@@ -1836,7 +1918,7 @@
  		// attempt is a single quiet probe; its pacing is the schedule itself.
  		const delays = scheduled ? [] : this.reconnectPolicy.ladderMs;
  		for (let attempt = 0; attempt <= delays.length; attempt++) {
@@ -786,7 +885,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  				logger.debug("MCP reconnect aborted before attempt after configuration changed", {
  					path: `mcp:${name}`,
  					storedEpoch: reconnectEpoch,
-@@ -1649,12 +1723,13 @@
+@@ -1845,12 +1927,13 @@
  				return null;
  			}
  			try {
@@ -802,7 +901,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  					logger.debug("MCP reconnect aborted after configuration changed", {
  						path: `mcp:${name}`,
  						storedEpoch: reconnectEpoch,
-@@ -1692,10 +1767,8 @@
+@@ -1888,10 +1971,8 @@
  		name: string,
  		config: MCPServerConfig,
  		source: SourceMeta | undefined,
@@ -814,7 +913,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  		const resolvedConfig = await this.#resolveAuthConfig(config, { signal: connectSignal });
  		const connection = await connectToServer(name, resolvedConfig, {
  			signal: connectSignal,
-@@ -1712,7 +1785,7 @@
+@@ -1908,7 +1989,7 @@
  
  		// Bail out if the server was disconnected or the manager was reset
  		// while we were connecting (e.g. /mcp reload called disconnectAll).
@@ -823,7 +922,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  			this.#detachConnection(name, connection);
  			void disconnectServer(connection).catch(() => {});
  			throw new Error(`Server "${name}" was disconnected during reconnection`);
-@@ -1737,7 +1810,8 @@
+@@ -1933,7 +2014,8 @@
  			void this.reconnectServer(name);
  		};
  		try {
@@ -831,20 +930,20 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
 +			const serverTools = await listTools(connection, { signal: connectSignal });
 +			connectSignal.throwIfAborted();
  			const reconnect = (options?: { authChallenge?: MCPAuthChallenge }) => this.reconnectServer(name, options);
- 			const customTools = MCPTool.fromTools(connection, serverTools, reconnect);
+ 			const customTools = MCPTool.fromTools(connection, serverTools, reconnect, this.#observeToolCall(name));
  			void this.toolCache?.set(name, config, serverTools);
-@@ -1826,6 +1900,7 @@
- 
- 		// Reload tools
- 		const serverTools = await listTools(connection);
+@@ -2031,6 +2113,7 @@
+ 			if (callProvoked) this.#callProvokedToolRefreshes.add(name);
+ 			throw error;
+ 		}
 +		if (this.#connections.get(name) !== connection) return;
  		const reconnect = () => this.reconnectServer(name);
- 		const customTools = MCPTool.fromTools(connection, serverTools, reconnect);
- 		void this.toolCache?.set(name, connection.config, serverTools);
+ 		const customTools = MCPTool.fromTools(connection, serverTools, reconnect, this.#observeToolCall(name));
+ 		if (callProvoked) this.#scopeAddedTools(name, customTools);
 diff --git a/src/mcp/tool-bridge.ts b/src/mcp/tool-bridge.ts
 --- a/src/mcp/tool-bridge.ts
 +++ b/src/mcp/tool-bridge.ts
-@@ -274,6 +274,9 @@
+@@ -281,6 +281,9 @@
  	return false;
  }
  
@@ -892,7 +991,7 @@ diff --git a/src/modes/acp/acp-agent.ts b/src/modes/acp/acp-agent.ts
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
  import { parseSkillInvocation } from "../../extensibility/skills";
  import { PYTHON_KERNEL_CANCEL_BUDGET_MS } from "../../eval/py/kernel";
-@@ -3081,14 +3081,7 @@
+@@ -3082,14 +3082,7 @@
  				getAllTools: () => record.session.getAllToolInfos(),
  				setActiveTools: toolNames => record.session.setActiveToolsByName(toolNames),
  				getCommands: () => getSessionSlashCommands(record.session),
@@ -939,7 +1038,7 @@ diff --git a/src/modes/controllers/extension-ui-controller.ts b/src/modes/contro
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
  import { cfgExtensionAssistantTextRenderers } from "../../extensibility/settings";
  import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
-@@ -260,12 +261,7 @@
+@@ -251,12 +252,7 @@
  			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
  			getAllTools: () => this.ctx.session.getAllToolInfos(),
  			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
@@ -953,7 +1052,7 @@ diff --git a/src/modes/controllers/extension-ui-controller.ts b/src/modes/contro
  			getThinkingLevel: () => this.ctx.session.thinkingLevel,
  			setThinkingLevel: level => this.ctx.session.setThinkingLevel(level),
  			getServiceTiers: () => this.ctx.session.serviceTierByFamily,
-@@ -493,12 +489,7 @@
+@@ -485,12 +481,7 @@
  			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
  			getAllTools: () => this.ctx.session.getAllToolInfos(),
  			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
@@ -1003,7 +1102,7 @@ diff --git a/src/modes/runtime-init.ts b/src/modes/runtime-init.ts
 diff --git a/src/sdk.ts b/src/sdk.ts
 --- a/src/sdk.ts
 +++ b/src/sdk.ts
-@@ -3730,6 +3730,7 @@
+@@ -3764,6 +3764,7 @@
  			}),
  			createAnnotationsAPI,
  		);
@@ -1011,7 +1110,7 @@ diff --git a/src/sdk.ts b/src/sdk.ts
  		// A dialog waits for the user, not the agent: the session lets the display sleep while one is open.
  		const trackUserWait: UserWaitTracker = dialog => (hasSession ? session.waitForUser(dialog) : dialog());
  		extensionRunner.setUserWaitTracker(trackUserWait);
-@@ -5155,6 +5156,7 @@
+@@ -5204,6 +5205,7 @@
  				hostMcpServerInstructions = source;
  			},
  			disconnectOwnedMcpManager: ownedMcpManager ? () => ownedMcpManager.disconnectAll() : undefined,
@@ -1022,7 +1121,7 @@ diff --git a/src/sdk.ts b/src/sdk.ts
 diff --git a/src/session/agent-session-types.ts b/src/session/agent-session-types.ts
 --- a/src/session/agent-session-types.ts
 +++ b/src/session/agent-session-types.ts
-@@ -427,6 +427,8 @@
+@@ -432,6 +432,8 @@
  	advisorConfigWarnings?: string[];
  	/** Disconnect the MCP manager owned by this session during disposal. */
  	disconnectOwnedMcpManager?: () => Promise<void>;
@@ -1034,7 +1133,7 @@ diff --git a/src/session/agent-session-types.ts b/src/session/agent-session-type
 diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
 --- a/src/session/agent-session.ts
 +++ b/src/session/agent-session.ts
-@@ -1196,6 +1196,7 @@
+@@ -1306,6 +1306,7 @@
  	#sideStreamFn: StreamFn;
  	#convertToLlm: (messages: AgentMessage[]) => Message[] | Promise<Message[]>;
  	#disconnectOwnedMcpManager: (() => Promise<void>) | undefined;
@@ -1042,7 +1141,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  
  	readonly #ttsr: TtsrCoordinator;
  	readonly #stats: SessionStatsTracker;
-@@ -2477,6 +2478,7 @@
+@@ -2641,6 +2642,7 @@
  			skillsReloadable: config.skillsReloadable,
  		});
  		this.#disconnectOwnedMcpManager = config.disconnectOwnedMcpManager;
@@ -1050,7 +1149,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  		const ttsrHost: TtsrCoordinatorHost = {
  			agent: this.agent,
  			sessionManager: this.sessionManager,
-@@ -5766,6 +5768,9 @@
+@@ -5866,6 +5868,9 @@
  		// `yielded` alone also covers queued steer/follow-up and IRC continuations,
  		// which `#flushPendingAgentEnd` re-tags non-terminal.
  		const awaitingAsyncWork = options?.willContinue === true && options.awaitingAsyncWork === true;
@@ -1060,7 +1159,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  		await this.#emitSessionEvent({
  			...event,
  			isTerminal: !options?.willContinue,
-@@ -6361,7 +6366,7 @@
+@@ -6623,7 +6628,7 @@
  		try {
  			await withTimeout(
  				this.#disconnectOwnedMcpManager(),
@@ -1069,7 +1168,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  				"Timed out disconnecting owned MCP manager during dispose",
  			);
  		} catch (error) {
-@@ -11713,7 +11718,7 @@
+@@ -12099,7 +12104,7 @@
  	setModelTemporary(
  		model: Model,
  		thinkingLevel?: ConfiguredThinkingLevel,
@@ -1081,7 +1180,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
 diff --git a/src/session/model-controls.ts b/src/session/model-controls.ts
 --- a/src/session/model-controls.ts
 +++ b/src/session/model-controls.ts
-@@ -282,7 +282,8 @@
+@@ -355,7 +355,8 @@
  	async setModelTemporary(
  		model: Model,
  		thinkingLevel?: ConfiguredThinkingLevel,
@@ -1091,7 +1190,7 @@ diff --git a/src/session/model-controls.ts b/src/session/model-controls.ts
  		selection: "explicit" | "automatic" = "explicit",
  	): Promise<void> {
  		const previousEditMode = this.#host.resolveActiveEditMode();
-@@ -299,7 +300,10 @@
+@@ -372,7 +373,10 @@
  			`${targetModel.provider}/${targetModel.id}`,
  			options?.prewalk ? PREWALK_MODEL_CHANGE_ROLE : options?.ephemeral ? EPHEMERAL_MODEL_CHANGE_ROLE : "temporary",
  		);
@@ -1156,7 +1255,7 @@ diff --git a/src/ssh/file-transfer.ts b/src/ssh/file-transfer.ts
  import { buildRemoteCommand, ensureConnection, ensureHostInfo, type SSHConnectionTarget } from "./connection-manager";
  import { quotePosixArgument } from "../utils/shell-quote";
  import { wrapInPosixShell } from "./utils";
-@@ -104,15 +105,13 @@
+@@ -108,21 +109,19 @@
  	remotePath: string,
  	opts: RemoteFileReadOptions,
  ): Promise<RemoteFileReadResult> {
@@ -1165,19 +1264,27 @@ diff --git a/src/ssh/file-transfer.ts b/src/ssh/file-transfer.ts
 +	}
  	const shell = await ensurePosixRemote(target);
 +	const transfer = await createFileTransfer(target, opts);
- 	const command = `head -c ${opts.maxBytes + 1} ${quotePosixArgument(remotePath)}`;
+ 	const p = quotePosixArgument(remotePath);
+-	// On a failed read, nothing at the path (not even a dangling symlink) exits with the reserved status;
+-	// `head`'s own stderr stays the message either way.
++	// Keep the reserved missing-path status through the compressed transfer
+ 	const command =
+ 		`head -c ${opts.maxBytes + 1} ${p} || { s=$?; ` +
+ 		`if [ ! -e ${p} ] && [ ! -L ${p} ]; then exit ${REMOTE_MISSING_EXIT}; fi; exit $s; }`;
 -	const args = await buildRemoteCommand(target, wrapInPosixShell(shell, command));
 -	using child = ptree.spawn(["ssh", ...args], {
 -		signal: ptree.combineSignals(opts.signal, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
 -	});
 -	// Drain stdout before awaiting exit so a full pipe can't deadlock the child.
 -	const raw = await child.bytes();
--	await child.exitedCleanly;
-+	const raw = await transfer.read(shell, command, opts.maxBytes + 1);
- 	const truncated = raw.length > opts.maxBytes;
- 	return { bytes: truncated ? raw.subarray(0, opts.maxBytes) : raw, truncated };
- }
-@@ -151,6 +150,7 @@
++	let raw: Uint8Array;
+ 	try {
+-		await child.exitedCleanly;
++		raw = await transfer.read(shell, command, opts.maxBytes + 1);
+ 	} catch (error) {
+ 		if (error instanceof ptree.NonZeroExitError && error.exitCode === REMOTE_MISSING_EXIT) {
+ 			throw Object.assign(new Error(error.message, { cause: error }), { code: "ENOENT" });
+@@ -167,6 +166,7 @@
  	if (remotePath.endsWith("/")) {
  		throw new Error("ssh://: destination is a directory path (trailing '/'); ssh:// write requires a file path");
  	}
@@ -1185,7 +1292,7 @@ diff --git a/src/ssh/file-transfer.ts b/src/ssh/file-transfer.ts
  	const dest = quotePosixArgument(remotePath);
  	const tmp = quotePosixArgument(`${remotePath}.omp-tmp.${crypto.randomUUID()}`);
  	// Stage stdin into the temp first (so the remote never blocks on an unread
-@@ -166,18 +166,13 @@
+@@ -182,18 +182,13 @@
  	const command =
  		`t=${tmp}; trap 'rm -f -- "$t"' 0; ` +
  		`mkdir -p -- "$(dirname "$t")" && ` +
@@ -1372,3 +1479,65 @@ new file mode 100644
 +    await sink.end();
 +  }
 +}
+diff --git a/src/thread/services/integrations.ts b/src/thread/services/integrations.ts
+--- a/src/thread/services/integrations.ts
++++ b/src/thread/services/integrations.ts
+@@ -331,6 +331,10 @@
+ 				),
+ 			),
+ 		connectedServers: manager => manager.getConnectedServers(),
++		allServerNames: manager => manager.getAllServerNames(),
++		serverConfig: (manager, name) => manager.getServerConfig(name),
++		connectionStatus: (manager, name) => manager.getConnectionStatus(name),
++		controlServer: (manager, name, action) => manager.controlServer(name, action),
+ 		serverResources: (manager, name) => manager.getServerResources(name),
+ 		ensureServerResources: (manager, name) => manager.ensureServerResources(name),
+ 		waitForPendingConnections: manager => manager.waitForPendingConnections(),
+diff --git a/src/thread/services/mcp-remote.ts b/src/thread/services/mcp-remote.ts
+--- a/src/thread/services/mcp-remote.ts
++++ b/src/thread/services/mcp-remote.ts
+@@ -7,8 +7,8 @@
+ import type { TSchema } from "@oh-my-pi/pi-ai";
+ import type { MCPToolDetails } from "@oh-my-pi/pi-tui/tools/mcp";
+ import type { CustomTool } from "../../extensibility/custom-tools/types";
+-import type { MCPManagerApi, MCPToolScope } from "../../mcp/manager";
+-import type { MCPRequestOptions, MCPResource, MCPResourceReadResult, MCPResourceTemplate } from "../../mcp/types";
++import type { MCPConnectionStatus, MCPManagerApi, MCPToolScope } from "../../mcp/manager";
++import type { MCPRequestOptions, MCPResource, MCPResourceReadResult, MCPResourceTemplate, MCPServerConfig } from "../../mcp/types";
+ import type { RemoteObject, RpcMethod } from "../rpc";
+ 
+ /** Remote-object kind of a main-thread `MCPManager`. */
+@@ -36,6 +36,10 @@
+ 	onToolsChanged: RpcMethod<[listener: () => void], () => void>;
+ 	onNotification: RpcMethod<[listener: McpNotificationListener], () => void>;
+ 	connectedServers: RpcMethod<[], string[]>;
++	allServerNames: RpcMethod<[], string[]>;
++	serverConfig: RpcMethod<[name: string], MCPServerConfig | undefined>;
++	connectionStatus: RpcMethod<[name: string], MCPConnectionStatus>;
++	controlServer: RpcMethod<[name: string, action: "start" | "stop" | "restart"], void>;
+ 	serverResources: RpcMethod<
+ 		[name: string],
+ 		{ resources: MCPResource[]; templates: MCPResourceTemplate[] } | undefined
+@@ -92,6 +96,22 @@
+ 		return this.#remote.callSync("connectedServers");
+ 	}
+ 
++	getAllServerNames(): string[] {
++		return this.#remote.callSync("allServerNames");
++	}
++
++	getServerConfig(name: string): MCPServerConfig | undefined {
++		return this.#remote.callSync("serverConfig", name);
++	}
++
++	getConnectionStatus(name: string): MCPConnectionStatus {
++		return this.#remote.callSync("connectionStatus", name);
++	}
++
++	controlServer(name: string, action: "start" | "stop" | "restart"): Promise<void> {
++		return this.#remote.call("controlServer", name, action);
++	}
++
+ 	getServerResources(name: string): { resources: MCPResource[]; templates: MCPResourceTemplate[] } | undefined {
+ 		return this.#remote.callSync("serverResources", name);
+ 	}

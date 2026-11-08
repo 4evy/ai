@@ -1,7 +1,7 @@
 diff --git a/dist/types/theme/schema.d.ts b/dist/types/theme/schema.d.ts
 --- a/dist/types/theme/schema.d.ts
 +++ b/dist/types/theme/schema.d.ts
-@@ -13,6 +13,8 @@
+@@ -36,6 +36,8 @@
      $schema?: string;
      name: string;
      vars?: Record<string, ColorValue>;
@@ -17,8 +17,8 @@ diff --git a/dist/types/theme/theme-class.d.ts b/dist/types/theme/theme-class.d.
       * otherwise-light theme.
       */
      readonly statusLineLuminance: number | undefined;
--    constructor(fgColors: Record<ThemeColor, string | number>, bgColors: Record<ThemeBg, string | number>, mode: ColorMode, symbolPreset: SymbolPreset, symbolOverrides: Partial<Record<SymbolKey, string>>, spinnerFramesOverrides?: Partial<Record<SpinnerType, string[]>>);
-+    constructor(fgColors: Record<ThemeColor, string | number>, bgColors: Record<ThemeBg, string | number>, mode: ColorMode, symbolPreset: SymbolPreset, symbolOverrides: Partial<Record<SymbolKey, string>>, spinnerFramesOverrides?: Partial<Record<SpinnerType, string[]>>, ribbonColors?: readonly (string | number)[], terminalBackground?: string | number);
+-    constructor(fgColors: Record<ThemeColor, string | number>, bgColors: Record<ThemeBg, string | number>, mode: ColorMode, symbolPreset: SymbolPreset, symbolOverrides: Partial<Record<SymbolKey, string>>, spinnerFramesOverrides?: Partial<Record<SpinnerType, string[]>>, ansiPalette?: ReadonlyArray<string | number>);
++    constructor(fgColors: Record<ThemeColor, string | number>, bgColors: Record<ThemeBg, string | number>, mode: ColorMode, symbolPreset: SymbolPreset, symbolOverrides: Partial<Record<SymbolKey, string>>, spinnerFramesOverrides?: Partial<Record<SpinnerType, string[]>>, ansiPalette?: ReadonlyArray<string | number>, ribbonColors?: readonly (string | number)[], terminalBackground?: string | number);
 +    /**
 +     * Paint a one-cell rule in five stripes, preserving the terminal background
 +     * Offset and total width keep stripes aligned across embedded labels
@@ -146,20 +146,11 @@ diff --git a/src/render/output-block.ts b/src/render/output-block.ts
 diff --git a/src/theme/loader.ts b/src/theme/loader.ts
 --- a/src/theme/loader.ts
 +++ b/src/theme/loader.ts
-@@ -3,7 +3,7 @@
- import { adjustHsv } from "@oh-my-pi/pi-utils/color";
- import { getCustomThemesDir } from "@oh-my-pi/pi-utils/dirs";
- import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
--import { detectColorMode, resolveThemeColors } from "./color";
-+import { detectColorMode, resolveThemeColors, resolveVarRefs } from "./color";
- import darkThemeJson from "./dark.json" with { type: "json" };
- import defaultThemes from "./defaults.json" with { type: "json" };
- import lightThemeJson from "./light.json" with { type: "json" };
-@@ -179,7 +179,18 @@
- 	const symbolPreset: SymbolPreset = symbolPresetOverride ?? themeJson.symbols?.preset ?? "unicode";
+@@ -180,7 +180,19 @@
  	const symbolOverrides = themeJson.symbols?.overrides ?? {};
  	const spinnerFramesOverrides = normalizeSpinnerFramesOverride(themeJson.symbols?.spinnerFrames);
--	return new Theme(fgColors, bgColors, colorMode, symbolPreset, symbolOverrides, spinnerFramesOverrides);
+ 	const ansiPalette = themeJson.terminal?.ansi?.map(color => resolveVarRefs(color, themeJson.vars ?? {}));
+-	return new Theme(fgColors, bgColors, colorMode, symbolPreset, symbolOverrides, spinnerFramesOverrides, ansiPalette);
 +	const ribbonColors = themeJson.ribbon?.map(color => resolveVarRefs(color, themeJson.vars ?? {}));
 +	const terminalBackground = themeJson.terminal?.background;
 +	return new Theme(
@@ -169,6 +160,7 @@ diff --git a/src/theme/loader.ts b/src/theme/loader.ts
 +		symbolPreset,
 +		symbolOverrides,
 +		spinnerFramesOverrides,
++		ansiPalette,
 +		ribbonColors,
 +		terminalBackground === undefined ? undefined : resolveVarRefs(terminalBackground, themeJson.vars ?? {}),
 +	);
@@ -189,7 +181,7 @@ diff --git a/src/theme/schema-validation.ts b/src/theme/schema-validation.ts
 diff --git a/src/theme/schema.ts b/src/theme/schema.ts
 --- a/src/theme/schema.ts
 +++ b/src/theme/schema.ts
-@@ -20,6 +20,8 @@
+@@ -45,6 +45,8 @@
  	$schema?: string;
  	name: string;
  	vars?: Record<string, ColorValue>;
@@ -201,7 +193,7 @@ diff --git a/src/theme/schema.ts b/src/theme/schema.ts
 diff --git a/src/theme/theme-class.ts b/src/theme/theme-class.ts
 --- a/src/theme/theme-class.ts
 +++ b/src/theme/theme-class.ts
-@@ -188,6 +188,7 @@
+@@ -193,6 +193,7 @@
  	#sessionAccentInputs: SessionAccentTheme | undefined;
  	#symbols: SymbolMap;
  	#spinnerFramesOverrides: Partial<Record<SpinnerType, string[]>>;
@@ -209,10 +201,10 @@ diff --git a/src/theme/theme-class.ts b/src/theme/theme-class.ts
  	/**
  	 * Perceptual luma (0..1) of the status-line background — used to classify the
  	 * theme light/dark. Undefined when it can't be resolved. Classified against the
-@@ -205,9 +206,12 @@
- 		private readonly symbolPreset: SymbolPreset,
+@@ -211,9 +212,12 @@
  		symbolOverrides: Partial<Record<SymbolKey, string>>,
  		spinnerFramesOverrides: Partial<Record<SpinnerType, string[]>> = {},
+ 		ansiPalette: ReadonlyArray<string | number> = [],
 +		ribbonColors?: readonly (string | number)[],
 +		terminalBackground?: string | number,
  	) {
@@ -224,7 +216,7 @@ diff --git a/src/theme/theme-class.ts b/src/theme/theme-class.ts
  		const slIsLight = this.statusLineLuminance !== undefined && this.statusLineLuminance > 0.5;
  
  		this.#fgColors = {} as Record<ThemeColor, string>;
-@@ -246,8 +250,24 @@
+@@ -253,8 +257,24 @@
  		// `status.done` aliases `status.success` unless a theme overrides it explicitly.
  		if (!("status.done" in symbolOverrides)) this.#symbols["status.done"] = this.#symbols["status.success"];
  		this.#spinnerFramesOverrides = spinnerFramesOverrides;

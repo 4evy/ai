@@ -13,45 +13,46 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  	PREVIEW_LIMITS,
  	shortenPath,
  } from "../render/render-utils";
--import { fileHyperlink, renderCodeCell, renderMarkdownCell } from "../render";
-+import { fileHyperlink, renderCodeCell, renderMarkdownCell, renderOutputBlock } from "../render";
+-import { fileHyperlink, renderCodeCell, renderMarkdownCell, urlHyperlinkAlways } from "../render";
++import { fileHyperlink, renderCodeCell, renderMarkdownCell, renderOutputBlock, urlHyperlinkAlways } from "../render";
  import { wrapTreeLine } from "../render/hanging-wrap";
 -import { wrapTextWithAnsi } from "../utils";
 +import { truncateToWidth, wrapTextWithAnsi } from "../utils";
  import { canonicalizeMessage } from "./thinking-display";
  import { internalUrlSchemeSpec, splitUrlScheme } from "../tools/url-scheme-host";
- import type { ToolExecutionHandle } from "./tool-execution";
-@@ -388,6 +389,7 @@
- 	#text: Text;
+ import { SpotlightNotices } from "./spotlight";
+@@ -404,6 +405,7 @@
+ 	#presented: boolean;
  	#expanded = false;
  	#toolActivityVisible = true;
 +	#allocation = Infinity;
  	#showContentPreview: boolean;
  	// A read group accretes entries across multiple assistant completions for as
  	// long as the run of reads is uninterrupted. It remains active while its
-@@ -417,9 +419,19 @@
- 	}
- 
+@@ -438,7 +440,21 @@
+ 	 * read is a row of its own; hidden draws nothing.
+ 	 */
  	override render(width: number): readonly string[] {
 -		if (!this.#toolActivityVisible) return [];
--		return super.render(width);
 +		if (!this.#toolActivityVisible || this.#allocation === 0) return [];
-+		const lines = super.render(width);
++		const lines = this.#renderPresentation(width);
 +		if (lines.length <= this.#allocation) return lines;
 +		const title =
 +			this.#text.render(Math.max(1, width - 4))[0]?.trimStart() ??
 +			`Read ${this.#formatPathValue(this.#entries.values().next().value?.path ?? "…")}`;
 +		if (this.#allocation === 1) return [truncateToWidth(title, width)];
 +		return renderOutputBlock({ header: title, width, applyBg: false }, theme);
- 	}
++	}
 +
 +	setTranscriptAllocation(rows: number): void {
 +		this.#allocation = Math.max(0, Math.trunc(rows));
 +	}
- 	isTranscriptBlockFinalized(): boolean {
- 		if (this.#sealed) return true;
- 		if (!this.#finalized) return false;
-@@ -620,8 +632,8 @@
++
++	#renderPresentation(width: number): readonly string[] {
+ 		const entries = [...this.#entries.values()];
+ 		const drawn = entries.map(entry => entry.presentation.draw());
+ 		if (drawn.every(shown => shown.mode === "full")) return super.render(width);
+@@ -749,8 +765,8 @@
  	}
  
  	/**
@@ -61,8 +62,8 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
 +	 * the fallback: a `card` (role `omp.tool.read`) with `Read <path>` or
  	 * `Read (N)` in the head, a `list` of path items (status tone, link,
  	 * correction and conflict detail, nested usage) and a clamped preview per
- 	 * read when content previews are on.
-@@ -635,7 +647,7 @@
+ 	 * read when content previews are on. Compact reads become rows of their
+@@ -790,7 +806,7 @@
  	}
  
  	/**
@@ -71,16 +72,16 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  	 * `tool` (role `omp.tool.read`). One file: `Read path:13-36`, a failure's
  	 * message in the head. Several: `Read 3 files` over one 22px row per file
  	 * (glyph, dim dir, strong name, range). Each content preview is numbered
-@@ -699,7 +711,7 @@
+@@ -853,7 +869,7 @@
  				title: "Read",
  				status,
  				tone: status === "error" ? "error" : undefined,
 -				frame: "inline",
 +				frame: "card",
  				collapsible,
- 				collapsed: collapsible ? !this.#expanded : undefined,
+ 				collapsed: collapsible ? !entries.some(entry => entry.expanded) : undefined,
  				preview: collapsible ? TRIMMED_BODY_PREVIEW : undefined,
-@@ -872,8 +884,8 @@
+@@ -1028,8 +1044,8 @@
  		return card(
  			{
  				role: "omp.tool.read",
@@ -91,7 +92,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  				status,
  				tone: status === "error" ? "error" : status === "running" ? "pending" : undefined,
  				head,
-@@ -915,6 +927,17 @@
+@@ -1071,6 +1087,17 @@
  		return text([span(plainText(line), "dim")], { wrap: "word", key, role: "omp.usage" });
  	}
  
@@ -108,8 +109,8 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
 +
  	#updateDisplay(): void {
  		this.#displayVersion++;
- 		const entries = [...this.#entries.values()];
-@@ -929,7 +952,7 @@
+ 		const entries = [...this.#entries.values()].filter(entry => entry.presentation.shown.mode === "full");
+@@ -1085,7 +1112,7 @@
  
  		if (displayRows.length === 0) {
  			this.#text.setText(` ${theme.format.bullet} ${theme.fg("toolTitle", theme.bold("Read"))}`);
@@ -118,7 +119,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  			return;
  		}
  
-@@ -942,7 +965,7 @@
+@@ -1098,7 +1125,7 @@
  				const usageRows = this.#usageRowsBySummaryRow(displayRows).get(0) ?? [];
  				this.#appendUsageRows(lines, usageRows, "   ");
  				this.#text.setText(lines.join("\n"));
@@ -127,7 +128,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
  			}
  			for (const entry of this.#previewEntriesForRow(row)) {
  				this.#addContentPreview(entry);
-@@ -962,7 +985,7 @@
+@@ -1118,7 +1145,7 @@
  		}
  
  		this.#text.setText(lines.join("\n"));
@@ -139,7 +140,7 @@ diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/re
 diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/tool-execution.ts
 --- a/packages/tui/src/chat/tool-execution.ts
 +++ b/packages/tui/src/chat/tool-execution.ts
-@@ -47,7 +47,13 @@
+@@ -59,7 +59,13 @@
  	resolveImageOptions,
  } from "../render/render-utils";
  import type { XdevMountedState } from "../tools/xdev";
@@ -153,9 +154,9 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
 +} from "../render/index";
  import { cachedPngConversion, convertImageToPngShared, imagePayloadKey } from "./image-loading";
  import { FenceFigure } from "./fence-figure";
- import { sanitizeWithOptionalSixelPassthrough } from "../render/sixel";
-@@ -363,8 +369,7 @@
- export class ToolExecutionComponent extends Container {
+ import { SpotlightNotices } from "./spotlight";
+@@ -411,8 +417,7 @@
+ 	#shellInspector: { hide(): void } | undefined;
  	#contentBox: Box; // Used for custom tools and bash visual truncation
  	#contentText: WidthAwareText; // Generic fallback (no custom/built-in renderer)
 -	// Which container the constructor mounted: bespoke/built-in renderers use
@@ -164,7 +165,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  	#usesContentBox = false;
  	#multiFileBoxes: (Box | Spacer)[] = []; // Extra boxes for multi-file edit results
  	#imageComponents: Image[] = [];
-@@ -397,9 +402,7 @@
+@@ -445,9 +450,7 @@
  	// previews, and Kitty PNG conversions. Folded into the dirty key so those
  	// updates are not swallowed by the memo (see #updateDisplay).
  	#displayInputVersion = 0;
@@ -175,7 +176,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  	#displayBuilt = false;
  	// Number of Image children the last rebuild emitted. Only when this is > 0 does
  	// the memo key fold in viewport-dependent image sizing (resolveImageOptions),
-@@ -513,24 +516,16 @@
+@@ -590,24 +593,16 @@
  		this.#editMode = resolveEditModeForTool(toolName, tool);
  		if (this.#editMode) this.#previewReady = Promise.withResolvers<void>();
  
@@ -206,7 +207,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  		this.setIgnoreTight(true);
  
  		this.#updateSpinnerAnimation();
-@@ -1095,14 +1090,13 @@
+@@ -1396,14 +1391,13 @@
  		const late = this.#lateDiagnosticsParts();
  		const body: NativeChild[] = [...(view.body ?? []), ...this.#nativeResultImages(view.body)];
  		if (late.section) body.push(late.section);
@@ -222,7 +223,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  		return node(
  			"tool",
  			{
-@@ -1124,7 +1118,7 @@
+@@ -1425,7 +1419,7 @@
  				age: live ? ms : undefined,
  				took: live ? undefined : ms,
  				intent: typeof intent === "string" && intent ? plainText(intent) : undefined,
@@ -231,7 +232,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  				collapsible: hasBody,
  				collapsed: hasBody ? this.#nativeCollapsed(status, view) : undefined,
  				preview: hasBody ? (preview === "auto" ? { lines: DEFAULT_TERMINAL_PREVIEW_LINES } : preview) : undefined,
-@@ -1185,7 +1179,6 @@
+@@ -1486,7 +1480,6 @@
  			...(late.section ? [late.section] : []),
  		];
  		const role = `omp.tool.${this.#toolName}`;
@@ -239,8 +240,8 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  		const hasBody = children.length > 1;
  		return card(
  			{
-@@ -1383,12 +1376,8 @@
- 			return [];
+@@ -1698,12 +1691,8 @@
+ 			);
  		}
  		let lines = super.render(width);
 -		if (this.#allocation < 3) {
@@ -254,16 +255,16 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  			const trimmed = trimBlankEdges(lines);
  			if (trimmed.length > this.#allocation) return this.#renderCompact(width);
  			lines = trimmed;
-@@ -1419,7 +1408,7 @@
- 			const styledGlyph = theme.fg(this.#spinnerFrame === undefined ? "dim" : "muted", glyph);
- 			return [truncateToWidth(`${styledGlyph} ${text}`, width)];
- 		}
+@@ -1743,7 +1732,7 @@
+ 	#renderCompact(width: number): readonly string[] {
+ 		const text = this.#compactText(width);
+ 		if (this.#allocation === 1) return [truncateToWidth(`${this.#compactGlyph()} ${text}`, width)];
 -		return [truncateToWidth(`${theme.fg("dim", "╭─")} ${text}`, width), theme.fg("dim", "╰")];
 +		return renderOutputBlock({ header: text, width, applyBg: false }, theme);
  	}
  
  	#activitySummary(): ToolActivitySummary {
-@@ -1476,11 +1465,7 @@
+@@ -1800,11 +1789,7 @@
  			return;
  		}
  
@@ -276,7 +277,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  		const benignSkip = this.#isBenignSkip();
  		const stateBgKey =
  			this.#isPartial || benignSkip ? "toolPendingBg" : this.#result?.isError ? "toolErrorBg" : "toolSuccessBg";
-@@ -1580,11 +1565,6 @@
+@@ -1904,11 +1889,6 @@
  					this.#contentBox.addChild(new Text(theme.fg("toolOutput", replaceTabs(output)), 0, 0));
  				}
  			}
@@ -288,7 +289,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
  		} else if (this.#renderer) {
  			// The active registry entry is a built-in tool with a rich renderer.
  			const renderer = this.#renderer;
-@@ -1738,6 +1718,20 @@
+@@ -2062,6 +2042,20 @@
  			this.#refreshContentText(stateBgKey, stateBgFn);
  		}
  
@@ -312,7 +313,7 @@ diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/too
 diff --git a/packages/tui/src/chrome/transcript-container.ts b/packages/tui/src/chrome/transcript-container.ts
 --- a/packages/tui/src/chrome/transcript-container.ts
 +++ b/packages/tui/src/chrome/transcript-container.ts
-@@ -676,9 +676,14 @@
+@@ -795,9 +795,14 @@
  			return output;
  		}
  
@@ -330,7 +331,7 @@ diff --git a/packages/tui/src/chrome/transcript-container.ts b/packages/tui/src/
  		// Surplus rows favor ordinary transcript blocks over dynamic tool-activity
  		// cards (newest-first within each class), so a growing tool card collapses to
  		// its compact form instead of clipping already-visible assistant text (#9718).
-@@ -691,7 +696,7 @@
+@@ -810,7 +815,7 @@
  		}
  		for (const index of order) {
  			if (surplus <= 0) break;
@@ -427,13 +428,21 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
  	formatMinimizedMeta,
  	formatStyledTruncationWarning,
  	type OutputMeta,
-@@ -29,10 +22,11 @@
- } from "./renderer";
- import { INTENT_FIELD, type TspTone } from "@oh-my-pi/pi-wire";
+@@ -31,19 +24,17 @@
+ import type { SpotlightDetails } from "../chat/spotlight";
  import { plainText } from "../native/spans";
--import { resultText, runBox, runFoot, runInput, runOutput, type RunState } from "./native-view";
-+import { code, keyed } from "../native/describe";
-+import { resultText, runBox, runFoot, runOutput, type RunState } from "./native-view";
+ import {
+-	RUN_INPUT_PREVIEW_LINES,
+ 	resultText,
+ 	runBox,
+ 	runFoot,
+-	runInput,
+ 	runOutput,
+ 	type RunState,
+ } from "./native-view";
+ import { renderShellVisualization, shellVizText } from "./shell-viz-render";
+-import { node } from "../native/describe";
++import { code, keyed, node } from "../native/describe";
  
  /** Default collapsed shell output preview height. */
 -export const BASH_DEFAULT_PREVIEW_LINES = DEFAULT_TERMINAL_PREVIEW_LINES;
@@ -441,7 +450,7 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
  
  /**
   * LLM-facing footer appended when a tool call becomes a background job. It states the job's kill
-@@ -321,6 +315,7 @@
+@@ -358,6 +349,7 @@
  	contextTimeout: number | undefined,
  	artifactId: string | undefined,
  	isError: boolean,
@@ -449,7 +458,7 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
  ): string[] {
  	const timeoutDisabled = details?.timeoutDisabled === true || contextTimeout === 0;
  	const timeoutSeconds = timeoutDisabled ? undefined : (details?.timeoutSeconds ?? contextTimeout);
-@@ -332,17 +327,21 @@
+@@ -369,17 +361,21 @@
  	}
  	if (details?.service) {
  		const service = details.service;
@@ -476,7 +485,7 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
  		statsParts.push(
  			requestedTimeoutSeconds !== undefined && requestedTimeoutSeconds !== timeoutSeconds
  				? `Timeout: ${timeoutSeconds}s (requested ${requestedTimeoutSeconds}s clamped)`
-@@ -411,7 +410,12 @@
+@@ -448,7 +444,12 @@
  }
  
  /** The command line as a run's input: wrapped shell source. */
@@ -490,7 +499,7 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
  
  /** Box tint per run state: failed runs read as errors, timed-out ones as warnings. */
  const RUN_BOX_TONE: Partial<Record<RunState, TspTone>> = { failed: "error", "timed-out": "warning" };
-@@ -423,11 +427,13 @@
+@@ -460,11 +461,13 @@
  	isPartial: boolean,
  	cancelled: boolean,
  ): RunState {
@@ -506,20 +515,20 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
  	return "done";
  }
  
-@@ -440,37 +446,61 @@
- 	};
+@@ -501,40 +504,67 @@
+ 	return details?.cwd === undefined ? args : { ...args, cwd: details.cwd, cdSeparator: details.cdSeparator };
  }
  
 +/** Cache source highlighting and visual capping separately from live output */
 +function createShellCommandPreview(args: BashRenderArgs, uiTheme: Theme) {
 +	let commandLines: string[] | undefined;
-+	let memo: { width: number; expanded: boolean; lines: readonly string[] } | undefined;
-+	return (width: number, expanded: boolean): readonly string[] => {
-+		if (memo && memo.width === width && memo.expanded === expanded) return memo.lines;
-+		commandLines ??= formatBashCommandLines(args, uiTheme);
++	let memo: { width: number; expanded: boolean; source: readonly string[]; lines: readonly string[] } | undefined;
++	return (width: number, expanded: boolean, source?: readonly string[]): readonly string[] => {
++		const input = source ?? (commandLines ??= formatBashCommandLines(args, uiTheme));
++		if (memo && memo.width === width && memo.expanded === expanded && memo.source === input) return memo.lines;
 +		const { lines } = formatOutputPaneLines(
 +			{
-+				lines: commandLines,
++				lines: input,
 +				expanded,
 +				collapsedMaxLines: 2,
 +				visual: true,
@@ -527,7 +536,7 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
 +			},
 +			uiTheme,
 +		);
-+		memo = { width, expanded, lines };
++		memo = { width, expanded, source: input, lines };
 +		return lines;
 +	};
 +}
@@ -541,10 +550,12 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
 -			// expensive part: defer it to the first paint, once per component,
 -			// so a rebuild that is replaced before painting never pays for it.
 -			let cmdLines: string[] | undefined;
--			return framedToolCard(uiTheme, () => {
--				cmdLines ??= formatBashCommandLines(renderArgs, uiTheme);
 +			const commandPreview = createShellCommandPreview(renderArgs, uiTheme);
-+			return framedToolCard(uiTheme, ({ contentWidth }) => {
+ 			return framedToolCard(uiTheme, ({ contentWidth }) => {
+-				const presentation = options.shellPresentation;
+-				cmdLines = presentation
+-					? visualCommandLines(presentation, renderArgs, undefined, uiTheme, contentWidth)
+-					: (cmdLines ?? formatBashCommandLines(renderArgs, uiTheme));
 +				const stateLabel = options.executionStarted ? "Running" : "Queued";
  				const header =
  					config.showHeader === false
@@ -572,13 +583,19 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
 -					sections: [{ content: capPreviewLines(cmdLines, uiTheme, { expanded: options.expanded }) }],
 +					sections: [
 +						{
-+							content: commandPreview(contentWidth, options.expanded),
++							content: commandPreview(
++								contentWidth,
++								options.expanded,
++								options.shellPresentation
++									? visualCommandLines(options.shellPresentation, renderArgs, undefined, uiTheme, contentWidth)
++									: undefined,
++							),
 +						},
 +					],
  				};
  			});
  		},
-@@ -486,25 +516,39 @@
+@@ -550,25 +580,39 @@
  			args?: TArgs,
  		): Component {
  			const renderArgs = toBashRenderArgs(args, config);
@@ -632,7 +649,7 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
  							uiTheme,
  						);
  			// Per-instance cache for the expensive inner lines computation. Mirrors
-@@ -580,6 +624,7 @@
+@@ -660,6 +704,7 @@
  						renderContext?.timeout,
  						rawOutputArtifact.artifactId,
  						isError,
@@ -640,11 +657,15 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
  					);
  					if (elapsedSecond !== undefined && elapsedSecond > 0) {
  						statsParts.unshift(`elapsed ${formatDuration(elapsedSecond * 1000)}`);
-@@ -617,17 +662,19 @@
+@@ -697,33 +742,27 @@
  
  					const snapshot: ToolCardSnapshot = {
  						header,
 -						phase: isPartial ? "partial" : isError ? (isTimeout ? "warning" : "error") : "success",
+-						// Shell cards keep the neutral segmented look in every phase: the
+-						// phase colours status and border, never a background wash. A
+-						// settled success names its default dim border, so a native host
+-						// drawing this card gets a muted tone rather than a success tint.
 +						headerMeta: config.showHeader === false ? uiTheme.fg("toolOutput", stateLabel) : undefined,
 +						phase:
 +							state === "running" || state === "background"
@@ -654,38 +675,88 @@ diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
 +									: state === "failed" || state === "cancelled"
 +										? "error"
 +										: "success",
+ 						applyBg: false,
+-						borderColor: success ? "dim" : undefined,
++						borderColor: state === "done" ? "dim" : undefined,
  						footerMeta,
  						sections: [
  							{
 -								// Viewport-sized tail window in every state — streaming and final
 -								// render identically; only ctrl+o uncaps.
 -								content: capPreviewLines(
--									args ? (cmdLines ??= formatBashCommandLines(renderArgs, uiTheme)) : [],
++								content: commandPreview?.(
++									contentWidth,
++									expanded,
+ 									trace !== undefined && options.shellPresentation
+-										? visualCommandLines(
+-												options.shellPresentation,
+-												renderArgs,
+-												details,
+-												uiTheme,
+-												contentWidth,
+-											)
+-										: args
+-											? (cmdLines ??= formatBashCommandLines(renderArgs, uiTheme))
+-											: [],
 -									uiTheme,
 -									{ expanded },
 -								),
-+								content: commandPreview?.(contentWidth, expanded) ?? [],
++										? visualCommandLines(options.shellPresentation, renderArgs, details, uiTheme, contentWidth)
++										: undefined,
++								) ?? [],
  							},
  							{ label: uiTheme.fg("toolTitle", "Output"), content: outputLines },
  						],
-@@ -655,7 +702,7 @@
- 				body: [
- 					runBox(
- 						[
--							runInput(command, SHELL_INPUT),
-+							keyed(code(command.trimEnd(), SHELL_INPUT), "input"),
+@@ -762,12 +801,11 @@
+ 											lang: "bash",
+ 											replayEpoch: options.shellReplayEpoch,
+ 											liveOrigin: options.executionStarted,
+-											preview: { lines: RUN_INPUT_PREVIEW_LINES },
+ 										},
+ 										undefined,
+ 										"input",
+ 									)
+-								: runInput(command, SHELL_INPUT),
++								: keyed(code(command.trimEnd(), SHELL_INPUT), "input"),
  							started &&
  								runFoot({ state: options.cancelled ? "cancelled" : "running", elapsedMs: options.elapsedMs }),
  						],
-@@ -697,7 +744,7 @@
- 			const meta = details?.meta;
- 			const box = runBox(
- 				[
--					runInput(command, SHELL_INPUT),
-+					keyed(code(command.trimEnd(), SHELL_INPUT), "input"),
- 					output.trim().length > 0 && runOutput(output, { role: "omp.tool.bash.output", previewLines }),
+@@ -833,12 +871,11 @@
+ 									liveOrigin: options.executionStarted,
+ 									...(displayWorkdir ? { cwd: displayWorkdir } : {}),
+ 									lang: "bash",
+-									preview: { lines: RUN_INPUT_PREVIEW_LINES },
+ 								},
+ 								undefined,
+ 								"input",
+ 							)
+-						: runInput(command, SHELL_INPUT),
++						: keyed(code(command.trimEnd(), SHELL_INPUT), "input"),
+ 					shownOutput.trim().length > 0 && runOutput(shownOutput, { role: "omp.tool.bash.output", previewLines }),
  					runFoot({
  						state,
+diff --git a/packages/tui/src/tools/json-tree.ts b/packages/tui/src/tools/json-tree.ts
+--- a/packages/tui/src/tools/json-tree.ts
++++ b/packages/tui/src/tools/json-tree.ts
+@@ -375,7 +375,7 @@
+ 			let body: readonly string[];
+ 			const displayKey = item.key ? sanitize(item.key) : undefined;
+ 			const label = theme.fg(
+-				item.keyColor ?? "muted",
++				item.keyColor === "dim" ? "dim" : item.depth <= 1 ? "toolOutput" : (item.keyColor ?? "muted"),
+ 				displayKey || (item.kind === "array" ? "array" : item.kind === "object" ? "object" : "value"),
+ 			);
+ 			if (item.kind === "placeholder") {
+@@ -517,7 +517,8 @@
+ 	): TspTreeNode => {
+ 		budget--;
+ 		const id = `${nextId++}`;
+-		const keySpans: TspSpan[] = key === undefined ? [] : [span(plainText(key), keyColor)];
++		const keySpans: TspSpan[] =
++			key === undefined ? [] : [span(plainText(key), depth <= 1 && keyColor === "muted" ? undefined : keyColor)];
+ 		const prefix = keySpans.length > 0 ? [...keySpans, span(": ", "muted")] : [];
+ 		const inline = inlineJson(entry, plainText);
+ 		if (inline) return { id, label: [...prefix, ...inline.map(([text, color]) => span(text, color))] };
 diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
 --- a/packages/tui/src/tools/eval.ts
 +++ b/packages/tui/src/tools/eval.ts
@@ -1271,28 +1342,6 @@ diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
  			),
  			status: evalStatusSection(details ?? {}, expanded),
  			foot: { state, elapsedMs: options.elapsedMs, ...callFacts },
-diff --git a/packages/tui/src/tools/json-tree.ts b/packages/tui/src/tools/json-tree.ts
---- a/packages/tui/src/tools/json-tree.ts
-+++ b/packages/tui/src/tools/json-tree.ts
-@@ -375,7 +375,7 @@
- 			let body: readonly string[];
- 			const displayKey = item.key ? sanitize(item.key) : undefined;
- 			const label = theme.fg(
--				item.keyColor ?? "muted",
-+				item.keyColor === "dim" ? "dim" : item.depth <= 1 ? "toolOutput" : (item.keyColor ?? "muted"),
- 				displayKey || (item.kind === "array" ? "array" : item.kind === "object" ? "object" : "value"),
- 			);
- 			if (item.kind === "placeholder") {
-@@ -517,7 +517,8 @@
- 	): TspTreeNode => {
- 		budget--;
- 		const id = `${nextId++}`;
--		const keySpans: TspSpan[] = key === undefined ? [] : [span(plainText(key), keyColor)];
-+		const keySpans: TspSpan[] =
-+			key === undefined ? [] : [span(plainText(key), depth <= 1 && keyColor === "muted" ? undefined : keyColor)];
- 		const prefix = keySpans.length > 0 ? [...keySpans, span(": ", "muted")] : [];
- 		const inline = inlineJson(entry, plainText);
- 		if (inline) return { id, label: [...prefix, ...inline.map(([text, color]) => span(text, color))] };
 diff --git a/packages/tui/src/tools/xdev.ts b/packages/tui/src/tools/xdev.ts
 --- a/packages/tui/src/tools/xdev.ts
 +++ b/packages/tui/src/tools/xdev.ts

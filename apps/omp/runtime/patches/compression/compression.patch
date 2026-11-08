@@ -9,7 +9,7 @@ diff --git a/packages/coding-agent/src/ssh/file-transfer.ts b/packages/coding-ag
  import { buildRemoteCommand, ensureConnection, ensureHostInfo, type SSHConnectionTarget } from "./connection-manager";
  import { quotePosixArgument } from "../utils/shell-quote";
  import { wrapInPosixShell } from "./utils";
-@@ -104,15 +105,13 @@
+@@ -108,21 +109,19 @@
  	remotePath: string,
  	opts: RemoteFileReadOptions,
  ): Promise<RemoteFileReadResult> {
@@ -18,19 +18,27 @@ diff --git a/packages/coding-agent/src/ssh/file-transfer.ts b/packages/coding-ag
 +	}
  	const shell = await ensurePosixRemote(target);
 +	const transfer = await createFileTransfer(target, opts);
- 	const command = `head -c ${opts.maxBytes + 1} ${quotePosixArgument(remotePath)}`;
+ 	const p = quotePosixArgument(remotePath);
+-	// On a failed read, nothing at the path (not even a dangling symlink) exits with the reserved status;
+-	// `head`'s own stderr stays the message either way.
++	// Keep the reserved missing-path status through the compressed transfer
+ 	const command =
+ 		`head -c ${opts.maxBytes + 1} ${p} || { s=$?; ` +
+ 		`if [ ! -e ${p} ] && [ ! -L ${p} ]; then exit ${REMOTE_MISSING_EXIT}; fi; exit $s; }`;
 -	const args = await buildRemoteCommand(target, wrapInPosixShell(shell, command));
 -	using child = ptree.spawn(["ssh", ...args], {
 -		signal: ptree.combineSignals(opts.signal, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
 -	});
 -	// Drain stdout before awaiting exit so a full pipe can't deadlock the child.
 -	const raw = await child.bytes();
--	await child.exitedCleanly;
-+	const raw = await transfer.read(shell, command, opts.maxBytes + 1);
- 	const truncated = raw.length > opts.maxBytes;
- 	return { bytes: truncated ? raw.subarray(0, opts.maxBytes) : raw, truncated };
- }
-@@ -151,6 +150,7 @@
++	let raw: Uint8Array;
+ 	try {
+-		await child.exitedCleanly;
++		raw = await transfer.read(shell, command, opts.maxBytes + 1);
+ 	} catch (error) {
+ 		if (error instanceof ptree.NonZeroExitError && error.exitCode === REMOTE_MISSING_EXIT) {
+ 			throw Object.assign(new Error(error.message, { cause: error }), { code: "ENOENT" });
+@@ -167,6 +166,7 @@
  	if (remotePath.endsWith("/")) {
  		throw new Error("ssh://: destination is a directory path (trailing '/'); ssh:// write requires a file path");
  	}
@@ -38,7 +46,7 @@ diff --git a/packages/coding-agent/src/ssh/file-transfer.ts b/packages/coding-ag
  	const dest = quotePosixArgument(remotePath);
  	const tmp = quotePosixArgument(`${remotePath}.omp-tmp.${crypto.randomUUID()}`);
  	// Stage stdin into the temp first (so the remote never blocks on an unread
-@@ -166,18 +166,13 @@
+@@ -182,18 +182,13 @@
  	const command =
  		`t=${tmp}; trap 'rm -f -- "$t"' 0; ` +
  		`mkdir -p -- "$(dirname "$t")" && ` +

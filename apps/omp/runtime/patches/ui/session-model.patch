@@ -1,7 +1,7 @@
 diff --git a/packages/coding-agent/src/session/model-controls.ts b/packages/coding-agent/src/session/model-controls.ts
 --- a/packages/coding-agent/src/session/model-controls.ts
 +++ b/packages/coding-agent/src/session/model-controls.ts
-@@ -282,7 +282,8 @@
+@@ -355,7 +355,8 @@
  	async setModelTemporary(
  		model: Model,
  		thinkingLevel?: ConfiguredThinkingLevel,
@@ -11,7 +11,7 @@ diff --git a/packages/coding-agent/src/session/model-controls.ts b/packages/codi
  		selection: "explicit" | "automatic" = "explicit",
  	): Promise<void> {
  		const previousEditMode = this.#host.resolveActiveEditMode();
-@@ -299,7 +300,10 @@
+@@ -372,7 +373,10 @@
  			`${targetModel.provider}/${targetModel.id}`,
  			options?.prewalk ? PREWALK_MODEL_CHANGE_ROLE : options?.ephemeral ? EPHEMERAL_MODEL_CHANGE_ROLE : "temporary",
  		);
@@ -26,7 +26,7 @@ diff --git a/packages/coding-agent/src/session/model-controls.ts b/packages/codi
 diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
 --- a/packages/coding-agent/src/session/agent-session.ts
 +++ b/packages/coding-agent/src/session/agent-session.ts
-@@ -11713,7 +11713,7 @@
+@@ -12099,7 +12099,7 @@
  	setModelTemporary(
  		model: Model,
  		thinkingLevel?: ConfiguredThinkingLevel,
@@ -58,7 +58,7 @@ diff --git a/packages/coding-agent/src/modes/controllers/extension-ui-controller
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
  import { cfgExtensionAssistantTextRenderers } from "../../extensibility/settings";
  import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
-@@ -260,12 +261,7 @@
+@@ -251,12 +252,7 @@
  			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
  			getAllTools: () => this.ctx.session.getAllToolInfos(),
  			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
@@ -72,7 +72,7 @@ diff --git a/packages/coding-agent/src/modes/controllers/extension-ui-controller
  			getThinkingLevel: () => this.ctx.session.thinkingLevel,
  			setThinkingLevel: level => this.ctx.session.setThinkingLevel(level),
  			getServiceTiers: () => this.ctx.session.serviceTierByFamily,
-@@ -493,12 +489,7 @@
+@@ -485,12 +481,7 @@
  			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
  			getAllTools: () => this.ctx.session.getAllToolInfos(),
  			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
@@ -120,7 +120,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/compact-handler.
 diff --git a/packages/coding-agent/src/extensibility/extensions/loader.ts b/packages/coding-agent/src/extensibility/extensions/loader.ts
 --- a/packages/coding-agent/src/extensibility/extensions/loader.ts
 +++ b/packages/coding-agent/src/extensibility/extensions/loader.ts
-@@ -374,8 +374,8 @@
+@@ -404,8 +404,8 @@
  		return this.runtime.getCommands();
  	}
  
@@ -134,7 +134,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/loader.ts b/pack
 diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packages/coding-agent/src/extensibility/extensions/types.ts
 --- a/packages/coding-agent/src/extensibility/extensions/types.ts
 +++ b/packages/coding-agent/src/extensibility/extensions/types.ts
-@@ -2079,8 +2079,11 @@
+@@ -2138,8 +2138,11 @@
  	/** Get available slash commands in the current session. */
  	getCommands(): SlashCommandInfo[];
  
@@ -148,7 +148,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packa
  
  	/** Get current thinking level. */
  	getThinkingLevel(): ThinkingLevel | undefined;
-@@ -2311,7 +2314,7 @@
+@@ -2370,7 +2373,7 @@
  
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
  
@@ -169,7 +169,7 @@ diff --git a/packages/coding-agent/src/modes/acp/acp-agent.ts b/packages/coding-
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
  import { parseSkillInvocation } from "../../extensibility/skills";
  import { PYTHON_KERNEL_CANCEL_BUDGET_MS } from "../../eval/py/kernel";
-@@ -3081,14 +3081,7 @@
+@@ -3082,14 +3082,7 @@
  				getAllTools: () => record.session.getAllToolInfos(),
  				setActiveTools: toolNames => record.session.setActiveToolsByName(toolNames),
  				getCommands: () => getSessionSlashCommands(record.session),
