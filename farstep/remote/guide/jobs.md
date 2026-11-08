@@ -28,7 +28,9 @@ or remotely with the saved connection.
 
 After an interrupted start or transport loss, call {{jobStatus}} with the saved
 handle, or recover the original `requestId`. If the job is still running, wait
-on that handle. Observation timeout does not stop it. If the job is unknown,
+on that handle. An observation timeout or canceled tool call does not stop
+already-started work. Use `stop` or `cancel` to stop it explicitly. Its execution
+deadline and session or persist lifetime still apply. If the job is unknown,
 recover its identity before launching replacement work. Connection loss proves
 neither completion nor cancellation.
 

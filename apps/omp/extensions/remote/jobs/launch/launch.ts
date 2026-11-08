@@ -22,6 +22,9 @@ import {
   prepareWorkflowLaunch,
 } from "./workflow";
 
+const CANCELED_OBSERVATION_NOTICE =
+  "Caller canceled the observation. The job was not stopped";
+
 export async function runJob(
   session: JobSession,
   connection: ExecutionTarget,
@@ -75,26 +78,21 @@ async function executeLaunch(
   const finish = session.begin(scope, name);
   let job: JobRecord | undefined;
   let snapshot: JobSnapshot | undefined;
-  let termination: RemoteJobDetails["termination"];
-  let receipt: RemoteJobDetails["receipt"];
   let notice: string | undefined;
   const recoverCancellation = async (): Promise<Result | undefined> => {
     if (job && signal?.aborted && session.isCurrent(scope)) {
       try {
         client = await session.forRecord(scope, job);
         const current = await session.inspect(scope, client, job);
-        const stopped = await session.stop(scope, client, job, current.snapshot);
-        const view = await session.logs(scope, client, job, stopped.snapshot);
+        const view = await session.logs(scope, client, job, current.snapshot);
         return session.result(scope, job, view.snapshot, view.logs, {
-          notice: `Caller canceled the observation. ${stopped.notice}`,
+          notice: CANCELED_OBSERVATION_NOTICE,
           markDelivered: true,
-          termination: stopped.termination,
-          receipt: stopped.receipt,
           raw: input.raw,
           compact: input.compact,
         });
       } catch {
-        // A lost channel cannot establish cancellation or completion
+        // A lost channel cannot establish the execution outcome
       }
     }
     return undefined;
@@ -117,13 +115,8 @@ async function executeLaunch(
     }
     ({ job, snapshot } = await session.inspect(scope, client, intent));
     assertLaunchSize(snapshot, size);
-    if (signal?.aborted) {
-      const stopped = await session.stop(scope, client, job, snapshot);
-      snapshot = stopped.snapshot;
-      termination = stopped.termination;
-      receipt = stopped.receipt;
-      notice = `Caller canceled the observation. ${stopped.notice}`;
-    }
+    // The broker owns execution once started, not this tool's observation
+    if (signal?.aborted) notice = CANCELED_OBSERVATION_NOTICE;
     const { view, screen, readyTimedOut } = await observeLaunch(
       session,
       scope,
@@ -138,8 +131,6 @@ async function executeLaunch(
     return session.result(scope, job, view.snapshot, view.logs, {
       notice,
       markDelivered: true,
-      termination,
-      receipt,
       screen,
       readyTimedOut,
       ...("screenVersion" in view
