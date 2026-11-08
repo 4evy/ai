@@ -1,41 +1,41 @@
 {
-  "@biomejs/cli-android-arm64@2.6.4": {
+  "@biomejs/cli-android-arm64@2.6.6": {
     "os": ["android"],
     "cpu": ["arm64"]
   },
-  "@biomejs/cli-android-x64@2.6.4": {
+  "@biomejs/cli-android-x64@2.6.6": {
     "os": ["android"],
     "cpu": ["x64"]
   },
-  "@biomejs/cli-darwin-arm64@2.6.4": {
+  "@biomejs/cli-darwin-arm64@2.6.6": {
     "os": ["darwin"],
     "cpu": ["arm64"]
   },
-  "@biomejs/cli-darwin-x64@2.6.4": {
+  "@biomejs/cli-darwin-x64@2.6.6": {
     "os": ["darwin"],
     "cpu": ["x64"]
   },
-  "@biomejs/cli-linux-arm64@2.6.4": {
+  "@biomejs/cli-linux-arm64@2.6.6": {
     "os": ["linux"],
     "cpu": ["arm64"]
   },
-  "@biomejs/cli-linux-arm64-musl@2.6.4": {
+  "@biomejs/cli-linux-arm64-musl@2.6.6": {
     "os": ["linux"],
     "cpu": ["arm64"]
   },
-  "@biomejs/cli-linux-x64@2.6.4": {
+  "@biomejs/cli-linux-x64@2.6.6": {
     "os": ["linux"],
     "cpu": ["x64"]
   },
-  "@biomejs/cli-linux-x64-musl@2.6.4": {
+  "@biomejs/cli-linux-x64-musl@2.6.6": {
     "os": ["linux"],
     "cpu": ["x64"]
   },
-  "@biomejs/cli-win32-arm64@2.6.4": {
+  "@biomejs/cli-win32-arm64@2.6.6": {
     "os": ["win32"],
     "cpu": ["arm64"]
   },
-  "@biomejs/cli-win32-x64@2.6.4": {
+  "@biomejs/cli-win32-x64@2.6.6": {
     "os": ["win32"],
     "cpu": ["x64"]
   },
@@ -161,79 +161,79 @@
     "os": ["win32"],
     "cpu": ["x64"]
   },
-  "@oxc-parser/binding-android-arm-eabi@0.155.0": {
+  "@oxc-parser/binding-android-arm-eabi@0.156.0": {
     "os": ["android"],
     "cpu": ["arm"]
   },
-  "@oxc-parser/binding-android-arm64@0.155.0": {
+  "@oxc-parser/binding-android-arm64@0.156.0": {
     "os": ["android"],
     "cpu": ["arm64"]
   },
-  "@oxc-parser/binding-darwin-arm64@0.155.0": {
+  "@oxc-parser/binding-darwin-arm64@0.156.0": {
     "os": ["darwin"],
     "cpu": ["arm64"]
   },
-  "@oxc-parser/binding-darwin-x64@0.155.0": {
+  "@oxc-parser/binding-darwin-x64@0.156.0": {
     "os": ["darwin"],
     "cpu": ["x64"]
   },
-  "@oxc-parser/binding-freebsd-x64@0.155.0": {
+  "@oxc-parser/binding-freebsd-x64@0.156.0": {
     "os": ["freebsd"],
     "cpu": ["x64"]
   },
-  "@oxc-parser/binding-linux-arm-gnueabihf@0.155.0": {
+  "@oxc-parser/binding-linux-arm-gnueabihf@0.156.0": {
     "os": ["linux"],
     "cpu": ["arm"]
   },
-  "@oxc-parser/binding-linux-arm-musleabihf@0.155.0": {
+  "@oxc-parser/binding-linux-arm-musleabihf@0.156.0": {
     "os": ["linux"],
     "cpu": ["arm"]
   },
-  "@oxc-parser/binding-linux-arm64-gnu@0.155.0": {
+  "@oxc-parser/binding-linux-arm64-gnu@0.156.0": {
     "os": ["linux"],
     "cpu": ["arm64"]
   },
-  "@oxc-parser/binding-linux-arm64-musl@0.155.0": {
+  "@oxc-parser/binding-linux-arm64-musl@0.156.0": {
     "os": ["linux"],
     "cpu": ["arm64"]
   },
-  "@oxc-parser/binding-linux-ppc64-gnu@0.155.0": {
+  "@oxc-parser/binding-linux-ppc64-gnu@0.156.0": {
     "os": ["linux"],
     "cpu": ["ppc64"]
   },
-  "@oxc-parser/binding-linux-riscv64-gnu@0.155.0": {
+  "@oxc-parser/binding-linux-riscv64-gnu@0.156.0": {
     "os": ["linux"],
     "cpu": ["none"]
   },
-  "@oxc-parser/binding-linux-riscv64-musl@0.155.0": {
+  "@oxc-parser/binding-linux-riscv64-musl@0.156.0": {
     "os": ["linux"],
     "cpu": ["none"]
   },
-  "@oxc-parser/binding-linux-s390x-gnu@0.155.0": {
+  "@oxc-parser/binding-linux-s390x-gnu@0.156.0": {
     "os": ["linux"],
     "cpu": ["s390x"]
   },
-  "@oxc-parser/binding-linux-x64-gnu@0.155.0": {
+  "@oxc-parser/binding-linux-x64-gnu@0.156.0": {
     "os": ["linux"],
     "cpu": ["x64"]
   },
-  "@oxc-parser/binding-linux-x64-musl@0.155.0": {
+  "@oxc-parser/binding-linux-x64-musl@0.156.0": {
     "os": ["linux"],
     "cpu": ["x64"]
   },
-  "@oxc-parser/binding-openharmony-arm64@0.155.0": {
+  "@oxc-parser/binding-openharmony-arm64@0.156.0": {
     "os": ["none"],
     "cpu": ["arm64"]
   },
-  "@oxc-parser/binding-win32-arm64-msvc@0.155.0": {
+  "@oxc-parser/binding-win32-arm64-msvc@0.156.0": {
     "os": ["win32"],
     "cpu": ["arm64"]
   },
-  "@oxc-parser/binding-win32-ia32-msvc@0.155.0": {
+  "@oxc-parser/binding-win32-ia32-msvc@0.156.0": {
     "os": ["win32"],
     "cpu": ["ia32"]
   },
-  "@oxc-parser/binding-win32-x64-msvc@0.155.0": {
+  "@oxc-parser/binding-win32-x64-msvc@0.156.0": {
     "os": ["win32"],
     "cpu": ["x64"]
   },
@@ -372,31 +372,31 @@
     "os": ["win32"],
     "cpu": ["x64"]
   },
-  "@typescript/typescript-darwin-arm64@7.1.0-dev.20261105.1": {
+  "@typescript/typescript-darwin-arm64@7.1.0-dev.20261108.1": {
     "os": ["darwin"],
     "cpu": ["arm64"]
   },
-  "@typescript/typescript-darwin-x64@7.1.0-dev.20261105.1": {
+  "@typescript/typescript-darwin-x64@7.1.0-dev.20261108.1": {
     "os": ["darwin"],
     "cpu": ["x64"]
   },
-  "@typescript/typescript-linux-arm@7.1.0-dev.20261105.1": {
+  "@typescript/typescript-linux-arm@7.1.0-dev.20261108.1": {
     "os": ["linux"],
     "cpu": ["arm"]
   },
-  "@typescript/typescript-linux-arm64@7.1.0-dev.20261105.1": {
+  "@typescript/typescript-linux-arm64@7.1.0-dev.20261108.1": {
     "os": ["linux"],
     "cpu": ["arm64"]
   },
-  "@typescript/typescript-linux-x64@7.1.0-dev.20261105.1": {
+  "@typescript/typescript-linux-x64@7.1.0-dev.20261108.1": {
     "os": ["linux"],
     "cpu": ["x64"]
   },
-  "@typescript/typescript-win32-arm64@7.1.0-dev.20261105.1": {
+  "@typescript/typescript-win32-arm64@7.1.0-dev.20261108.1": {
     "os": ["win32"],
     "cpu": ["arm64"]
   },
-  "@typescript/typescript-win32-x64@7.1.0-dev.20261105.1": {
+  "@typescript/typescript-win32-x64@7.1.0-dev.20261108.1": {
     "os": ["win32"],
     "cpu": ["x64"]
   },

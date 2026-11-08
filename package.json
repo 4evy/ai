@@ -17,10 +17,10 @@
   "devDependencies": {
     "@actions/core": "3.0.1",
     "@actions/exec": "3.0.0",
-    "@biomejs/biome": "2.6.4",
+    "@biomejs/biome": "2.6.6",
     "@types/bun": "catalog:",
     "farstep": "workspace:*",
-    "knip": "6.44.1",
+    "knip": "6.44.2",
     "omp-agent-runtime": "workspace:*",
     "typescript": "catalog:",
     "vite": "catalog:"
@@ -42,8 +42,8 @@
     ],
     "catalog": {
       "@types/bun": "1.4.4",
-      "typescript": "7.1.0-dev.20261105.1",
-      "vite": "8.3.5"
+      "typescript": "7.1.0-dev.20261108.1",
+      "vite": "8.3.6"
     }
   },
   "scripts": {

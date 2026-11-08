@@ -19,16 +19,16 @@
     "@logtape/file": "2.4.2",
     "@logtape/redaction": "2.4.2",
     "@opentelemetry/api": "1.10.0",
-    "@opentelemetry/sdk-trace": "3.0.0",
-    "@opentelemetry/exporter-trace-otlp-http": "0.300.0",
-    "@opentelemetry/resources": "3.0.0",
+    "@opentelemetry/sdk-trace": "3.1.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.301.0",
+    "@opentelemetry/resources": "3.1.0",
     "atomically": "2.1.1",
     "mdast-util-from-markdown": "2.1.0",
     "fast-json-stable-stringify": "2.1.0",
     "leven": "4.1.0",
     "ipaddr.js": "2.5.0",
     "diff": "9.0.0",
-    "plist": "5.0.0"
+    "plist": "5.1.0"
   },
   "private": true,
   "type": "module"
