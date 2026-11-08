@@ -5,11 +5,11 @@
     "sha256": "2c2cd776db3c1f6a097ba418922378ac3649cadd5e844a6f5f088ae628a7be67"
   },
   "gradle": {
-    "version": "9.8.2",
-    "url": "https://downloads.gradle.org/distributions/gradle-9.8.2-bin.zip",
-    "sha256": "21bd5da2de49b642904077f38c0efdc7778e92b3ed0889392dca61b97e389607"
+    "version": "9.9.0",
+    "url": "https://downloads.gradle.org/distributions/gradle-9.9.0-bin.zip",
+    "sha256": "0b00b0ffe07c4d4789c12d4935a44a7057d55774b7540bd4a3f76f336deb177a"
   },
-  "uvVersion": "0.13.6",
+  "uvVersion": "0.13.7",
   "platforms": {
     "win32-x64": {
       "jdk": {
@@ -18,8 +18,8 @@
         "sha256": "636bdc13dc649ddc7d5921c5c7d23cca6e44fd19d662b45cc9c02135a6c96c42"
       },
       "uv": {
-        "url": "https://github.com/astral-sh/uv/releases/download/0.13.6/uv-x86_64-pc-windows-msvc.zip",
-        "sha256": "a2a8820d5eea32f08ef467ef3b7f66883a9b076d5737a2fc2fbb5f458d1bb50f"
+        "url": "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-x86_64-pc-windows-msvc.zip",
+        "sha256": "0cdc5b38fe5a8168ed6a25814f5ba43c21d313dd3187314fccb37b7cec46e021"
       }
     }
   }
