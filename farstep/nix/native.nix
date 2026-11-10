@@ -26,6 +26,8 @@ let
   cargo = farstep-cargo;
   metadata = lib.trivial.importJSON ../package.json;
   linux = stdenv.hostPlatform.isLinux;
+  # Native bridges only need the compiler, not the REPL's separately built LLDB
+  swiftCompiler = swift.override { enableRepl = false; };
   nativeInputs = lib.attrsets.attrValues (
     lib.attrsets.optionalAttrs linux {
       inherit
@@ -95,9 +97,16 @@ let
       {
         inherit pkg-config makeBinaryWrapper;
       }
-      // lib.attrsets.optionalAttrs stdenv.hostPlatform.isDarwin { inherit clang swift; }
+      // lib.attrsets.optionalAttrs stdenv.hostPlatform.isDarwin {
+        inherit clang;
+        swift = swiftCompiler;
+      }
     );
     buildInputs = nativeInputs;
+    env = lib.attrsets.optionalAttrs stdenv.hostPlatform.isDarwin {
+      # Search both Nixpkgs layouts for Swift's back-deployment archives
+      NIX_LDFLAGS = "-L${swiftCompiler}/lib -L${swiftCompiler}/lib/swift/macosx";
+    };
   };
   # Always resolve the final feature graph, even while compiling a smaller layer
   # Unimplemented workspace crates are Crane dummies, removed before exporting

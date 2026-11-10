@@ -21,6 +21,9 @@ declared Bun version, Just, and the task's native dependencies, then run
 `just install`. Prefer Linux for Linux builds and Nix work, and macOS for Darwin
 work.
 
+For native-only work, use `nix develop .#native`. On Darwin, it inherits the
+[desktop package's toolchain](../farstep/nix/native.nix) and linker settings.
+
 `just install` uses frozen lockfiles without lifecycle scripts. Root workspaces
 share `bun.lock`. Distribution manifests under `tools/runtime/`,
 `farstep/dependencies/`, and `apps/omp/runtime/upstream/` have separate

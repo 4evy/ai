@@ -67,9 +67,6 @@ pkgs.mkShell {
         rumdl
         ;
     }
-    // lib.attrsets.optionalAttrs (!linux) {
-      inherit (pkgs) clang swift;
-    }
     // lib.attrsets.optionalAttrs (linux && !nativeOnly) {
       inherit (pkgs.qt6) qtdeclarative;
       inherit (pkgs.kdePackages) kwin;
@@ -79,6 +76,10 @@ pkgs.mkShell {
   env = {
     RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
     CARGO = lib.meta.getExe cargo;
+  }
+  // lib.attrsets.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
+    # inputsFrom inherits compiler inputs, but not the package's linker flags
+    inherit (farstep.desktop) NIX_LDFLAGS;
   }
   // lib.attrsets.optionalAttrs (!nativeOnly && farstep.skyRuntime != null) {
     FARSTEP_SKY_RUNTIME = toString farstep.skyRuntime;
