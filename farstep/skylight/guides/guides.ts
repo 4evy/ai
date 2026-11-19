@@ -2,7 +2,7 @@ import { readGuide } from "@ai/toolkit/guide/guide";
 import { readText } from "@ai/toolkit/text/text";
 import type { SkyBackend } from "../../protocol/sky/execution";
 import { SKYLIGHT_TOOLS } from "../names";
-import { SKYLIGHT_EXAMPLES } from "./examples";
+import { SKYLIGHT_EXAMPLES, WAYLAND_EXAMPLES } from "./examples";
 import { readLinuxApi } from "./linux/api";
 import type { Guide } from "./topics";
 
@@ -52,7 +52,14 @@ export async function guideText(
     );
   }
   const url = new URL(`./${platform}/${guide}.md`, import.meta.url);
-  if (guide !== "api") return readGuide(url, SKYLIGHT_EXAMPLES, SKYLIGHT_TOOLS);
+  if (guide !== "api")
+    return readGuide(
+      url,
+      platform === "linux"
+        ? { ...SKYLIGHT_EXAMPLES, ...WAYLAND_EXAMPLES }
+        : SKYLIGHT_EXAMPLES,
+      SKYLIGHT_TOOLS,
+    );
   if (platform === "linux") return readLinuxApi();
   if (!referenceText) throw new Error("Sky reference requires the selected target");
   const reference = await referenceText();

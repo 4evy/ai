@@ -5,7 +5,7 @@ image. Pointer input needs an authoritative mapping. Recapture after geometry,
 scale, rotation or output changes:
 
 ``` js
-await sky.click({ x: observedX, y: observedY });
+await sky.click({{waylandClick}});
 var shots = await sky.get_screenshot();
 for (const shot of shots) await nodeRepl.emitImage(shot.bytes);
 ```
@@ -14,10 +14,10 @@ After verifying a text field's focus and Control+A behavior, replace its
 contents and inspect the receipt and app:
 
 ``` js
-var textInput = { text: "replacement text", paste_key: "Control_L+v" };
-await sky.press_key({ key: "Control_L+a" });
+var textInput = {{waylandText}};
+await sky.press_key({{waylandSelectAll}});
 if (textInput.text === "") {
-  await sky.press_key({ key: "BackSpace" });
+  await sky.press_key({{waylandBackspace}});
 } else {
   var receipt = await sky.type_text(textInput);
   await nodeRepl.write(JSON.stringify(receipt, null, 2));
@@ -51,12 +51,7 @@ For scrolling, set the direction, pixel distance and origin from the latest
 image. Replace this hypothetical distance:
 
 ``` js
-var scrollInput = {
-  direction: "down",
-  pixels: 480,
-  x: observedX,
-  y: observedY,
-};
+var scrollInput = {{waylandScroll}};
 await sky.scroll(scrollInput);
 var shots = await sky.get_screenshot();
 for (const shot of shots) await nodeRepl.emitImage(shot.bytes);
