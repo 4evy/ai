@@ -1,7 +1,7 @@
 diff --git a/python/bridge_mcp_ghidra/static_tools.py b/python/bridge_mcp_ghidra/static_tools.py
 --- a/python/bridge_mcp_ghidra/static_tools.py
 +++ b/python/bridge_mcp_ghidra/static_tools.py
-@@ -642,5 +642,6 @@ def _auto_connect(project: str | None = None) -> bool:
+@@ -496,5 +496,6 @@ def _auto_connect(project: str | None = None) -> bool:
      """Return True after connecting and registering tools for a unique instance."""
 -    # Try UDS first
 -    instances = discovery.discover_instances()
