@@ -1,5 +1,6 @@
 import { objectSchema } from "@ai/values/schema/input";
 import * as v from "valibot";
+import { EXECUTION_TOOLS } from "../protocol/sky/execution";
 import { GUIDE_TOPICS } from "./guides/topics";
 
 export function createSkylightParameters() {
@@ -34,7 +35,7 @@ export function createSkylightParameters() {
       v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(80))),
       v.description("Short action or observation title shown in chat"),
     ),
-    timeout_ms: v.optional(v.pipe(v.number(), v.integer(), v.gtValue(0))),
+    timeout_ms: EXECUTION_TOOLS[0].schema.entries.timeout_ms,
     reset: v.pipe(
       v.optional(v.boolean()),
       v.description("Clear Skylight bindings before executing code"),
