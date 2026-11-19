@@ -569,11 +569,13 @@ continuation, add `rpc` to `goal.continuationModes` in a host-specific
 `--config` overlay. Keep `interactive` in the list to retain terminal
 continuation, and avoid enabling it globally for unrelated RPC clients.
 
-Build Farstep on its target platform. On Unix, build `.#farstep` with Nix and
-run the output's `bin/farstep install --package-path /nix/store/...`. Remote
-installs require a trusted store output on the target. Windows packaging
-requires Bun, Rust, .NET, and WiX. Read [packaging](../farstep/packaging/)
-before deployment.
+Build Farstep on its target platform. On nix-darwin, system activation selects
+the Farstep job runner, ahead of any older per-user installation. Update it
+through the system configuration rather than the standalone installer.
+For standalone Unix installs, build `.#farstep` with Nix and run the output's
+`bin/farstep install --package-path /nix/store/...`. Remote installs require
+a trusted store output on the target. Windows packaging requires Bun, Rust,
+.NET, and WiX. Read [packaging](../farstep/packaging/) before deployment.
 
 `ai chatgpt configure` modifies plugins and app policy. Relaunch ChatGPT after
 launcher environment changes. Sky archives and checksums live in

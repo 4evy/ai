@@ -1,10 +1,11 @@
 import { run } from "@ai/runtime/effect/effect";
 import { Effect } from "effect";
 import * as v from "valibot";
+import { systemHelper } from "../../installation";
 import { uuidSchema } from "../../protocol/identity";
 import { scriptRunnerSchema } from "../../protocol/jobs/gateway";
 import { type ScriptTransport, scriptCommandEffect } from "./execution";
-import { currentHelper, helperCommand } from "./helper";
+import { helperCommand, unixHelperSelection } from "./helper";
 
 export const helperStatusSchema = v.pipe(
   v.looseObject({
@@ -57,7 +58,7 @@ export const helperStatusEffect = Effect.fnUntraced(function* (
     };
   const output = yield* scriptCommandEffect(
     transport,
-    `if [ -x ${currentHelper} ]; then ${currentHelper} status; elif [ -x /run/current-system/sw/bin/farstep ]; then /run/current-system/sw/bin/farstep status; elif [ -x /usr/bin/farstep ]; then /usr/bin/farstep status; elif [ -x /usr/local/bin/farstep ]; then /usr/local/bin/farstep status; else printf '%s\\n' '{"installed":false,"jobsReady":false,"status":"not-installed"}'; fi`,
+    `${unixHelperSelection(platform)}\nif [ -x "$helper" ]; then "$helper" status; elif [ -x '${systemHelper}' ]; then '${systemHelper}' status; elif [ -x /usr/bin/farstep ]; then /usr/bin/farstep status; elif [ -x /usr/local/bin/farstep ]; then /usr/local/bin/farstep status; else printf '%s\\n' '{"installed":false,"jobsReady":false,"status":"not-installed"}'; fi`,
   );
   return yield* Effect.try({
     try: () => v.parse(helperStatusSchema, JSON.parse(output)),

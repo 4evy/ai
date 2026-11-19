@@ -80,9 +80,14 @@ async function assertOperation(
   host: HelperHost,
   signal?: AbortSignal,
 ): Promise<void> {
-  const before = args.maintenanceToken
-    ? undefined
-    : await helperStatus(connection, host, signal);
+  const before =
+    args.maintenanceToken && connection.info.os !== "macos"
+      ? undefined
+      : await helperStatus(connection, host, signal);
+  if (before?.manager === "nix-darwin")
+    throw new Error(
+      "Farstep is managed by nix-darwin. Update the system configuration instead",
+    );
   if (!args.maintenanceToken) assertInitialOperation(args, before);
   const owner = MANAGER_OWNERS[plan.manager];
   if (

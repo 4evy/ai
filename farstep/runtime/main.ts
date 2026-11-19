@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { flushObservability, operation } from "@ai/runtime/effect/effect";
 import { errorMessage } from "@ai/values/error/error";
 import { Match } from "effect";
+import { darwinSystemPackage } from "../installation";
 import { type Command, parseCommand } from "./cli/cli";
 import { doctor } from "./cli/doctor";
 import { workList } from "./cli/work";
@@ -16,11 +17,12 @@ import { exists, PROTOCOL_MAJOR, paths, VERSION } from "./state";
 import { disableSystem, enableSystem, systemExec, systemStatus } from "./system/system";
 import { runSystem } from "./system/tools";
 
-async function assertActivated(): Promise<void> {
+async function assertActivated(allowSystem = false): Promise<void> {
   const state = paths().state;
   if (
     (await exists(join(state, "maintenance.lock"))) ||
-    !(await exists(join(state, "installer.json")))
+    (!(allowSystem && (await darwinSystemPackage())) &&
+      !(await exists(join(state, "installer.json"))))
   )
     throw new Error("Helper is not activated or is undergoing maintenance");
 }
@@ -95,7 +97,7 @@ function executeCommand(options: Command, native: Native): Promise<void> {
         await relayDesktop(request.wireCodec === "zstd");
       },
       jobs: async (request) => {
-        await assertActivated();
+        await assertActivated(true);
         await runJobs(request.scope, request.owner);
       },
       status: () => writeResult(management.status()),

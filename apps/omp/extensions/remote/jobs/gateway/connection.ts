@@ -1,5 +1,6 @@
 import { quotePosixArgument } from "@ai/values/shell/shell";
 import { Effect } from "effect";
+import { unixHelperSelection } from "farstep/client/execution/helper";
 import { localHelperEffect } from "farstep/client/execution/local";
 import type { GatewayConnection } from "farstep/client/jobs/gateway";
 import { REMOTE_TOOLS } from "farstep/remote/tools/names";
@@ -26,7 +27,7 @@ export const gatewayTransportEffect = Effect.fnUntraced(function* (
           command: "ssh",
           args: yield* remoteArgvEffect(
             connection,
-            `helper="\${XDG_DATA_HOME:-$HOME/.local/share}/farstep/current/bin/farstep"\n[ -x "$helper" ] || { printf '%s\\n' 'farstep is not installed; use ${REMOTE_TOOLS.helper}' >&2; exit 69; }\nexec "$helper" jobs --scope ${quotePosixArgument(scopeId)} --owner ${quotePosixArgument(owner)}`,
+            `${unixHelperSelection(connection.info.os)}\n[ -x "$helper" ] || { printf '%s\\n' 'farstep is not installed; use ${REMOTE_TOOLS.helper}' >&2; exit 69; }\nexec "$helper" jobs --scope ${quotePosixArgument(scopeId)} --owner ${quotePosixArgument(owner)}`,
             false,
           ),
         };

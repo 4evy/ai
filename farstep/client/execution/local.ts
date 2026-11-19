@@ -6,6 +6,7 @@ import { attempt, run } from "@ai/runtime/effect/effect";
 import { readText } from "@ai/toolkit/text/text";
 import { isFsError } from "@oh-my-pi/pi-utils";
 import { Effect } from "effect";
+import { systemHelper } from "../../installation";
 import { type ExecutionTarget, pathValue } from "./execution";
 
 export interface LocalTarget extends ExecutionTarget {
@@ -80,9 +81,10 @@ export function localTarget(cwd: string): Promise<LocalTarget> {
 export const localHelperEffect = Effect.fnUntraced(function* (target: LocalTarget) {
   const data = process.env.XDG_DATA_HOME || join(target.home, ".local/share");
   const candidates = [
+    ...(target.info.os === "macos" ? [systemHelper] : []),
     join(data, "farstep/current/bin/farstep"),
     Bun.which("farstep", { cwd: target.cwd }),
-    "/run/current-system/sw/bin/farstep",
+    ...(target.info.os === "linux" ? [systemHelper] : []),
     "/usr/bin/farstep",
     "/usr/local/bin/farstep",
   ];

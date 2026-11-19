@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { readText } from "@ai/toolkit/text/text";
 import { COORDINATION_CAPABILITY } from "farstep/protocol/coordination";
 import { type JobOperation, jobOperationSchema } from "farstep/protocol/jobs/protocol";
@@ -23,13 +22,18 @@ import {
   workflowStartSchema,
 } from "#farstep/protocol/workflow/workflow";
 import type { CoordinationRegistry } from "../coordination/registry";
-import { exists, PROTOCOL_MAJOR, paths, VERSION, withMaintenanceLock } from "../state";
+import { PROTOCOL_MAJOR, VERSION, withMaintenanceLock } from "../state";
 import type { JobActions } from "./actions";
 import type { JobBrokerClient } from "./broker/client";
 import type { CompletionChannel } from "./completion";
 import { bindDeadline, deadlineEvidence, prepareDeadline } from "./deadline";
 import { validateEnvironment } from "./environment";
-import { scriptActivation, scriptRunner, verifyScriptRunner } from "./script/runner";
+import {
+  assertActiveJobPackage,
+  scriptActivation,
+  scriptRunner,
+  verifyScriptRunner,
+} from "./script/runner";
 import type { ToolRegistrar } from "./tools";
 import type { WorkflowService } from "./workflow/workflow";
 
@@ -301,8 +305,7 @@ export class JobGateway {
   private async start(request: Extract<JobOperation, { op: "start" }>) {
     const spec = request.spec;
     return withMaintenanceLock(async () => {
-      if (!(await exists(join(paths().state, "installer.json"))))
-        throw new Error("Helper is not activated; managed launches are disabled");
+      await assertActiveJobPackage();
       await this.coordination.beginJob({
         name: spec.name,
         cwd: spec.cwd,

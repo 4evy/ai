@@ -17,6 +17,7 @@ let
       ../vite.config.ts
       ../tsconfig.json
       ../farstep.ts
+      ../installation.ts
       ../client
       ../protocol
       ../transport

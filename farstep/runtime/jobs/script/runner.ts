@@ -6,6 +6,7 @@ import { attempt, run } from "@ai/runtime/effect/effect";
 import { executeBoundedCommand } from "@ai/runtime/effect/process/process";
 import { Effect } from "effect";
 import { SCRIPT_API, type ScriptRunner } from "farstep/protocol/jobs/gateway";
+import { darwinSystemPackage } from "../../../installation";
 import { existsEffect, paths, privateRead } from "../../state";
 import { type LockWait, waitForLockEffect } from "../lock/wait";
 
@@ -115,6 +116,40 @@ export async function verifyScriptRunner(packagePath?: string): Promise<ScriptRu
   }
 }
 
+type JobPackageActivation =
+  | { current: string; manager: "nix-darwin" }
+  | { current: string; manager: "installer"; record: string };
+
+async function jobPackageActivation(): Promise<JobPackageActivation> {
+  const system = await darwinSystemPackage();
+  if (system) return { current: system, manager: "nix-darwin" };
+  const location = paths();
+  const [current, record] = await Promise.all([
+    realpath(join(location.data, "current")),
+    privateRead(join(location.state, "installer.json")),
+  ]);
+  return { current, record, manager: "installer" };
+}
+
+function assertCurrentJobPackage(
+  activation: JobPackageActivation,
+  packagePath: string | null,
+): void {
+  if (
+    activation.current !== packagePath &&
+    (packagePath !== null || activation.manager === "nix-darwin")
+  )
+    throw new Error(
+      "Active Farstep package changed. Disconnect and reconnect the target before launching scripts. No user script was run",
+    );
+}
+
+export async function assertActiveJobPackage(): Promise<void> {
+  const activation = await jobPackageActivation();
+  const packagePath = process.env.FARSTEP_PACKAGE_PATH;
+  assertCurrentJobPackage(activation, packagePath ? await realpath(packagePath) : null);
+}
+
 /** Read-only activation identity, independent of installation/job ownership */
 export async function scriptActivation(
   runner: ScriptRunner,
@@ -131,11 +166,10 @@ export async function scriptActivation(
             continue;
           }
           const inspectedRunner = yield* attempt(scriptRunner);
-          const [current, installation, record] = yield* attempt(() =>
+          const [activation, installation] = yield* attempt(() =>
             Promise.all([
-              realpath(join(paths().data, "current")),
+              jobPackageActivation(),
               privateRead(join(paths().state, "installation.json")),
-              privateRead(join(paths().state, "installer.json")),
             ]),
           );
           if (yield* existsEffect(lock)) {
@@ -148,22 +182,16 @@ export async function scriptActivation(
                 "Script runner changed during activation inspection. Disconnect and reconnect the target before launching scripts. No user script was run",
               ),
             );
-          if (
-            requireCurrent &&
-            runner.packagePath !== null &&
-            current !== runner.packagePath
-          )
-            return yield* Effect.fail(
-              new Error(
-                "Active Farstep package changed. Disconnect and reconnect the target before launching scripts. No user script was run",
-              ),
-            );
+          if (requireCurrent)
+            yield* Effect.try({
+              try: () => assertCurrentJobPackage(activation, runner.packagePath),
+              catch: (error) => error,
+            });
           return createHash("sha256")
             .update(
               JSON.stringify({
-                current,
+                activation,
                 installation,
-                record,
                 runner: inspectedRunner,
               }),
             )

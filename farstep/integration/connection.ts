@@ -6,6 +6,7 @@ import {
   type ExecutionTarget,
   scriptCommandEffect,
 } from "../client/execution/execution";
+import { unixHelperSelection } from "../client/execution/helper";
 import { localHelper, localTarget } from "../client/execution/local";
 import type { GatewayConnection } from "../client/jobs/gateway";
 import type { HelperConfig } from "../transport/connection/bun";
@@ -104,7 +105,7 @@ export async function toolConnection(input: ConnectionInput): Promise<ToolConnec
       backend: "ssh",
       platform: os === "Darwin" ? "macos" : "linux",
       transport: command(
-        `set -eu\ncd ${quote(input.cwd)}\nhelper="\${XDG_DATA_HOME:-$HOME/.local/share}/farstep/current/bin/farstep"\nif [ ! -x "$helper" ]; then helper="$(command -v farstep)"; fi\n[ -x "$helper" ] || { printf '%s\\n' 'Activated Farstep is required' >&2; exit 69; }\nexec "$helper" jobs --scope ${quote(scope)} --owner ${quote(owner)}`,
+        `set -eu\ncd ${quote(input.cwd)}\n${unixHelperSelection(target.info.os)}\nif [ ! -x "$helper" ]; then helper="$(command -v farstep)"; fi\n[ -x "$helper" ] || { printf '%s\\n' 'Activated Farstep is required' >&2; exit 69; }\nexec "$helper" jobs --scope ${quote(scope)} --owner ${quote(owner)}`,
       ),
     }),
   };

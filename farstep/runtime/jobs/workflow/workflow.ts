@@ -13,8 +13,9 @@ import {
   workflowInspectSchema,
   workflowStartSchema,
 } from "#farstep/protocol/workflow/workflow";
-import { exists, paths, privateRead, withMaintenanceLock } from "../../state";
+import { exists, privateRead, withMaintenanceLock } from "../../state";
 import { type JobBrokerClient, JobBrokerUnavailableError } from "../broker/client";
+import { assertActiveJobPackage } from "../script/runner";
 import { assertWorkflowSpec, readWorkflowManifest } from "./manifest";
 import { WorkflowPreparation } from "./preparation";
 import { presentResult } from "./presentation";
@@ -135,10 +136,7 @@ export class WorkflowService {
           return withMaintenanceLock(
             async () => {
               prestart.throwIfAborted();
-              if (!(await exists(join(paths().state, "installer.json"))))
-                throw new Error(
-                  "Helper is not activated; workflow launches are disabled",
-                );
+              await assertActiveJobPackage();
               await beforeStart(manifest.prepared.spec);
               prestart.throwIfAborted();
               // Fence publication can fail after becoming visible or durable
