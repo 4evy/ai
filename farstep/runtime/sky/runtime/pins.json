@@ -1,38 +1,38 @@
 {
-  "version": "26.1103.32239",
-  "skyVersion": "0.7.17",
+  "version": "26.1111.71704",
+  "skyVersion": "0.7.21",
   "artifacts": [
     {
       "platform": "darwin",
       "arch": "arm64",
-      "url": "https://persistent.oaistatic.com/codex-app-prod/ChatGPT-darwin-arm64-26.1103.41825.zip",
-      "sha256": "0b30ce5cac787893bf574b549b1d32cf363f21302935538acd369c668df2fd1f",
+      "url": "https://persistent.oaistatic.com/codex-app-prod/ChatGPT-darwin-arm64-26.1111.71704.zip",
+      "sha256": "0c790d8ab58425539fe1d844066acb8b80415aa19a5c46d89409815112e8134d",
       "resources": "ChatGPT.app/Contents/Resources",
-      "skyVersion": "0.7.17"
+      "skyVersion": "0.7.21"
     },
     {
       "platform": "linux",
       "arch": "x64",
-      "url": "https://persistent.oaistatic.com/codex-app-prod/linux/rpm/x86_64/chatgpt-26.1103.32239-1.x86_64.rpm",
-      "sha256": "a5d7ef11eeaee5a12e9de3c3504204b3a780602b143b14247ac719692b940fbf",
+      "url": "https://persistent.oaistatic.com/codex-app-prod/linux/rpm/x86_64/chatgpt-26.1111.71704-1.x86_64.rpm",
+      "sha256": "efc911c846aa1d9c2d9cbc2cb6940d325f078faa49a720b13d3edb9a37f00035",
       "resources": "usr/lib/chatgpt/resources",
-      "skyVersion": "0.7.17"
+      "skyVersion": "0.7.21"
     },
     {
       "platform": "win32",
       "arch": "x64",
       "url": "https://persistent.oaistatic.com/codex-app-prod/ChatGPT-x64.msix",
-      "sha256": "9a5fdf536327ce471f9594b0ac6e369244ec3ebfd5e09ec5a66524575dbaa60c",
+      "sha256": "5a00348bc3a6c7f17cb3b457a51c3934a4dc1c2843e3d735b9355d3add9c7f43",
       "resources": "app/resources",
-      "skyVersion": "0.7.17"
+      "skyVersion": "0.7.21"
     },
     {
       "platform": "win32",
       "arch": "arm64",
       "url": "https://persistent.oaistatic.com/codex-app-prod/ChatGPT-arm64.msix",
-      "sha256": "2abe7abc7456c0e9ba28ddf7e3cd4bc906ab21d86913e5a23588a71577eb47f0",
+      "sha256": "9b75cb08b7f104126b811e049ceaac8c64102b16cc225e98e2cb7038be0a0ae5",
       "resources": "app/resources",
-      "skyVersion": "0.7.17"
+      "skyVersion": "0.7.21"
     }
   ]
 }

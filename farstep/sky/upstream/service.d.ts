@@ -17,6 +17,7 @@ export type WireMedia = {
 };
 export type SkyServiceRequest = {
     type: "setup";
+    window_protocol_version?: 1;
 } | {
     type: "create";
     options?: ClientOptions;
@@ -25,6 +26,7 @@ export type SkyServiceRequest = {
     method: string;
     args: Array<unknown>;
     client_id?: string;
+    window_protocol_version?: 1;
 } | {
     type: "drag_start";
     handle_id: string;
