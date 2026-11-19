@@ -7,6 +7,8 @@
   pkg-config,
   clang,
   swift,
+  swiftpm,
+  apple-sdk,
   glib,
   dbus,
   libsysprof-capture,
@@ -26,7 +28,7 @@ let
   cargo = farstep-cargo;
   metadata = lib.trivial.importJSON ../package.json;
   linux = stdenv.hostPlatform.isLinux;
-  # Native bridges only need the compiler, not the REPL's separately built LLDB
+  # Bridge builds need SwiftPM, but not the REPL's separately built LLDB
   swiftCompiler = swift.override { enableRepl = false; };
   nativeInputs = lib.attrsets.attrValues (
     lib.attrsets.optionalAttrs linux {
@@ -98,14 +100,18 @@ let
         inherit pkg-config makeBinaryWrapper;
       }
       // lib.attrsets.optionalAttrs stdenv.hostPlatform.isDarwin {
-        inherit clang;
+        inherit clang swiftpm;
         swift = swiftCompiler;
       }
     );
     buildInputs = nativeInputs;
     env = lib.attrsets.optionalAttrs stdenv.hostPlatform.isDarwin {
-      # Search both Nixpkgs layouts for Swift's back-deployment archives
-      NIX_LDFLAGS = "-L${swiftCompiler}/lib -L${swiftCompiler}/lib/swift/macosx";
+      # Rust links both Swift back-deployment archives and SDK overlays
+      NIX_LDFLAGS = lib.concatStringsSep " " [
+        "-L${swiftCompiler}/lib"
+        "-L${swiftCompiler}/lib/swift/macosx"
+        "-L${apple-sdk.sdkroot}/usr/lib/swift"
+      ];
     };
   };
   # Always resolve the final feature graph, even while compiling a smaller layer

@@ -23,6 +23,7 @@ work.
 
 For native-only work, use `nix develop .#native`. On Darwin, it inherits the
 [desktop package's toolchain](../farstep/nix/native.nix) and linker settings.
+This includes SwiftPM and SDK Swift overlays required by the Rust bridge crates.
 
 `just install` uses frozen lockfiles without lifecycle scripts. Root workspaces
 share `bun.lock`. Distribution manifests under `tools/runtime/`,
