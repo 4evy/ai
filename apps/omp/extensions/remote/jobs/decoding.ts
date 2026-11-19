@@ -42,6 +42,24 @@ function incompleteUtf8Tail(bytes: Uint8Array): number {
   return pendingLength;
 }
 
+function replayPrefix(read: OutputRead): OutputRead {
+  // Invalid UTF-8 can expand one input byte into three replacement bytes
+  const maximum = Math.floor(JOB_OUTPUT_MAX_BYTES / 3);
+  let end = Math.min(read.bytes.length, maximum);
+  let lines = 0;
+  for (let index = 0; index < end; index++) {
+    if (read.bytes[index] === 10 && ++lines === read.lines) {
+      end = index + 1;
+      break;
+    }
+  }
+  return {
+    ...read,
+    bytes: read.bytes.subarray(0, end),
+    cursor: read.startCursor + end,
+  };
+}
+
 export function decodeOutput(
   delivery: DeliveryRecord,
   read: OutputRead | undefined,
@@ -49,18 +67,23 @@ export function decodeOutput(
   logs: Logs,
 ): { logs: Logs; pending: string | undefined; redrawing: boolean } {
   if (!read) return snapshotOutput(delivery, logs);
+  if (read.replay) read = replayPrefix(read);
   const cursor = read.replay ? read.requestedCursor : (delivery.outputCursor ?? 0);
   const gap = outputGap(read, cursor);
   const { text, pending } = decodeBytes(delivery, read, snapshot, cursor);
-  const rawTail = truncateTail(text, {
-    maxLines: read.lines,
-    maxBytes: JOB_OUTPUT_MAX_BYTES,
-  }).content;
+  const rawTail = read.replay
+    ? text
+    : truncateTail(text, {
+        maxLines: read.lines,
+        maxBytes: JOB_OUTPUT_MAX_BYTES,
+      }).content;
   const plain = sanitizeText(text);
-  const plainTail = truncateTail(plain, {
-    maxLines: read.lines,
-    maxBytes: JOB_OUTPUT_MAX_BYTES,
-  }).content;
+  const plainTail = read.replay
+    ? plain
+    : truncateTail(plain, {
+        maxLines: read.lines,
+        maxBytes: JOB_OUTPUT_MAX_BYTES,
+      }).content;
   const truncation =
     rawTail !== text || plainTail !== plain
       ? "[Earlier unread output omitted by the response limit]\n"
@@ -69,6 +92,11 @@ export function decodeOutput(
   return {
     logs: {
       ...logs,
+      ...(read.replay
+        ? {
+            cursor: read.cursor - (pending ? Buffer.byteLength(pending, "base64") : 0),
+          }
+        : {}),
       text: gap + truncation + plainTail,
       rawText,
       ...(gap || truncation ? { outputGap: gap + truncation } : {}),
@@ -83,7 +111,7 @@ export function decodeOutput(
           read.startCursor > Math.max(cursor, read.availableStart),
       },
     },
-    pending,
+    pending: read.replay ? undefined : pending,
     redrawing: Boolean(delivery.terminalRedraw || hasTerminalRedraw(text)),
   };
 }
@@ -120,7 +148,8 @@ function decodeBytes(
 ) {
   const offset = Math.max(0, cursor - read.startCursor);
   let bytes = read.bytes.subarray(offset);
-  const continuing = cursor === delivery.outputCursor && cursor >= read.startCursor;
+  const continuing =
+    !read.replay && cursor === delivery.outputCursor && cursor >= read.startCursor;
   if (continuing && delivery.decoderPending && read.cursor >= cursor)
     bytes = Buffer.concat([Buffer.from(delivery.decoderPending, "base64"), bytes]);
   const streaming = !terminal(snapshot.state) || read.cursor < read.availableEnd;

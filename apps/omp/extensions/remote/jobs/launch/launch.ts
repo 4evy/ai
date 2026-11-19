@@ -5,6 +5,7 @@ import type {
 import { toError } from "@oh-my-pi/pi-utils/type-guards";
 import { terminalSize } from "farstep/client/terminal/terminal";
 import type { JobSnapshot } from "farstep/protocol/jobs/protocol";
+import { WorkflowStartError } from "farstep/protocol/workflow/workflow";
 import { REMOTE_TOOLS } from "farstep/remote/tools/names";
 import type { ExecutionTarget } from "../../connections/types";
 import type { JobSession } from "../session";
@@ -79,6 +80,7 @@ async function executeLaunch(
   let job: JobRecord | undefined;
   let snapshot: JobSnapshot | undefined;
   let notice: string | undefined;
+  let startFailure: unknown;
   const recoverCancellation = async (): Promise<Result | undefined> => {
     if (job && signal?.aborted && session.isCurrent(scope)) {
       try {
@@ -107,6 +109,12 @@ async function executeLaunch(
       );
       snapshot = started.snapshot;
     } catch (error) {
+      startFailure = error;
+      if (
+        error instanceof WorkflowStartError &&
+        error.outcome === "definitely-not-started"
+      )
+        throw error;
       // Inspection is safe even when the start request failed after spawning
       notice = `The native start did not return a successful response: ${
         toError(error).message
@@ -142,6 +150,9 @@ async function executeLaunch(
   } catch (error) {
     const recovered = await recoverCancellation();
     if (recovered) return recovered;
+    const definitelyNotStarted =
+      startFailure instanceof WorkflowStartError &&
+      startFailure.outcome === "definitely-not-started";
     return {
       content: [
         {
@@ -156,16 +167,23 @@ async function executeLaunch(
               scopeId: scope.scopeId,
               nativeId: job?.nativeId ?? intent.nativeId,
               requestId: intent.requestId,
-              lifecycle: "unknown",
+              lifecycle: definitelyNotStarted ? "not-started" : "unknown",
             },
             output: { state: "unavailable" },
-            error: toError(error).message,
+            outcome: definitelyNotStarted ? "definitely-not-started" : "unknown",
+            error: toError(startFailure ?? error).message,
+            ...(startFailure && startFailure !== error
+              ? { inspectionError: toError(error).message }
+              : {}),
             notice,
             recovery: {
               replayed: false,
-              next: { tool: REMOTE_TOOLS.job, action: "status", job: name },
-              reason:
-                "Execution outcome is unknown. Inspect this exact handle before starting new work",
+              ...(!definitelyNotStarted
+                ? { next: { tool: REMOTE_TOOLS.job, action: "status", job: name } }
+                : {}),
+              reason: definitelyNotStarted
+                ? "This request did not cross its start fence. Existing reservations were preserved"
+                : "Execution outcome is unknown. Inspect this exact handle before starting new work",
             },
           }),
         },
@@ -178,7 +196,7 @@ async function executeLaunch(
         nativeId: job?.nativeId ?? intent.nativeId,
         installationId: client.installationId,
         scopeId: scope.scopeId,
-        remoteState: "unknown",
+        ...(!definitelyNotStarted ? { remoteState: "unknown" as const } : {}),
       },
       isError: true,
     };

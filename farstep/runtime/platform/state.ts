@@ -5,6 +5,10 @@ import * as windows from "./windows/state/state";
 export const paths = process.platform === "win32" ? windows.paths : posix.paths;
 export const privateDirectory =
   process.platform === "win32" ? windows.privateDirectory : posix.privateDirectory;
+export const checkPrivateDirectory =
+  process.platform === "win32"
+    ? windows.checkPrivateDirectory
+    : posix.checkPrivateDirectory;
 export const privateRead =
   process.platform === "win32" ? windows.privateRead : posix.privateRead;
 export const atomicWrite =

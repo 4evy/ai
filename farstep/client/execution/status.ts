@@ -2,16 +2,38 @@ import { run } from "@ai/runtime/effect/effect";
 import { Effect } from "effect";
 import * as v from "valibot";
 import { uuidSchema } from "../../protocol/identity";
+import { scriptRunnerSchema } from "../../protocol/jobs/gateway";
 import { type ScriptTransport, scriptCommandEffect } from "./execution";
 import { currentHelper, helperCommand } from "./helper";
 
-export const helperStatusSchema = v.looseObject({
-  installed: v.boolean(),
-  installationId: v.optional(uuidSchema),
-  version: v.optional(v.string()),
-  jobsReady: v.optional(v.boolean()),
-});
-export type HelperStatus = v.InferOutput<typeof helperStatusSchema>;
+export const helperStatusSchema = v.pipe(
+  v.looseObject({
+    installed: v.boolean(),
+    installationId: v.optional(uuidSchema),
+    version: v.optional(v.string()),
+    manager: v.optional(v.string()),
+    jobsReady: v.optional(v.boolean()),
+    scriptRunner: v.optional(v.unknown()),
+  }),
+  v.transform((status) => {
+    const runner = v.safeParse(scriptRunnerSchema, status.scriptRunner);
+    return {
+      ...status,
+      scriptRunner: runner.success ? runner.output : undefined,
+      scriptApiCompatible: runner.success,
+      jobsReady: status.jobsReady === true && runner.success,
+      ...(status.jobsReady === true && !runner.success
+        ? {
+            reason:
+              "Helper has not verified the cmd/Env/Effect script API. Upgrade and activate Farstep on the target, then disconnect and reconnect the target",
+          }
+        : {}),
+    };
+  }),
+);
+export type HelperStatus = Partial<v.InferOutput<typeof helperStatusSchema>> & {
+  installed: boolean;
+};
 
 export const helperStatusEffect = Effect.fnUntraced(function* (
   platform: string,

@@ -1,9 +1,11 @@
 import { sanitizeText } from "@oh-my-pi/pi-utils";
 import type { WorkflowResult } from "farstep/protocol/workflow/workflow";
+import { REMOTE_TOOLS } from "farstep/remote/tools/names";
+import type { JobRecord } from "../types";
 
 const MAX_INLINE_REASON_BYTES = 120;
 const MAX_WORKFLOW_TEXT_BYTES = 64 * 1024;
-const PREVIEW_NOTICE_RESERVE_BYTES = 256;
+const PREVIEW_NOTICE_RESERVE_BYTES = 512;
 
 function inlineReason(
   reason: string | undefined,
@@ -20,12 +22,19 @@ function inlineReason(
   };
 }
 
-export function workflowText(workflow: WorkflowResult): string {
+export function workflowText(
+  workflow: WorkflowResult,
+  job: Pick<JobRecord, "name" | "connectionId">,
+): string {
   const steps = workflow.steps.map((step) => {
     const reason = inlineReason(step.reason);
     const readinessReason = inlineReason(step.readiness?.reason);
     return {
       id: step.id,
+      recovery: {
+        tool: REMOTE_TOOLS.job,
+        arguments: { action: "status", job: job.name, step: step.id },
+      },
       dependsOn: step.dependsOn.length ? step.dependsOn : undefined,
       state: step.state,
       exitCode: step.exitCode,
@@ -42,11 +51,48 @@ export function workflowText(workflow: WorkflowResult): string {
           }
         : undefined,
       output: step.output
-        ? { format: step.output.format, state: step.output.state }
+        ? {
+            format: step.output.format,
+            state: step.output.state,
+            previewState: step.output.previewState,
+            persistenceState: step.output.persistenceState,
+            parsingState: step.output.parsingState,
+          }
         : undefined,
     };
   });
-  const metadata = { ...workflow, steps };
+  const metadata = {
+    ...workflow,
+    persistenceState:
+      workflow.observation?.source === "journal" ? "durable" : "unknown",
+    steps,
+  };
+  const recovery = (step: (typeof workflow.steps)[number]) => ({
+    inspect: {
+      tool: REMOTE_TOOLS.job,
+      arguments: { action: "status", job: job.name, step: step.id },
+    },
+    artifacts: (["stdout", "stderr"] as const).flatMap((stream) => {
+      const artifact = step.output?.[stream];
+      return artifact
+        ? [
+            {
+              stream,
+              completeness: artifact.truncated
+                ? "truncated"
+                : step.output?.persistenceState === "complete"
+                  ? "complete"
+                  : "unknown",
+              retainedBytes: artifact.retainedBytes,
+              read: {
+                tool: REMOTE_TOOLS.read,
+                arguments: { connection: job.connectionId, path: artifact.path },
+              },
+            },
+          ]
+        : [];
+    }),
+  });
   let header = JSON.stringify({ workflow: metadata });
   if (Buffer.byteLength(header) > MAX_WORKFLOW_TEXT_BYTES / 2)
     header = JSON.stringify({
@@ -55,10 +101,9 @@ export function workflowText(workflow: WorkflowResult): string {
         stepDetailsOmitted: true,
         steps: steps.map((step) => ({
           id: step.id,
+          recovery: step.recovery,
           state: step.state,
           exitCode: step.exitCode,
-          readiness: step.readiness?.state,
-          output: step.output,
         })),
       },
     });
@@ -73,7 +118,9 @@ export function workflowText(workflow: WorkflowResult): string {
       step.output.value !== undefined || step.output.records !== undefined
         ? { ...step.output, stdoutText: undefined }
         : step.output;
-    let text = JSON.stringify({ step: step.id, output });
+    const recover = recovery(step);
+    let text = JSON.stringify({ step: step.id, output, recovery: recover });
+    let omitted = false;
     if (Buffer.byteLength(text) + 1 > remaining) {
       text = JSON.stringify({
         step: step.id,
@@ -85,15 +132,19 @@ export function workflowText(workflow: WorkflowResult): string {
           records: undefined,
           error: inlineReason(output.error)?.text,
           inlineOmitted: true,
+          previewState: "omitted",
         },
+        recovery: recover,
       });
-      omittedOutputs++;
+      omitted = true;
     }
     const bytes = Buffer.byteLength(text) + 1;
     if (bytes > remaining) {
+      omittedOutputs++;
       continue;
     }
     lines.push(text);
+    if (omitted) omittedOutputs++;
     remaining -= bytes;
   }
   if (omittedOutputs)
@@ -103,6 +154,10 @@ export function workflowText(workflow: WorkflowResult): string {
           inlineOmitted: true,
           omittedOutputs,
           maxBytes: MAX_WORKFLOW_TEXT_BYTES,
+          recovery: {
+            tool: REMOTE_TOOLS.job,
+            arguments: { action: "status", job: job.name },
+          },
         },
       }),
     );

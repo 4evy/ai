@@ -19,6 +19,7 @@ import type {
 } from "../../protocol/jobs/gateway";
 import {
   actionReceiptSchema,
+  generationSchema,
   JOB_COMPLETION_METHOD,
   observeResultSchema,
   terminationResultSchema,
@@ -32,8 +33,10 @@ import type {
 import { parseJobRpcResult, parseJobWireMessage } from "../../protocol/jobs/protocol";
 import type { WorkflowPrepare } from "../../protocol/workflow/workflow";
 import {
+  WorkflowStartError,
   workflowPreparedSchema,
   workflowResultSchema,
+  workflowStartFailureSchema,
 } from "../../protocol/workflow/workflow";
 import type { HelperConfig, HelperConnection } from "../../transport/connection/bun";
 import { connectHelperEffect } from "../../transport/connection/bun";
@@ -69,7 +72,9 @@ export class Gateway {
   readonly owner: string;
   readonly installationId: string;
   readonly env: Record<string, string>;
-  readonly scriptRunner: ScriptRunner;
+  readonly application: string;
+  readonly #scriptRunner: ScriptRunner | undefined;
+  readonly #activation: string | undefined;
   readonly #helper: HelperConnection;
   #closed = false;
   readonly #lifetime: Lifetime;
@@ -83,7 +88,9 @@ export class Gateway {
     scopeId: string,
     owner: string,
     env: Record<string, string>,
-    scriptRunner: ScriptRunner,
+    application: string,
+    scriptRunner: ScriptRunner | undefined,
+    activation: string | undefined,
     lifetime: Lifetime,
   ) {
     this.#helper = helper;
@@ -92,7 +99,9 @@ export class Gateway {
     this.owner = owner;
     this.installationId = helper.identity.installationId;
     this.env = env;
-    this.scriptRunner = scriptRunner;
+    this.application = application;
+    this.#scriptRunner = scriptRunner;
+    this.#activation = activation;
     this.#lifetime = lifetime;
     this.#presence = new GatewayPresence(
       owner,
@@ -107,6 +116,27 @@ export class Gateway {
     );
   }
 
+  get canLaunch(): boolean {
+    return this.#scriptRunner !== undefined;
+  }
+
+  get scriptRunner(): ScriptRunner {
+    if (!this.#scriptRunner)
+      throw new Error(
+        "This gateway is observation-only. Upgrade and activate Farstep on the target, then disconnect and reconnect before launching scripts. No user script was run",
+      );
+    return this.#scriptRunner;
+  }
+
+  async isCurrent(): Promise<boolean> {
+    if (!this.#activation || this.#closed) return false;
+    const response = await this.#call("job.activation", {});
+    return (
+      v.parse(v.strictObject({ activation: generationSchema }), response).activation ===
+      this.#activation
+    );
+  }
+
   static readonly connectEffect = Effect.fnUntraced(function* (
     connection: GatewayConnection,
     scopeId: string,
@@ -115,6 +145,7 @@ export class Gateway {
       | ((client: Gateway, notification: JobCompletionNotification) => Promise<boolean>)
       | undefined,
     onClose: (client: Gateway | undefined) => void,
+    launch = true,
   ) {
     const transport = connection.transport;
     let gateway: Gateway | undefined;
@@ -190,10 +221,8 @@ export class Gateway {
             },
           }),
         );
-        const { env, scriptRunner } = yield* gatewayEnvironmentEffect(
-          helper,
-          connection,
-        );
+        const { env, application, scriptRunner, activation } =
+          yield* gatewayEnvironmentEffect(helper, connection, launch);
         if (transportClosed)
           return yield* Effect.fail(new Error("Job gateway closed during negotiation"));
         gateway = new Gateway(
@@ -202,7 +231,9 @@ export class Gateway {
           scopeId,
           owner,
           env,
+          application,
           scriptRunner,
+          activation,
           lifetime,
         );
         gateway.#onRegistered = () => {
@@ -221,9 +252,10 @@ export class Gateway {
       | ((client: Gateway, notification: JobCompletionNotification) => Promise<boolean>)
       | undefined,
     onClose: (client: Gateway | undefined) => void,
+    launch = true,
   ): Promise<Gateway> {
     return run(
-      Gateway.connectEffect(connection, scopeId, owner, onCompletion, onClose),
+      Gateway.connectEffect(connection, scopeId, owner, onCompletion, onClose, launch),
     );
   }
 
@@ -231,6 +263,7 @@ export class Gateway {
     operation: Operation,
     signal?: AbortSignal,
   ): Promise<JobRpcResult<Operation["op"]>> {
+    if (operation.op === "start") void this.scriptRunner;
     const response = await this.#call(
       "job.request",
       { operation },
@@ -285,6 +318,7 @@ export class Gateway {
   }
 
   async prepareWorkflow(input: WorkflowPrepare, signal?: AbortSignal) {
+    void this.scriptRunner;
     return v.parse(
       workflowPreparedSchema,
       await this.#call("job.workflow_prepare", input, signal),
@@ -297,11 +331,39 @@ export class Gateway {
     spec: Extract<JobOperation, { op: "start" }>["spec"],
     signal?: AbortSignal,
   ) {
-    const result = parseJobRpcResult(
-      { op: "start", spec, owner: this.owner },
-      await this.#call("job.workflow_start", { name, fingerprint }, signal),
-    );
-    return result;
+    if (signal?.aborted)
+      throw new WorkflowStartError(
+        "definitely-not-started",
+        signal.reason instanceof Error ? signal.reason.message : String(signal.reason),
+        { cause: signal.reason },
+      );
+    try {
+      void this.scriptRunner;
+    } catch (error) {
+      throw new WorkflowStartError(
+        "definitely-not-started",
+        error instanceof Error ? error.message : String(error),
+        { cause: error },
+      );
+    }
+    try {
+      const response = await this.#call(
+        "job.workflow_start",
+        { name, fingerprint },
+        signal,
+      );
+      const failure = v.safeParse(workflowStartFailureSchema, response);
+      if (failure.success)
+        throw new WorkflowStartError(failure.output.outcome, failure.output.error);
+      return parseJobRpcResult({ op: "start", spec, owner: this.owner }, response);
+    } catch (error) {
+      if (error instanceof WorkflowStartError) throw error;
+      throw new WorkflowStartError(
+        "unknown",
+        error instanceof Error ? error.message : String(error),
+        { cause: error },
+      );
+    }
   }
 
   async workflow(name: string, signal?: AbortSignal, step?: string) {

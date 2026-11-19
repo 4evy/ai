@@ -22,17 +22,39 @@ export const workflowManifestSchema = v.strictObject({
   prepared: workflowPreparedSchema,
 });
 export type WorkflowManifest = v.InferOutput<typeof workflowManifestSchema>;
-export const workflowJournalSchema = v.strictObject({
-  phase: v.picklist(["prepared", "active", "complete", "unknown"]),
-  workerPid: v.optional(v.pipe(v.number(), v.safeInteger(), v.minValue(1))),
-  result: workflowResultSchema,
-});
+export const workflowJournalSchema = v.pipe(
+  v.strictObject({
+    phase: v.picklist(["prepared", "active", "complete", "unknown"]),
+    workerPid: v.optional(v.pipe(v.number(), v.safeInteger(), v.minValue(1))),
+    result: workflowResultSchema,
+  }),
+  v.check(({ phase, result }) => {
+    switch (phase) {
+      case "prepared":
+        return result.state === "prepared";
+      case "active":
+        return result.state === "running";
+      case "unknown":
+        return result.state === "unknown";
+      case "complete":
+        return (
+          result.state !== "prepared" &&
+          result.state !== "running" &&
+          result.state !== "unknown"
+        );
+    }
+  }, "Workflow journal phase and result state disagree"),
+);
 export type WorkflowJournal = v.InferOutput<typeof workflowJournalSchema>;
 
-export function markWorkflowUnknown(journal: WorkflowJournal, reason: string): void {
+export function markWorkflowUnknown(
+  journal: WorkflowJournal,
+  reason: string,
+  finishedAt: number | null = Date.now(),
+): void {
   journal.phase = "unknown";
   journal.result.state = "unknown";
-  journal.result.finishedAt = Date.now();
+  journal.result.finishedAt = finishedAt ?? undefined;
   for (const step of journal.result.steps) {
     const interrupted = STEP_POLICY[step.state].interrupted;
     if (!interrupted) continue;
@@ -49,6 +71,11 @@ export const workflowCancellationSchema = v.strictObject({
 export const reservationSchema = v.strictObject({
   attemptedAt: v.pipe(v.number(), v.finite(), v.minValue(0)),
   nativeId: v.optional(v.string()),
+});
+export const executionSchema = v.strictObject({
+  workerPid: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+  startedAt: v.pipe(v.number(), v.finite(), v.minValue(0)),
+  fingerprint: v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/u)),
 });
 export const requestIndexSchema = v.strictObject({
   name: v.string(),
@@ -86,12 +113,22 @@ export async function readJournal(
   path: string,
   manifest: WorkflowManifest,
 ): Promise<WorkflowJournal> {
-  let journal: WorkflowJournal;
+  return (
+    (await readWorkflowRecord(path, workflowJournalSchema)) ?? {
+      phase: "prepared",
+      result: initialWorkflowResult(manifest),
+    }
+  );
+}
+
+export async function readWorkflowRecord<S extends v.GenericSchema>(
+  path: string,
+  schema: S,
+): Promise<v.InferOutput<S> | undefined> {
   try {
-    journal = v.parse(workflowJournalSchema, JSON.parse(await privateRead(path)));
+    return v.parse(schema, JSON.parse(await privateRead(path)));
   } catch (error) {
     if (!isEnoent(error)) throw error;
-    journal = { phase: "prepared", result: initialWorkflowResult(manifest) };
+    return undefined;
   }
-  return journal;
 }

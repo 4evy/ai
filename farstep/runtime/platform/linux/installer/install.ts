@@ -1,6 +1,7 @@
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 import { verifyBrokerRuntime } from "#farstep/runtime/jobs/jobs";
+import { verifyScriptRunner } from "#farstep/runtime/jobs/script/runner";
 import { loadIdentity, privateDirectory } from "#farstep/runtime/state";
 import { enableSystem } from "#farstep/runtime/system/system";
 import {
@@ -72,6 +73,7 @@ async function prepareInstallation(
   installationId: string,
 ) {
   const manifest = await artifact(packagePath);
+  await verifyScriptRunner(packagePath);
   const old = await installed();
   if (action === "upgrade" && !old)
     throw new Error("Helper is not installed; use install");

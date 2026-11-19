@@ -19,14 +19,13 @@ export interface ToolConnection {
   input: ConnectionInput;
   target: ExecutionTarget;
   command(script: string): HelperConfig;
-  gateway(scope: string, owner: string): GatewayConnection;
+  gateway(scope: string, owner: string): Promise<GatewayConnection>;
   sshArgs: string[] | undefined;
 }
 
 export async function toolConnection(input: ConnectionInput): Promise<ToolConnection> {
   if (input.target === "local") {
     const target = await localTarget(input.cwd);
-    const helper = await localHelper(target);
     return {
       input,
       target,
@@ -36,11 +35,11 @@ export async function toolConnection(input: ConnectionInput): Promise<ToolConnec
         args: ["-c", script],
         cwd: target.cwd,
       }),
-      gateway: (scope, owner) => ({
+      gateway: async (scope, owner) => ({
         backend: "local",
         platform: target.info.os,
         transport: {
-          command: helper,
+          command: await localHelper(target),
           args: ["jobs", "--scope", scope, "--owner", owner],
           cwd: target.cwd,
         },
@@ -101,7 +100,7 @@ export async function toolConnection(input: ConnectionInput): Promise<ToolConnec
     target,
     command,
     sshArgs,
-    gateway: (scope, owner) => ({
+    gateway: async (scope, owner) => ({
       backend: "ssh",
       platform: os === "Darwin" ? "macos" : "linux",
       transport: command(

@@ -186,10 +186,21 @@ export class JobRoutes<Scope extends JobScope, Connection> {
     scope: Scope,
     connection: Connection,
     expectedInstallation?: string,
+    launch = expectedInstallation === undefined,
   ): Promise<Gateway> {
     this.options.assertCurrent(scope);
     const connectionKey = this.#key(scope, connection);
-    const route = JSON.stringify([connectionKey, expectedInstallation]);
+    const route = JSON.stringify([connectionKey, expectedInstallation, launch]);
+    const cached = this.#routes.get(route)?.client;
+    if (cached && launch) {
+      const current = await cached.isCurrent();
+      this.options.assertCurrent(scope);
+      if (!current) {
+        // Retire transport caches, not immutable job routes or reservations
+        this.#forget(cached);
+        await cached.close().catch((error) => this.options.closeFailure(error));
+      }
+    }
     const pending = this.#routes.getOrInsertComputed(route, () => {
       const pending: PendingRoute = {
         connectionKey,
@@ -225,6 +236,7 @@ export class JobRoutes<Scope extends JobScope, Connection> {
                     this.#routes.delete(route);
                   }
                 },
+                launch,
               );
               return yield* Effect.gen({ self: this }, function* () {
                 yield* Effect.try({
@@ -248,6 +260,18 @@ export class JobRoutes<Scope extends JobScope, Connection> {
                   scope.projectDir,
                   this.options.project(connection),
                 ]);
+                const known = this.#clients.get(key);
+                const reusable =
+                  !known ||
+                  !launch ||
+                  (known.canLaunch &&
+                    (yield* attempt(() => known.isCurrent()).pipe(
+                      Effect.catch(() => Effect.succeed(false)),
+                    )));
+                if (known && !reusable) {
+                  this.#forget(known);
+                  yield* attempt(() => known.close(), { awaitOnInterrupt: true });
+                }
                 const selected = this.#clients.getOrInsert(key, client);
                 pending.client = selected;
                 if (selected !== client)

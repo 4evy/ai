@@ -1,4 +1,3 @@
-import { readText } from "@ai/toolkit/text/text";
 import { Struct } from "effect";
 import * as v from "valibot";
 import {
@@ -35,14 +34,7 @@ export function presentResult(
     const output = {
       ...Struct.omit(step.output, ["stdoutText", "stderrText", "value", "records"]),
       inlineOmitted: true,
-      error: [
-        step.output.error,
-        readText(new URL("./workflow.md", import.meta.url), "preview", {
-          STEP: String(step.id),
-        }),
-      ]
-        .filter(Boolean)
-        .join("; "),
+      previewState: "omitted" as const,
     };
     return { ...step, output };
   });

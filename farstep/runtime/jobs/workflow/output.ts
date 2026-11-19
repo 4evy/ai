@@ -89,6 +89,24 @@ class OutputCapture implements WorkflowCapture {
       const output: WorkflowOutput = {
         format: this.policy.format,
         state: "complete",
+        previewState:
+          stdout.bytes > this.policy.maxBytes ||
+          stderr.bytes > this.policy.maxBytes ||
+          stdoutText.limited ||
+          stderrText.limited ||
+          stdout.error ||
+          stderr.error
+            ? "truncated"
+            : "complete",
+        persistenceState:
+          initialized.error || stdout.error || stderr.error
+            ? "failed"
+            : !stdout.artifact || !stderr.artifact
+              ? "unknown"
+              : stdout.artifact.truncated || stderr.artifact.truncated
+                ? "truncated"
+                : "complete",
+        parsingState: this.policy.format === "text" ? "not-requested" : "unavailable",
         ...(stdout.artifact ? { stdout: stdout.artifact } : {}),
         ...(stderr.artifact ? { stderr: stderr.artifact } : {}),
         stdoutText: stdoutText.text,

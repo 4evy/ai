@@ -19,7 +19,3 @@ foreach ($rule in $rules) {
     throw 'Private file allows another account'
   }
 }
-if ($owner -ne $sid) {
-  $acl.SetOwner([Security.Principal.SecurityIdentifier]::new($sid))
-  Set-Acl -LiteralPath $item.FullName -AclObject $acl
-}

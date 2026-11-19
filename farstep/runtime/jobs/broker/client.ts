@@ -40,6 +40,7 @@ export interface JobBrokerClient {
   request<Operation extends JobOperation>(
     operation: Operation,
     signal?: AbortSignal,
+    options?: { readOnly?: boolean },
   ): Promise<JobRpcResult<Operation["op"]>>;
 
   onCompletion(
@@ -50,6 +51,8 @@ export interface JobBrokerClient {
 }
 
 export class JobBrokerRejectedError extends Error {}
+
+export class JobBrokerUnavailableError extends Error {}
 
 interface Pending {
   succeed: (value: unknown) => void;
@@ -118,9 +121,83 @@ class BrokerConnection implements JobBrokerClient {
   async request<Operation extends JobOperation>(
     operation: Operation,
     signal?: AbortSignal,
+    options: { readOnly?: boolean } = {},
   ): Promise<JobRpcResult<Operation["op"]>> {
     if (this.#closed) throw new Error("Job broker connection is closed");
     signal?.throwIfAborted();
+    if (options.readOnly) {
+      if (operation.op !== "describe")
+        throw new Error("Read-only broker requests must describe an existing job");
+      return this.#lifetime.run(
+        Effect.gen({ self: this }, function* () {
+          const socket = yield* Effect.acquireRelease(
+            Effect.interruptible(
+              connect(join(this.directory, "broker.sock")).pipe(
+                Effect.catch((error) => {
+                  const code = "code" in error ? error.code : undefined;
+                  return Effect.fail(
+                    code === "ENOENT" || code === "ECONNREFUSED"
+                      ? new JobBrokerUnavailableError(error.message, { cause: error })
+                      : error,
+                  );
+                }),
+              ),
+            ),
+            (socket) => Effect.sync(() => socket.destroy()),
+          );
+          return yield* Effect.callback<JobRpcResult<Operation["op"]>, Error>(
+            (resume) => {
+              const id = randomUUID();
+              const buffer = new ConcatSink();
+              socket.on("data", (chunk: Buffer) => {
+                if (
+                  (buffer.flush()?.byteLength ?? 0) + chunk.byteLength >
+                  8 * 1024 * 1024
+                ) {
+                  resume(
+                    Effect.fail(new Error("Broker inspection response is too large")),
+                  );
+                  return;
+                }
+                for (const line of buffer.appendAndFlushLines(chunk)) {
+                  try {
+                    const message = parseJobWireMessage(
+                      JSON.parse(Buffer.from(line).toString("utf8")),
+                    );
+                    if ("event" in message || message.id !== id)
+                      throw new Error("Broker inspection response identity mismatch");
+                    if (!message.ok) throw new JobBrokerRejectedError(message.error);
+                    resume(
+                      Effect.succeed(parseJobRpcResult(operation, message.result)),
+                    );
+                  } catch (error) {
+                    resume(Effect.fail(toError(error)));
+                  }
+                }
+              });
+              socket.on("error", (error) => resume(Effect.fail(error)));
+              socket.on("close", () =>
+                resume(Effect.fail(new Error("Broker inspection connection closed"))),
+              );
+              socket.write(
+                `${JSON.stringify({
+                  id,
+                  token: this.secret,
+                  operation,
+                })}\n`,
+              );
+            },
+          );
+        }).pipe(
+          Effect.scoped,
+          Effect.timeoutOrElse({
+            duration: BROKER_REQUEST_TIMEOUT_MS,
+            orElse: () => Effect.fail(new Error("Broker inspection timed out")),
+          }),
+        ),
+        signal,
+      );
+    }
     if (!this.#socket || this.#socket.destroyed) {
       if (!this.#connecting) {
         const connecting = Effect.runSync(

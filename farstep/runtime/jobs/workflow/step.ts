@@ -179,7 +179,12 @@ export class WorkflowStep {
         stdout: "inherit",
         stderr: "inherit",
       });
-      this.output = Promise.resolve({ format: "text", state: "inherited" });
+      this.output = Promise.resolve({
+        format: "text",
+        state: "inherited",
+        persistenceState: "inherited",
+        parsingState: "not-requested",
+      });
     } else {
       const piped = Bun.spawn(
         subreaperScript ? [process.execPath, "-e", subreaperScript] : command,

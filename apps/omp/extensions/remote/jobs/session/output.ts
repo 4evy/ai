@@ -319,6 +319,6 @@ function completeOutput(
   const complete =
     isJobTerminal(snapshot.state) &&
     isJobTerminal(logs.state) &&
-    (!read || read.cursor >= read.availableEnd);
+    (!read || logs.cursor >= read.availableEnd);
   return complete;
 }

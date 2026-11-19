@@ -24,6 +24,10 @@ const { workflowPrepareSchema, workflowTaskSchema } = createWorkflowSchemas(
   v.unknown(),
 );
 
+export const MAX_RUN_WAIT_SECONDS = 30;
+export const MAX_JOB_WAIT_SECONDS = 60;
+export const MAX_JOB_LOG_LINES = 1000;
+
 export function createJobParameters() {
   const columnsParameter = v.optional(terminalSizeSchema.entries.columns);
   const rowsParameter = v.optional(terminalSizeSchema.entries.rows);
@@ -48,8 +52,10 @@ export function createJobParameters() {
       v.description("Execution seconds; 0 disables deadline"),
     ),
     waitSeconds: v.pipe(
-      v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(30))),
-      v.description("Initial observation budget, not command deadline"),
+      v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(MAX_RUN_WAIT_SECONDS))),
+      v.description(
+        `Initial observation budget, 0–${MAX_RUN_WAIT_SECONDS} seconds, not command deadline`,
+      ),
     ),
     pty: v.pipe(
       v.optional(v.boolean()),
@@ -173,8 +179,20 @@ function createJobControlParameters() {
     columns: v.pipe(columnsParameter, v.description("New PTY width for resize")),
     rows: v.pipe(rowsParameter, v.description("New PTY height for resize")),
     cursor: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0))),
-    lines: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1000))),
-    waitSeconds: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(60))),
+    lines: v.pipe(
+      v.optional(
+        v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(MAX_JOB_LOG_LINES)),
+      ),
+      v.description(
+        `Preview line limit, 1–${MAX_JOB_LOG_LINES}; not retained output size`,
+      ),
+    ),
+    waitSeconds: v.pipe(
+      v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(MAX_JOB_WAIT_SECONDS))),
+      v.description(
+        `Observation budget, 0–${MAX_JOB_WAIT_SECONDS} seconds; expiry does not stop work`,
+      ),
+    ),
     pattern: v.pipe(v.optional(v.string()), v.description("Output regex for wait")),
     lifetime: lifetimeParameter,
     actionId: v.pipe(

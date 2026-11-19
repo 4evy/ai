@@ -73,6 +73,17 @@ export const privateDirectoryEffect = Effect.fnUntraced(function* (path: string)
 export function privateDirectory(path: string) {
   return run(privateDirectoryEffect(path));
 }
+
+export const checkPrivateDirectoryEffect = Effect.fnUntraced(function* (path: string) {
+  const info = yield* attempt(() => lstat(path));
+  if (!info.isDirectory() || info.isSymbolicLink())
+    return yield* Effect.fail(new Error(`Unsafe private directory: ${path}`));
+  yield* powershellEffect(render(readScript, { PATH: quote(path) }));
+});
+
+export function checkPrivateDirectory(path: string) {
+  return run(checkPrivateDirectoryEffect(path));
+}
 export const privateReadEffect = Effect.fnUntraced(function* (path: string) {
   const info = yield* attempt(() => lstat(path));
   if (!info.isFile() || info.isSymbolicLink())

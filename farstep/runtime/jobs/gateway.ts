@@ -1,5 +1,4 @@
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { readText } from "@ai/toolkit/text/text";
 import { COORDINATION_CAPABILITY } from "farstep/protocol/coordination";
 import { type JobOperation, jobOperationSchema } from "farstep/protocol/jobs/protocol";
@@ -12,6 +11,8 @@ import {
   observeRequestSchema,
   prepareStartRequestSchema,
   receiptRequestSchema,
+  SCRIPT_CAPABILITY,
+  type ScriptRunner,
   terminationRequestSchema,
 } from "#farstep/protocol/jobs/gateway";
 import {
@@ -28,6 +29,7 @@ import type { JobBrokerClient } from "./broker/client";
 import type { CompletionChannel } from "./completion";
 import { bindDeadline, deadlineEvidence, prepareDeadline } from "./deadline";
 import { validateEnvironment } from "./environment";
+import { scriptActivation, scriptRunner, verifyScriptRunner } from "./script/runner";
 import type { ToolRegistrar } from "./tools";
 import type { WorkflowService } from "./workflow/workflow";
 
@@ -68,6 +70,18 @@ function operation(value: unknown): JobOperation {
 const MUTATING_OPERATIONS = new Set<JobOperation["op"]>(["send", "stop", "mode"]);
 
 export class JobGateway {
+  #verifiedRunner: { generation: string; result: Promise<ScriptRunner> } | undefined;
+
+  private async runner(): Promise<ScriptRunner> {
+    const current = await scriptRunner();
+    if (this.#verifiedRunner?.generation !== current.generation)
+      this.#verifiedRunner = {
+        generation: current.generation,
+        result: verifyScriptRunner(current.packagePath ?? undefined),
+      };
+    return this.#verifiedRunner.result;
+  }
+
   constructor(
     private readonly scope: JobScope,
     private readonly broker: JobBrokerClient,
@@ -79,6 +93,11 @@ export class JobGateway {
 
   registerHandshake(register: ToolRegistrar): void {
     register("helper.handshake", { inputSchema: v.object({}) }, async () => {
+      // A broken runner must not prevent recovery of already-owned jobs
+      const scriptsReady = await this.runner().then(
+        () => true,
+        () => false,
+      );
       this.completion.subscribe();
       return result({
         protocolMajor: PROTOCOL_MAJOR,
@@ -86,25 +105,35 @@ export class JobGateway {
         installationId: this.scope.installationId,
         platform: process.platform,
         capabilities: [
-          ...JOB_CAPABILITIES,
+          ...JOB_CAPABILITIES.filter(
+            (capability) => scriptsReady || capability !== SCRIPT_CAPABILITY,
+          ),
           WORKFLOW_CAPABILITY,
           COORDINATION_CAPABILITY,
           SYSTEM_CAPABILITY,
         ],
       });
     });
-    register("job.environment", { inputSchema: v.object({}) }, async () =>
+    register(
+      "job.environment",
+      { inputSchema: v.object({ launch: v.optional(v.boolean(), true) }) },
+      async ({ launch }, signal) => {
+        if (!launch)
+          return result({
+            env: this.scope.env,
+            scriptRunner: { application: process.execPath },
+          });
+        const scriptRunner = await this.runner();
+        return result({
+          env: this.scope.env,
+          scriptRunner,
+          activation: await scriptActivation(scriptRunner, true, { signal }),
+        });
+      },
+    );
+    register("job.activation", { inputSchema: v.object({}) }, async (_input, signal) =>
       result({
-        env: this.scope.env,
-        scriptRunner: {
-          application: process.execPath,
-          script: fileURLToPath(
-            new URL(
-              `./script/script.${import.meta.url.endsWith(".js") ? "js" : "ts"}`,
-              import.meta.url,
-            ),
-          ),
-        },
+        activation: await scriptActivation(await scriptRunner(), false, { signal }),
       }),
     );
     register(
@@ -122,39 +151,43 @@ export class JobGateway {
       [
         "job.workflow_prepare",
         workflowPrepareSchema,
-        (input: unknown) => this.workflows.prepare(input),
+        (input: unknown, _signal?: AbortSignal) => this.workflows.prepare(input),
       ],
       [
         "job.workflow_start",
         workflowStartSchema,
-        (input: unknown) => this.startWorkflow(input),
+        (input: unknown, signal?: AbortSignal) => this.startWorkflow(input, signal),
       ],
       [
         "job.workflow_inspect",
         workflowInspectSchema,
-        (input: unknown) => this.workflows.inspect(input),
+        (input: unknown, _signal?: AbortSignal) => this.workflows.inspect(input),
       ],
       [
         "job.workflow_cancel",
         workflowCancelSchema,
-        (input: unknown) => this.workflows.cancel(input),
+        (input: unknown, _signal?: AbortSignal) => this.workflows.cancel(input),
       ],
     ] as const;
     for (const [name, schema, handle] of routes)
-      register(name, { inputSchema: v.object(schema.entries) }, async (input) =>
-        result(await handle(v.parse(schema, input))),
+      register(name, { inputSchema: v.object(schema.entries) }, async (input, signal) =>
+        result(await handle(v.parse(schema, input), signal)),
       );
   }
 
-  private async startWorkflow(input: unknown) {
-    const started = await this.workflows.start(input, (spec) =>
-      this.coordination.beginJob({
-        name: spec.name,
-        cwd: spec.cwd,
-        kind: "workflow",
-        lifetime: spec.persist ? "persist" : "session",
-      }),
+  private async startWorkflow(input: unknown, signal?: AbortSignal) {
+    const started = await this.workflows.start(
+      input,
+      (spec) =>
+        this.coordination.beginJob({
+          name: spec.name,
+          cwd: spec.cwd,
+          kind: "workflow",
+          lifetime: spec.persist ? "persist" : "session",
+        }),
+      signal,
     );
+    if ("outcome" in started) return started;
     await this.coordination.observeJob(started.snapshot);
     return started;
   }

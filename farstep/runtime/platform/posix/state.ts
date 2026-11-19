@@ -38,10 +38,7 @@ export function paths() {
   };
 }
 
-export const privateDirectoryEffect = Effect.fnUntraced(function* (path: string) {
-  yield* attempt(() => mkdir(path, { recursive: true, mode: 0o700 }), {
-    awaitOnInterrupt: true,
-  });
+export const checkPrivateDirectoryEffect = Effect.fnUntraced(function* (path: string) {
   const info = yield* attempt(() => lstat(path));
   if (
     !info.isDirectory() ||
@@ -53,6 +50,17 @@ export const privateDirectoryEffect = Effect.fnUntraced(function* (path: string)
     );
   }
 });
+
+export const privateDirectoryEffect = Effect.fnUntraced(function* (path: string) {
+  yield* attempt(() => mkdir(path, { recursive: true, mode: 0o700 }), {
+    awaitOnInterrupt: true,
+  });
+  yield* checkPrivateDirectoryEffect(path);
+});
+
+export function checkPrivateDirectory(path: string): Promise<void> {
+  return run(checkPrivateDirectoryEffect(path));
+}
 
 export function privateDirectory(path: string): Promise<void> {
   return run(privateDirectoryEffect(path));

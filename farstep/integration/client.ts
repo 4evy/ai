@@ -2,8 +2,8 @@ import { hash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, mkdir, open } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
+import { attempt } from "@ai/runtime/effect/effect";
 import { atomicWrite, syncDirectoryAncestors } from "@ai/runtime/effect/fs/fs";
-import { Effect } from "effect";
 import * as v from "valibot";
 import type { Gateway } from "../client/jobs/gateway";
 import { JobRoutes, type JobScope, recoverJob } from "../client/jobs/recovery";
@@ -131,7 +131,7 @@ async function openGateway(
     address: (target) => [target.input.target, target.input.cwd],
     project: (target) => target.target.cwd,
     transport: (target, current) =>
-      Effect.succeed(target.gateway(current.scopeId, current.owner)),
+      attempt(() => target.gateway(current.scopeId, current.owner)),
     failure: (_scope, _connection, error) => {
       active.failure = error;
     },
@@ -165,14 +165,15 @@ interface ClientRoute {
 }
 
 export class ToolClient implements AsyncDisposable {
-  readonly gateway: Gateway;
   private constructor(
     readonly directory: string,
     readonly state: State,
     readonly connection: ToolConnection,
     private readonly route: ClientRoute,
-  ) {
-    this.gateway = route.gateway;
+  ) {}
+
+  get gateway(): Gateway {
+    return this.route.gateway;
   }
 
   static async connect(
@@ -254,6 +255,12 @@ export class ToolClient implements AsyncDisposable {
   }
 
   async launch(input: v.InferOutput<typeof launchInputSchema>) {
+    this.route.gateway = await this.route.routes.client(
+      this.route.scope,
+      this.connection,
+      this.state.installationId,
+      true,
+    );
     const rendered = scriptShell(
       this.connection.target,
       input,

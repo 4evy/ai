@@ -104,6 +104,10 @@ For execution changes, preserve these ownership and recovery rules:
 - Negotiate identity, protocol major, and capabilities before issuing
   operations. Update both Rust and TypeScript wire contracts when changing
   shared fields.
+- Require the versioned script API and the verified runner generation before
+  launching user code. Helper version and installation identity alone do not
+  prove which runner a gateway uses. See
+  [runner verification](../farstep/runtime/jobs/script/runner.ts).
 
 ### Execution and desktop boundaries
 
@@ -121,6 +125,13 @@ conversation or model loop. Persistent jobs can survive transport loss. They
 do not promise continuation after a supervisor crash or reboot. An interrupted
 supervisor can leave the outcome unknown, so inspect the existing handle rather
 than launching the operation again.
+
+Workflow inspection reads existing records without creating locks or starting
+a broker. Its `observation` separates durable journal state from broker or
+start-fence evidence. Missing completion evidence stays unknown, even when
+the native root exited successfully. Launch contention waits within a bounded
+pre-start budget. Only failures before the start fence can be reported as
+definitely not started.
 
 Desktop opening follows the helper's advertised `open` availability. The native
 backend still enforces its prerequisites and reports failures with their
@@ -228,6 +239,13 @@ non-PTY runs include stdout, stderr, and retained-file metadata. JSON and JSONL
 results expose parsed values or records without repeating raw stdout. Parse
 errors retain their raw preview. Large workflow previews report omitted output
 explicitly, with full workflow details kept in the card.
+
+Preview, persistence, and parsing states are independent. A clipped preview
+can still have a complete retained artifact, and successful execution does not
+establish successful parsing. Recovery metadata identifies the existing job,
+step, cursor, and artifact. Explicit cursor reads page forward through displayed
+bytes instead of repeatedly returning the same tail. Never rerun a producer to
+recover omitted output.
 
 An observation timeout does not imply command failure. Readiness wait expiry,
 readiness probe failure, incomplete output, and unknown process state remain

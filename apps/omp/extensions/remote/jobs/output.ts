@@ -9,6 +9,8 @@ import type {
 import type { JobSnapshot } from "farstep/protocol/jobs/protocol";
 import { isJobTerminal as terminal } from "farstep/protocol/jobs/states";
 import type { WorkflowResult } from "farstep/protocol/workflow/workflow";
+import { REMOTE_TOOLS } from "farstep/remote/tools/names";
+import { MAX_JOB_LOG_LINES } from "farstep/remote/tools/schemas/jobs";
 import { workflowFailed, workflowText } from "./output/workflow";
 import { jobNotices } from "./presentation";
 import type { JobRecord, Logs, Result } from "./types";
@@ -170,6 +172,38 @@ function jobContext(snapshot: JobSnapshot, logs: Logs, options: JobResultOptions
 }
 type JobContext = ReturnType<typeof jobContext>;
 
+function executionOutcome(snapshot: JobSnapshot, code: number | undefined) {
+  if (snapshot.state === "unknown") return "unknown";
+  if (!terminal(snapshot.state)) return "running";
+  if (code === undefined) return "unknown";
+  return code === 0 ? "succeeded" : "failed";
+}
+
+function outputRecovery(job: JobRecord, logs: Logs) {
+  const range = logs.outputRange;
+  const more = logs.replay && logs.cursor < (range?.availableEnd ?? logs.cursor);
+  if (!logs.outputGap && !range?.responseTruncated && !range?.retentionGap && !more)
+    return undefined;
+  return {
+    logs: {
+      tool: REMOTE_TOOLS.job,
+      arguments: {
+        action: "logs",
+        job: job.name,
+        cursor: logs.replay
+          ? logs.cursor
+          : Math.max(range?.requestedCursor ?? 0, range?.availableStart ?? 0),
+        lines: MAX_JOB_LOG_LINES,
+      },
+    },
+    inspect: {
+      tool: REMOTE_TOOLS.job,
+      arguments: { action: "status", job: job.name },
+    },
+    lostBeforeCursor: range?.retentionGap ? range.availableStart : undefined,
+  };
+}
+
 function jobHeader(
   code: number | undefined,
   job: JobRecord,
@@ -199,6 +233,7 @@ function jobHeader(
       pty: job.pty,
       timeoutSeconds: job.timeoutSeconds,
       state: snapshot.state,
+      executionOutcome: executionOutcome(snapshot, code),
       lifecycle:
         snapshot.state === "unknown"
           ? "unknown"
@@ -237,10 +272,26 @@ function jobHeader(
       cursor: logs.cursor,
       unreadCursor,
       ...logs.outputRange,
+      previewState:
+        logs.outputRange?.responseTruncated || logs.outputGap
+          ? "truncated"
+          : "complete",
+      retentionState:
+        snapshot.state === "unknown"
+          ? "unknown"
+          : logs.outputRange?.retentionGap
+            ? "gap"
+            : "available",
+      recovery: outputRecovery(job, logs),
+      nextCursor:
+        logs.replay && logs.cursor < (logs.outputRange?.availableEnd ?? logs.cursor)
+          ? logs.cursor
+          : undefined,
       state:
         snapshot.state === "unknown"
           ? "unknown"
-          : logs.outputGap || unreadCursor < snapshot.outputBytes
+          : logs.outputGap ||
+              (logs.replay ? logs.cursor : unreadCursor) < snapshot.outputBytes
             ? "incomplete"
             : context.finished
               ? "complete"
@@ -279,8 +330,11 @@ function jobText(
   const workflow = context.workflow;
   return [
     jobHeader(code, job, snapshot, logs, options, context),
-    ...(workflow ? [workflowText(workflow)] : []),
-    ...(job.pty || options.raw || !workflow?.steps.some((step) => step.output)
+    ...(workflow ? [workflowText(workflow, job)] : []),
+    ...(job.pty ||
+    options.raw ||
+    logs.replay ||
+    !workflow?.steps.some((step) => step.output)
       ? [displayedOutput(context.view)]
       : []),
   ].join("\n");
@@ -377,6 +431,9 @@ function jobDetails(
     scopeId: job.scopeId,
     cursor: logs.cursor,
     unreadCursor: options.unreadCursor ?? logs.cursor,
+    executionOutcome: executionOutcome(snapshot, code),
+    outputRange: logs.outputRange,
+    outputRecovery: outputRecovery(job, logs),
     newOutput: context.view.newOutput,
     compact: context.view.compact,
     ...(context.workflow ? { workflow: context.workflow } : {}),
@@ -385,7 +442,13 @@ function jobDetails(
     ...outputDetails(job, logs, options, context),
     ...timingDetails(code, options, context.finishedAt),
     remoteState:
-      code !== undefined ? "completed" : context.finished ? "unknown" : "running",
+      snapshot.state === "unknown"
+        ? "unknown"
+        : code !== undefined
+          ? "completed"
+          : context.finished
+            ? "unknown"
+            : "running",
     state: snapshot.state,
     lifetime: snapshot.persist ? "persist" : "session",
     timeoutSeconds: job.timeoutSeconds,
@@ -409,6 +472,7 @@ export function jobResult(
     ],
     details: jobDetails(code, job, snapshot, logs, options, context),
     isError:
+      snapshot.state === "unknown" ||
       (code !== undefined ? code !== 0 : context.finished) ||
       workflowFailed(context.workflow),
   };

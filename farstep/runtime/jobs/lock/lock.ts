@@ -5,6 +5,7 @@ import { attempt, run } from "@ai/runtime/effect/effect";
 import { acquireFileLock } from "@oh-my-pi/pi-utils/file-lock";
 import { Effect, RcMap, Scope, Semaphore } from "effect";
 import { privateDirectory } from "../../state";
+import { type LockWait, waitForLockEffect } from "./wait";
 
 // The process shares one permit per path while any holder or waiter retains it
 const queues = Effect.runSync(
@@ -17,14 +18,15 @@ export async function withFileLock<T>(
   directory: string,
   key: string,
   work: () => Promise<T>,
-  options: { unsafeMessage: string; timeoutMessage?: string },
+  options: LockWait & { unsafeMessage: string },
 ): Promise<T> {
   const path = join(directory, key);
   return run(
     Effect.gen(function* () {
       const queue = yield* RcMap.get(queues, path);
-      return yield* queue.withPermit(
+      yield* waitForLockEffect(
         Effect.gen(function* () {
+          yield* queue.takeScoped(1);
           yield* attempt(() => privateDirectory(directory));
           yield* Effect.acquireUseRelease(
             attempt(() =>
@@ -48,24 +50,22 @@ export async function withFileLock<T>(
           );
           // The native utility appends .lock; OS locks vanish on process exit
           yield* Effect.acquireRelease(
-            attempt((signal) => {
-              const budget = AbortSignal.timeout(15000);
-              return acquireFileLock(path, {
-                retries: 601,
-                retryDelayMs: 25,
-                signal: AbortSignal.any([signal, budget]),
-              }).catch((error) => {
-                if (budget.aborted && options.timeoutMessage)
-                  throw new Error(options.timeoutMessage, { cause: error });
-                throw error;
-              });
-            }),
+            Effect.interruptible(
+              attempt((signal) =>
+                acquireFileLock(path, {
+                  retries: 601,
+                  retryDelayMs: 25,
+                  signal,
+                }),
+              ),
+            ),
             (lock) => Effect.sync(() => lock.release()),
           );
-          // Keep the lock until a started mutation has persisted its receipt
-          return yield* Effect.uninterruptible(attempt(work));
-        }).pipe(Effect.scoped),
+        }),
+        options,
       );
+      // Keep the lock until a started mutation has persisted its receipt
+      return yield* Effect.uninterruptible(attempt(work));
     }).pipe(Effect.scoped),
   );
 }

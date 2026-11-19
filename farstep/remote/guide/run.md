@@ -5,9 +5,10 @@ SSH. Set `cwd` when switching projects and confirm the target's shell and
 toolchain. Observe with {{jobTool}} and the returned handle. Read the schema for
 supported options, limits and defaults.
 
-`waitSeconds` limits observation, while `timeout` limits execution. Choose
-`pty:true` for interactive terminals or `pty:false` for separate stdout and
-stderr and machine-readable output. Read "interactive" before terminal input.
+`waitSeconds` accepts 0–{{runWaitMaximum}} seconds and limits observation, while
+`timeout` limits execution. Choose `pty:true` for interactive terminals or
+`pty:false` for separate stdout and stderr and machine-readable output. Read
+"interactive" before terminal input.
 
 ## Choose the environment
 
@@ -250,10 +251,11 @@ deadline.
 Helper signals also interrupt native Effects, including environment loading.
 A common pipeline signal cancels every stage, even with stage-specific signals.
 
-If the harness only exposes a JSON device, construct its arguments as an object
-and serialize once with `JSON.stringify` in the harness's code tool. Do not
-hand-escape JSON around TypeScript around shell. This avoids an extra manual
-escaping layer, but does not change where the command executes.
+Use native {{runTool}} and {{batchTool}} when available. If the harness only
+exposes a JSON device, construct its arguments as an object and serialize once
+with `JSON.stringify` in the harness's code tool. Keep external values in
+`params`. Do not hand-escape JSON around TypeScript around shell or add a
+second process wrapper. The fallback does not change where the command executes.
 
 Await every command and helper call. Returning with running zx commands fails
 the script and stops those commands. Use `try/finally` for normal cleanup, but
@@ -365,15 +367,38 @@ Use `output:"json"` or `"jsonl"` with `pty:false` for parsed stdout. Check
 returned errors, truncation and artifact paths before using the result. Read
 batch details with {{jobTool}} `status` or `logs` and `step:"ID"`.
 
-For parsed output, inspect the step's `output.state` and reported parse errors.
+Execution, durability, preview size and parsing are independent. A successful
+step does not prove that its result was persisted, fully displayed or parsed.
+Inspect the workflow's `observation.source` and `observation.durableState`.
+`journal` identifies a durable observation. `broker`, `fence` and `preparation`
+can report an in-memory reconciliation, not a durably finalized success.
+An `unknown` execution outcome is not success, even if a stale exit code is 0.
+
+For each step, preserve `output.state` and inspect these separate fields:
+
+- `previewState`: `complete`, `truncated` or `omitted` describes inline display
+- `persistenceState`: `complete` means both artifacts were retained and flushed
+  in full, `truncated` means retained prefixes only, and `failed` or `unknown`
+  cannot establish complete retained output
+- `parsingState`: `complete` permits `value` or `records`, `invalid` means the
+  captured stdout failed parsing, and `unavailable` means parsing could not
+  establish a value. Text output uses `not-requested`
+
+An `oversized` preview with `persistenceState:"complete"` is recoverable from
+the complete artifact. It is not the same as lost output or a parse failure.
+Each artifact independently reports `bytes`, `retainedBytes` and `truncated`.
+Missing artifact metadata is not proof of complete retention.
+
 `output.value` contains parsed JSON and `output.records` contains JSONL records.
 For example, a step's `output` can contain:
 
 {{parsedOutput}}
 
-`output.stdoutText` contains text output. Use returned artifact paths when
-output was retained in a file. Completion alone does not prove parsing
-succeeded.
+`output.stdoutText` contains the text preview. When output or step details are
+omitted, use the returned `recovery.inspect` arguments to select that exact
+handle and step. Use each `recovery.artifacts[].read` with its exact returned
+connection and artifact path. A truncated artifact cannot recover its missing
+suffix. Do not rerun the command to recover output.
 
 ## Recover a launch after transport loss
 

@@ -330,12 +330,29 @@ export const EXAMPLES = {
     }),
     parsedOutput: example(
       workflowOutputSchema,
-      { format: "json", state: "complete", value: { ok: true } },
+      {
+        format: "json",
+        state: "complete",
+        previewState: "complete",
+        persistenceState: "complete",
+        parsingState: "complete",
+        value: { ok: true },
+      },
       true,
     ),
   },
   jobs: {
     jobStatus: example(jobParameters, { action: "status", job: "RETURNED_HANDLE" }),
+    jobLogs: example(jobParameters, {
+      action: "logs",
+      job: "RETURNED_HANDLE",
+      cursor: 0,
+    }),
+    stepStatus: example(jobParameters, {
+      action: "status",
+      job: "RETURNED_HANDLE",
+      step: "RETURNED_STEP_ID",
+    }),
     inputReceipt: example(jobParameters, {
       action: "receipt",
       job: "RETURNED_HANDLE",

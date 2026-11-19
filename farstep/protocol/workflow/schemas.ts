@@ -156,6 +156,15 @@ export function createWorkflowSchemas<S extends v.GenericSchema>(daemonSpecSchem
   const workflowStartSchema = v.strictObject({
     name,
     fingerprint: v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/u)),
+    lockTimeoutMs: v.optional(
+      v.pipe(v.number(), v.safeInteger(), v.minValue(1), v.maxValue(15000)),
+      15000,
+    ),
+  });
+  const workflowStartFailureSchema = v.strictObject({
+    op: v.literal("start"),
+    outcome: v.picklist(["definitely-not-started", "unknown"]),
+    error: text,
   });
   const workflowInspectSchema = v.strictObject({ name, step: v.optional(name) });
   const workflowCancelSchema = v.strictObject({ name, step: v.optional(name) });
@@ -176,6 +185,13 @@ export function createWorkflowSchemas<S extends v.GenericSchema>(daemonSpecSchem
     records: v.optional(v.pipe(v.array(jsonValueSchema), v.maxLength(1000))),
     error: v.optional(text),
     inlineOmitted: v.optional(v.boolean()),
+    previewState: v.optional(v.picklist(["complete", "truncated", "omitted"])),
+    persistenceState: v.optional(
+      v.picklist(["complete", "truncated", "failed", "unknown", "inherited"]),
+    ),
+    parsingState: v.optional(
+      v.picklist(["not-requested", "complete", "invalid", "unavailable"]),
+    ),
   });
   const workflowStepResultSchema = v.strictObject({
     id: name,
@@ -199,20 +215,30 @@ export function createWorkflowSchemas<S extends v.GenericSchema>(daemonSpecSchem
     readiness: v.optional(workflowReadinessResultSchema),
     output: v.optional(workflowOutputSchema),
   });
+  const workflowStateSchema = v.picklist([
+    "prepared",
+    "running",
+    "succeeded",
+    "failed",
+    "skipped",
+    "cancelled",
+    "unknown",
+  ]);
   const workflowResultSchema = v.strictObject({
     name,
     kind: v.picklist(["job", "batch"]),
     requestId: v.optional(workflowRequestIdSchema),
     fingerprint: v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/u)),
-    state: v.picklist([
-      "prepared",
-      "running",
-      "succeeded",
-      "failed",
-      "skipped",
-      "cancelled",
-      "unknown",
-    ]),
+    state: workflowStateSchema,
+    observation: v.optional(
+      v.strictObject({
+        source: v.picklist(["journal", "broker", "fence", "preparation"]),
+        durableState: v.optional(workflowStateSchema),
+        broker: v.picklist(["available", "unavailable", "not-queried"]),
+        reason: v.optional(text),
+        observedAt: v.pipe(v.number(), v.finite(), v.minValue(0)),
+      }),
+    ),
     createdAt: v.pipe(v.number(), v.finite(), v.minValue(0)),
     finishedAt: v.optional(v.pipe(v.number(), v.finite(), v.minValue(0))),
     steps: v.pipe(
@@ -235,6 +261,7 @@ export function createWorkflowSchemas<S extends v.GenericSchema>(daemonSpecSchem
     workflowPrepareSchema,
     workflowPreparedSchema,
     workflowStartSchema,
+    workflowStartFailureSchema,
     workflowInspectSchema,
     workflowCancelSchema,
     workflowArtifactSchema,

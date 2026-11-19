@@ -5,6 +5,11 @@ import type { JobRpcResult } from "farstep/protocol/jobs/protocol";
 import { jobSnapshotSchema, parseJobRpcResult } from "farstep/protocol/jobs/protocol";
 import * as v from "valibot";
 
+// Increment when the documented script globals or command contract changes
+export const SCRIPT_API = "cmd-env-effect-v1";
+export const SCRIPT_CAPABILITY = `typescript-${SCRIPT_API}`;
+export const generationSchema = v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/u));
+
 export const JOB_CAPABILITIES = [
   "jobs",
   "job-snapshots",
@@ -18,13 +23,22 @@ export const JOB_CAPABILITIES = [
   "job-environment",
   "job-termination",
   "job-deadlines",
-  "typescript-scripts-v1",
+  SCRIPT_CAPABILITY,
 ] as const;
 export const scriptRunnerSchema = v.strictObject({
   application: v.pipe(v.string(), v.startsWith("/")),
   script: v.pipe(v.string(), v.startsWith("/")),
+  api: v.literal(SCRIPT_API),
+  generation: generationSchema,
+  packagePath: v.nullable(v.pipe(v.string(), v.startsWith("/"))),
 });
 export type ScriptRunner = v.InferOutput<typeof scriptRunnerSchema>;
+
+export const gatewayEnvironmentSchema = v.strictObject({
+  env: recordSchema(v.string(), v.string()),
+  scriptRunner: scriptRunnerSchema,
+  activation: generationSchema,
+});
 
 export const JOB_COMPLETION_METHOD = "notifications/farstep/job-completion";
 

@@ -28,6 +28,18 @@ export interface RemoteJobDetails extends BashToolDetails {
   remoteExitCode?: number | undefined;
   remoteState?: "running" | "completed" | "unknown" | undefined;
   state?: JobSnapshot["state"] | undefined;
+  executionOutcome?: "running" | "succeeded" | "failed" | "unknown" | undefined;
+  outputRange?: Logs["outputRange"];
+  outputRecovery?:
+    | {
+        logs: {
+          tool: string;
+          arguments: { action: string; job: string; cursor: number; lines: number };
+        };
+        inspect: { tool: string; arguments: { action: string; job: string } };
+        lostBeforeCursor?: number | undefined;
+      }
+    | undefined;
   lifetime?: "session" | "persist" | undefined;
   cursor?: number | undefined;
   waitTimedOut?: boolean | undefined;

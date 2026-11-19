@@ -6,7 +6,7 @@ import type { JobSpec } from "farstep/protocol/jobs/protocol";
 import canonical from "fast-json-stable-stringify";
 import * as v from "valibot";
 import type { WorkflowPrepare } from "#farstep/protocol/workflow/workflow";
-import { privateDirectory, privateRead } from "../../state";
+import { checkPrivateDirectory, privateRead } from "../../state";
 import { validateEnvironment } from "../environment";
 import { validateReadiness } from "./policy";
 
@@ -54,7 +54,7 @@ export async function readWorkflowManifest(path: string): Promise<WorkflowManife
   const root = dirname(directory);
   const scope = dirname(root);
   for (const parent of [scope, root, directory]) {
-    await privateDirectory(parent);
+    await checkPrivateDirectory(parent);
     if ((await realpath(parent)) !== parent)
       throw new Error("Workflow manifest directory is not canonical");
   }

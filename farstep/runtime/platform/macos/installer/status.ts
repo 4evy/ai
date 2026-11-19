@@ -1,9 +1,11 @@
 import { join } from "node:path";
 import { errorMessage } from "@ai/values/error/error";
 import { uuidSchema } from "farstep/protocol/identity";
+import type { ScriptRunner } from "farstep/protocol/jobs/gateway";
 import * as v from "valibot";
 import { desktopHealth } from "../../../desktop";
 import { verifyBrokerRuntime } from "../../../jobs/jobs";
+import { verifyScriptRunner } from "../../../jobs/script/runner";
 import { exists, PROTOCOL_MAJOR, paths, privateRead } from "../../../state";
 
 import { assertOwned, installed, locations, ownership, prepared } from "./state";
@@ -42,9 +44,20 @@ export async function status() {
   };
   const { desktop, desktopError } = await inspectDesktop();
   if (packageOwnership.owned && !maintenance) await verifyBrokerRuntime();
+  let scriptRunner: ScriptRunner | undefined;
+  let scriptRunnerError: string | undefined;
+  if (packageOwnership.owned && !maintenance) {
+    try {
+      scriptRunner = await verifyScriptRunner(record.current.packagePath);
+    } catch (error) {
+      scriptRunnerError = errorMessage(error);
+    }
+  }
   return {
     installed: true,
-    jobsReady: packageOwnership.owned && !maintenance,
+    jobsReady: packageOwnership.owned && !maintenance && scriptRunner !== undefined,
+    ...(scriptRunner ? { scriptRunner } : {}),
+    ...(scriptRunnerError ? { scriptRunnerError } : {}),
     protocolMajor: PROTOCOL_MAJOR,
     platform: "darwin",
     ...identity,
@@ -58,7 +71,9 @@ export async function status() {
     status: maintenance
       ? "maintenance"
       : packageOwnership.owned
-        ? "ready"
+        ? scriptRunnerError
+          ? "script-api-incompatible"
+          : "ready"
         : "package-unavailable",
     desktop,
     ...(desktopError ? { desktopError } : {}),

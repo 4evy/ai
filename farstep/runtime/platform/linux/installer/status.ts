@@ -1,8 +1,11 @@
 import { join } from "node:path";
+import { errorMessage } from "@ai/values/error/error";
 import { uuidSchema } from "farstep/protocol/identity";
+import type { ScriptRunner } from "farstep/protocol/jobs/gateway";
 import * as v from "valibot";
 import { desktopHealth } from "#farstep/runtime/desktop";
 import { verifyBrokerRuntime } from "#farstep/runtime/jobs/jobs";
+import { verifyScriptRunner } from "#farstep/runtime/jobs/script/runner";
 import { exists, PROTOCOL_MAJOR, paths, privateRead } from "#farstep/runtime/state";
 import { command } from "./command";
 import { locations, UNIT } from "./locations";
@@ -36,11 +39,22 @@ export async function status() {
   const ownership = await packageOwnership(record.current);
   const maintenance = await exists(locations().lock);
   if (ownership.owned && !maintenance) await verifyBrokerRuntime();
+  let scriptRunner: ScriptRunner | undefined;
+  let scriptRunnerError: string | undefined;
+  if (ownership.owned && !maintenance) {
+    try {
+      scriptRunner = await verifyScriptRunner(record.current.packagePath);
+    } catch (error) {
+      scriptRunnerError = errorMessage(error);
+    }
+  }
   const active =
     (await command(["systemctl", "--user", "is-active", UNIT], true)).code === 0;
   return {
     installed: true,
-    jobsReady: ownership.owned && !maintenance,
+    jobsReady: ownership.owned && !maintenance && scriptRunner !== undefined,
+    ...(scriptRunner ? { scriptRunner } : {}),
+    ...(scriptRunnerError ? { scriptRunnerError } : {}),
     protocolMajor: PROTOCOL_MAJOR,
     version: record.current.version,
     ...identity,
@@ -55,7 +69,9 @@ export async function status() {
         }
       : null,
     ...(preparation ? { maintenanceToken: preparation.maintenanceToken } : {}),
-    status: installationStatus(maintenance, ownership.owned, active),
+    status: scriptRunnerError
+      ? "script-api-incompatible"
+      : installationStatus(maintenance, ownership.owned, active),
     desktop:
       active && ownership.owned && !maintenance
         ? await desktopHealth(identity.installationId, record.current.version)

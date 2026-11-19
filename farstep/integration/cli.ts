@@ -106,7 +106,7 @@ async function main() {
       print(
         await retrieveFile(
           client.connection,
-          client.gateway.scriptRunner.application,
+          client.gateway.application,
           request.source,
           request.destination,
           request.expectedSha256,

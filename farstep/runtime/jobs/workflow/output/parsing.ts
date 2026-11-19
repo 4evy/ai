@@ -20,17 +20,19 @@ export function errorText(error: unknown): string {
 export function parseMachine(
   stdout: Captured,
   policy: WorkflowOutputPolicy,
-): Pick<WorkflowOutput, "state" | "value" | "records" | "error"> {
-  if (stdout.bytes > policy.maxBytes) {
-    return {
-      state: "oversized",
-      error: `stdout exceeds maxBytes (${policy.maxBytes}); inspect the stdout artifact`,
-    };
-  }
+): Pick<WorkflowOutput, "state" | "parsingState" | "value" | "records" | "error"> {
   if (stdout.artifact?.truncated) {
     return {
       state: "truncated",
+      parsingState: "unavailable",
       error: `stdout exceeds maxCaptureBytes (${policy.maxCaptureBytes}); machine output is incomplete`,
+    };
+  }
+  if (stdout.bytes > policy.maxBytes) {
+    return {
+      state: "oversized",
+      parsingState: "unavailable",
+      error: `stdout exceeds maxBytes (${policy.maxBytes}); inspect the stdout artifact`,
     };
   }
   try {
@@ -39,7 +41,11 @@ export function parseMachine(
       stdout.preview,
     );
     if (policy.format === "json") {
-      return { state: "complete", value: v.parse(jsonValueSchema, JSON.parse(text)) };
+      return {
+        state: "complete",
+        parsingState: "complete",
+        value: v.parse(jsonValueSchema, JSON.parse(text)),
+      };
     }
     const records: NonNullable<WorkflowOutput["records"]> = [];
     let start = 0;
@@ -47,6 +53,7 @@ export function parseMachine(
       if (records.length === policy.maxRecords) {
         return {
           state: "oversized",
+          parsingState: "unavailable",
           error: `stdout exceeds maxRecords (${policy.maxRecords}); inspect the stdout artifact`,
         };
       }
@@ -57,15 +64,17 @@ export function parseMachine(
       } catch (error) {
         return {
           state: "invalid",
+          parsingState: "invalid",
           error: `Invalid JSONL record ${records.length + 1}: ${errorText(error)}`,
         };
       }
       start = newline === -1 ? text.length : end + 1;
     }
-    return { state: "complete", records };
+    return { state: "complete", parsingState: "complete", records };
   } catch (error) {
     return {
       state: "invalid",
+      parsingState: "invalid",
       error: `Invalid ${policy.format} stdout: ${errorText(error)}`,
     };
   }

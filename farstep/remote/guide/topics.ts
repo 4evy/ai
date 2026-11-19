@@ -9,6 +9,11 @@ import {
 } from "../../protocol/system";
 import { JOB_ACTIONS } from "../jobs/actions";
 import { REMOTE_TOOLS } from "../tools/names";
+import {
+  MAX_JOB_LOG_LINES,
+  MAX_JOB_WAIT_SECONDS,
+  MAX_RUN_WAIT_SECONDS,
+} from "../tools/schemas/jobs";
 import { EXAMPLES } from "./examples";
 
 export const TOPICS = {
@@ -66,6 +71,7 @@ export const TOPICS = {
       new URL("./run.md", import.meta.url),
       {
         captureMiB: String(DEFAULT_CAPTURE_BYTES / 1024 / 1024),
+        runWaitMaximum: String(MAX_RUN_WAIT_SECONDS),
         ...EXAMPLES.run,
       },
       REMOTE_TOOLS,
@@ -79,6 +85,8 @@ export const TOPICS = {
         jobActions: Object.keys(JOB_ACTIONS)
           .map((action) => `\`${action}\``)
           .join(", "),
+        jobWaitMaximum: String(MAX_JOB_WAIT_SECONDS),
+        jobLineMaximum: String(MAX_JOB_LOG_LINES),
         ...EXAMPLES.jobs,
       },
       REMOTE_TOOLS,

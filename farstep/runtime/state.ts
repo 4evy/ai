@@ -7,7 +7,7 @@ import { isEexist, isEnoent } from "@oh-my-pi/pi-utils/fs-error";
 import { Effect } from "effect";
 import { uuidSchema } from "farstep/protocol/identity";
 import * as v from "valibot";
-
+import { type LockWait, waitForLockEffect } from "./jobs/lock/wait";
 import {
   atomicWriteEffect,
   paths,
@@ -18,6 +18,7 @@ import {
 export {
   atomicWrite,
   atomicWriteEffect,
+  checkPrivateDirectory,
   paths,
   privateDirectory,
   privateDirectoryEffect,
@@ -83,21 +84,48 @@ export function loadIdentity(): Promise<v.InferOutput<typeof identitySchema>> {
 
 export const withMaintenanceLockEffect = Effect.fnUntraced(function* <A, E, R>(
   work: Effect.Effect<A, E, R>,
+  options: LockWait = {},
 ) {
   const state = paths().state;
   yield* privateDirectoryEffect(state);
   const lock = join(state, "maintenance.lock");
-  yield* Effect.acquireRelease(
-    attempt(() => mkdir(lock, { mode: 0o700 })).pipe(
-      Effect.mapError((error) =>
-        isEexist(error)
-          ? new Error(
-              "Helper is busy with a launch or installation operation; no operation was replayed",
-            )
-          : error,
-      ),
-    ),
-    () => attempt(() => rm(lock, { recursive: true })).pipe(Effect.orDie),
+  yield* waitForLockEffect(
+    Effect.gen(function* () {
+      while (true) {
+        const acquired = yield* Effect.acquireRelease(
+          attempt(async () => {
+            await mkdir(lock, { mode: 0o700 });
+            return lstat(lock);
+          }),
+          (owned) =>
+            attempt(async () => {
+              const current = await lstat(lock);
+              if (
+                !current.isDirectory() ||
+                current.dev !== owned.dev ||
+                current.ino !== owned.ino
+              )
+                throw new Error(
+                  "Maintenance lock ownership changed; replacement was left intact",
+                );
+              await rm(lock, { recursive: true });
+            }).pipe(Effect.orDie),
+        ).pipe(
+          Effect.as(true),
+          Effect.catch((error) =>
+            isEexist(error) ? Effect.succeed(false) : Effect.fail(error),
+          ),
+        );
+        if (acquired) return;
+        yield* Effect.sleep(25);
+      }
+    }),
+    {
+      ...options,
+      timeoutMessage:
+        options.timeoutMessage ??
+        "Helper is busy with a launch or installation operation; no operation was replayed",
+    },
   );
   yield* atomicWriteEffect(
     join(lock, "owner.json"),
@@ -106,8 +134,13 @@ export const withMaintenanceLockEffect = Effect.fnUntraced(function* <A, E, R>(
   return yield* work;
 }, Effect.scoped);
 
-export function withMaintenanceLock<T>(work: () => Promise<T>): Promise<T> {
-  return run(withMaintenanceLockEffect(attempt(work, { awaitOnInterrupt: true })));
+export function withMaintenanceLock<T>(
+  work: () => Promise<T>,
+  options: LockWait = {},
+): Promise<T> {
+  return run(
+    withMaintenanceLockEffect(attempt(work, { awaitOnInterrupt: true }), options),
+  );
 }
 
 export const existsEffect = Effect.fnUntraced(function* (path: string) {

@@ -4,6 +4,7 @@ import { isDeepStrictEqual } from "node:util";
 import { quotePosixArgument as quote } from "@ai/values/shell/shell";
 import type * as v from "valibot";
 import { verifyBrokerRuntime } from "../../../jobs/jobs";
+import { verifyScriptRunner } from "../../../jobs/script/runner";
 import { atomicWrite, loadIdentity, privateDirectory } from "../../../state";
 import { disableSystem, enableSystem, systemExec } from "../../../system/system";
 import { activateDesktop, removeDesktop, requestPermissions } from "../desktop/desktop";
@@ -50,6 +51,7 @@ export async function install(
     await assertOwned(old);
     await assertIdle();
     const current = await artifact(packagePath);
+    await verifyScriptRunner(packagePath);
     await verifyBrokerRuntime();
     const previous =
       old && old.current.packagePath !== current.packagePath

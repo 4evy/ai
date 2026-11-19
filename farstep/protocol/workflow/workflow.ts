@@ -14,6 +14,7 @@ export const {
   workflowPrepareSchema,
   workflowPreparedSchema,
   workflowStartSchema,
+  workflowStartFailureSchema,
   workflowInspectSchema,
   workflowCancelSchema,
   workflowArtifactSchema,
@@ -33,3 +34,15 @@ export type WorkflowArtifact = v.InferOutput<typeof workflowArtifactSchema>;
 export type WorkflowOutput = v.InferOutput<typeof workflowOutputSchema>;
 export type WorkflowStepResult = v.InferOutput<typeof workflowStepResultSchema>;
 export type WorkflowResult = v.InferOutput<typeof workflowResultSchema>;
+export type WorkflowStartFailure = v.InferOutput<typeof workflowStartFailureSchema>;
+
+export class WorkflowStartError extends Error {
+  constructor(
+    readonly outcome: WorkflowStartFailure["outcome"],
+    message: string,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = "WorkflowStartError";
+  }
+}

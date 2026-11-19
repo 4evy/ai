@@ -176,7 +176,7 @@ function jobView(
   // Completed workflow streams are authoritative and separated from their envelopes
   // PTY snapshots remain authoritative for interactive jobs
   const outputs =
-    screen || details.rawOutput !== undefined
+    screen || details.rawOutput !== undefined || details.replay
       ? []
       : (workflow?.steps.flatMap((step) =>
           step.output
