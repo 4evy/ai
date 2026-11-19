@@ -624,6 +624,10 @@ OMP settings module installs it at `~/.omp/agent/commands/commit.md`. For a
 checkout-only setup, copy the command into the target repository's
 `.omp/commands/commit.md`, then reload OMP.
 
+The patched runtime exposes OMP's built-in selective Git commit workflow as
+`/agent-commit` so it does not shadow `/commit`. The eval `commit` API is
+unchanged.
+
 ## Rebase onto the updated remote base in OMP
 
 Use `/rebase` to update the remote base and rebase the current local stack,

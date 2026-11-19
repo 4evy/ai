@@ -1,0 +1,37 @@
+diff --git a/packages/coding-agent/src/slash-commands/builtin-commit.ts b/packages/coding-agent/src/slash-commands/builtin-commit.ts
+--- a/packages/coding-agent/src/slash-commands/builtin-commit.ts
++++ b/packages/coding-agent/src/slash-commands/builtin-commit.ts
+@@ -9,17 +9,18 @@
+ /** Recent commit subjects shown to the agent for style. */
+ const RECENT_SUBJECTS = 5;
+ 
+-/** `/commit`: hand the agent a draft of its own changes and ask it to commit them with the eval `commit` namespace. */
++/** `/agent-commit`: hand the agent a draft of its own changes and ask it to commit them with the eval `commit` namespace. */
+ export const BUILTIN_COMMIT_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
+ 	{
+-		name: "commit",
++		// Leave /commit available for the file-based Jujutsu workflow
++		name: "agent-commit",
+ 		icon: "branch",
+ 		description: "Commit only the changes this agent and its subagents made",
+ 		inlineHint: "[instructions]",
+ 		allowArgs: true,
+ 		handle: async (command, runtime) => {
+ 			if (!runtime.session.getAdvertisedEvalPreludes().some(prelude => prelude.name === "commit")) {
+-				return usage("/commit needs the eval tool and the `commit.enabled` setting.", runtime);
++				return usage("/agent-commit needs the eval tool and the `commit.enabled` setting.", runtime);
+ 			}
+ 			try {
+ 				const draft = await draftFor({
+diff --git a/packages/coding-agent/src/tools/settings.ts b/packages/coding-agent/src/tools/settings.ts
+--- a/packages/coding-agent/src/tools/settings.ts
++++ b/packages/coding-agent/src/tools/settings.ts
+@@ -735,7 +735,7 @@
+ 		group: "Available Tools",
+ 		label: "Selective commit",
+ 		description:
+-			"Enable the commit eval prelude and /commit: commit only the lines this agent and its subagents wrote",
++			"Enable the commit eval prelude and /agent-commit: commit only the lines this agent and its subagents wrote",
+ 	},
+ });
+ 

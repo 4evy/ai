@@ -1,6 +1,7 @@
 {
   "profiles": {
     "runtime": [
+      "commit/slash-command.patch",
       "ssh/ssh.patch",
       "workspace/workspace.patch",
       "compression/compression.patch",
