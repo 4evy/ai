@@ -1,6 +1,6 @@
 import { realpath } from "node:fs/promises";
 import { isDeepStrictEqual } from "node:util";
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import {
   type CoordinationJob,
   type CoordinationRequest,
@@ -22,6 +22,8 @@ const OBSERVED_STATES = {
   failed: "failed",
   unknown: "unknown",
 } as const satisfies Record<JobSnapshot["state"], CoordinationJob["state"]>;
+
+export const actionableJobCondition = sql`json_extract(${tables.jobs.payload}, '$.state') IN ('starting', 'running', 'unknown')`;
 
 export class CoordinationJobs {
   constructor(
@@ -152,12 +154,22 @@ export class CoordinationJobs {
     });
   }
 
-  jobRecords(project?: string): CoordinationJob[] {
+  refreshCandidates(project: string | undefined, limit: number): CoordinationJob[] {
     const rows = this.context.store.queries
       .select({ payload: tables.jobs.payload })
       .from(tables.jobs)
-      .where(project === undefined ? undefined : eq(tables.jobs.project, project))
-      .orderBy(tables.jobs.scope, tables.jobs.name)
+      .where(
+        and(
+          project === undefined ? undefined : eq(tables.jobs.project, project),
+          actionableJobCondition,
+        ),
+      )
+      .orderBy(
+        sql`json_extract(${tables.jobs.payload}, '$.updatedAt')`,
+        tables.jobs.scope,
+        tables.jobs.name,
+      )
+      .limit(limit)
       .all();
     return rows.map((row) => v.parse(coordinationJobSchema, row.payload));
   }
@@ -203,7 +215,8 @@ export class CoordinationJobs {
       state: OBSERVED_STATES[snapshot.state],
       lifetime: snapshot.persist ? "persist" : "session",
       availability: snapshot.state === "unknown" ? "unavailable" : "available",
-      updatedAt: Date.now(),
+      // Keep attempts ordered even when they share one clock tick
+      updatedAt: Math.max(Date.now(), old.updatedAt + 1),
       ...(snapshot.startedAt ? { startedAt: snapshot.startedAt } : {}),
       ...(snapshot.exitedAt !== undefined ? { stoppedAt: snapshot.exitedAt } : {}),
       ...(snapshot.exitCode !== undefined ? { exitCode: snapshot.exitCode } : {}),
@@ -229,8 +242,9 @@ export class CoordinationJobs {
       const old = v.parse(coordinationJobSchema, row.payload);
       this.assertObservedJob(snapshot, old, reference);
       const job = this.observedJob(snapshot, old);
-      if (isDeepStrictEqual({ ...job, updatedAt: old.updatedAt }, old)) return;
+      const changed = !isDeepStrictEqual({ ...job, updatedAt: old.updatedAt }, old);
       this.saveJob(job);
+      if (!changed) return;
       this.context.event(
         "job-observed",
         { job: job.name, ...(job.work ? { work: job.work } : {}) },
@@ -263,14 +277,20 @@ export class CoordinationJobs {
         reference.createdAt !== old.createdAt
       )
         throw new Error("Coordination refresh job identity changed");
-      if (old.availability === "unavailable") return;
+      if (old.availability === "unavailable") {
+        this.saveJob({
+          ...old,
+          updatedAt: Math.max(Date.now(), old.updatedAt + 1),
+        });
+        return;
+      }
       const job: CoordinationJob = {
         ...old,
         availability: "unavailable",
         state:
           old.state === "stopped" || old.state === "failed" ? old.state : "unknown",
         reason: "Broker state unavailable",
-        updatedAt: Date.now(),
+        updatedAt: Math.max(Date.now(), old.updatedAt + 1),
       };
       this.saveJob(job);
       this.context.event("job-unavailable", { job: job.name }, job.project, job.actor);

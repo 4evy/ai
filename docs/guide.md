@@ -151,10 +151,18 @@ Installed helpers expose the same routes as `farstep doctor` and
 loading a shell environment, requesting desktop authorization, or capturing a
 screen. Use `--scope SCOPE_ID` to inspect a recorded scope's endpoint.
 
-Work list reads the existing coordination registry. Follow
-`pagination.nextCursor` while `pagination.hasMore` is true. Without `--project`,
-it includes all projects for the user. Each collection uses the same page
-offset, and pages are not a frozen snapshot.
+Work list reads actionable coordination by default. Add `--history` for
+completed work, terminal jobs, stale sessions, expired stored claims, and
+acknowledged handoffs. Agent snapshots expose the same choice as
+`history: true`. Follow `pagination.nextCursor` while `pagination.hasMore`
+is true. Without `--project`, work list includes all projects. Each collection
+uses the same page offset, and pages are not a frozen snapshot.
+
+Only an initial actionable agent snapshot refreshes native job observations,
+bounded to the oldest 100 nonterminal records. Continuations and history
+requests read stored state without refreshing the registry again. Live claims
+and jobs can keep a disconnected owner relevant. See
+[coordination views](../farstep/runtime/coordination/views.ts).
 
 Record age and presence are not process liveness. The output separates recorded
 state from current state, which remains unknown without a live observation.

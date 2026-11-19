@@ -31,6 +31,7 @@ const coordinationActionSchema = v.variant("action", [
   v.strictObject({
     action: v.literal("snapshot"),
     allProjects: v.optional(v.boolean(), false),
+    history: v.optional(v.boolean(), false),
     ...page,
   }),
   v.strictObject({ action: v.literal("session"), purpose: text(1024), ...mutation }),
@@ -83,26 +84,27 @@ const coordinationActionSchema = v.variant("action", [
   v.strictObject({ action: v.literal("events"), ...page }),
 ]);
 export const COORDINATION_ACTIONS = {
-  snapshot: { approval: "read", refreshJobs: true },
-  session: { approval: "exec", refreshJobs: false },
-  work: { approval: "exec", refreshJobs: false },
-  claim: { approval: "exec", refreshJobs: false },
-  release: { approval: "exec", refreshJobs: false },
-  link: { approval: "exec", refreshJobs: false },
-  note: { approval: "exec", refreshJobs: false },
-  inbox: { approval: "read", refreshJobs: true },
-  acknowledge: { approval: "exec", refreshJobs: false },
-  thread: { approval: "read", refreshJobs: true },
-  handoff: { approval: "exec", refreshJobs: false },
-  events: { approval: "read", refreshJobs: true },
+  snapshot: { approval: "read" },
+  session: { approval: "exec" },
+  work: { approval: "exec" },
+  claim: { approval: "exec" },
+  release: { approval: "exec" },
+  link: { approval: "exec" },
+  note: { approval: "exec" },
+  inbox: { approval: "read" },
+  acknowledge: { approval: "exec" },
+  thread: { approval: "read" },
+  handoff: { approval: "exec" },
+  events: { approval: "read" },
 } as const satisfies Record<
   v.InferOutput<typeof coordinationActionSchema>["action"],
-  { approval: "read" | "exec"; refreshJobs: boolean }
+  { approval: "read" | "exec" }
 >;
 
 export const coordinationRequestInputSchema = v.object({
   action: v.picklist(Records.keys(COORDINATION_ACTIONS)),
   allProjects: v.optional(v.boolean()),
+  history: v.optional(v.boolean()),
   limit,
   cursor: v.optional(integer),
   requestId: v.optional(token),
@@ -172,6 +174,7 @@ export const coordinationJobSchema = v.strictObject({
   availability: v.picklist(["available", "unavailable"]),
   work: v.optional(uuidSchema),
   createdAt: integer,
+  // Last recorded change or observation attempt, not proof of process liveness
   updatedAt: integer,
   startedAt: v.optional(integer),
   stoppedAt: v.optional(integer),

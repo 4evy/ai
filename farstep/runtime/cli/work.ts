@@ -8,6 +8,7 @@ import { completionEvidence } from "./records";
 
 export async function workList(options: {
   project?: string | undefined;
+  history: boolean;
   cursor: number;
   limit: number;
 }) {
@@ -17,7 +18,10 @@ export async function workList(options: {
     const project = options.project ? await realpath(options.project) : undefined;
     using store = await CoordinationStore.openReadOnly();
     const page = store.queries.transaction(() =>
-      CoordinationViews.snapshot(store, project, options.cursor, options.limit, true),
+      CoordinationViews.snapshot(store, project, options.cursor, options.limit, {
+        history: options.history,
+        includeHandoffs: true,
+      }),
     );
     const jobs = await Promise.all(
       (page.jobs ?? []).map(async (job) => {
@@ -53,6 +57,7 @@ export async function workList(options: {
       availability: "available" as const,
       source,
       project: project ?? null,
+      history: options.history,
       freshness: {
         source: "registry-records",
         liveRefresh: false,
@@ -80,7 +85,8 @@ export async function workList(options: {
       jobs,
       handoffs: page.notes?.map((note) => ({
         ...note,
-        condition: "unacknowledged",
+        condition:
+          note.acknowledgedAt === undefined ? "unacknowledged" : "acknowledged",
         freshness: {
           recordedAt: note.createdAt,
           ageMs: Math.max(0, observedAt - note.createdAt),
@@ -91,7 +97,7 @@ export async function workList(options: {
         requestedCursor: options.cursor,
         requestedLimit: options.limit,
         detail:
-          "Each collection is paginated independently at the same offset. Pages are not a frozen snapshot across CLI invocations. Follow nextCursor while hasMore is true.",
+          "Each filtered collection uses the same offset. The response budget can reduce page width below limit. Keep project, history and limit unchanged, and follow nextCursor while hasMore is true. Pages are not frozen across CLI invocations, so concurrent changes or claim expiry can shift offsets.",
       },
     };
   } catch (error) {

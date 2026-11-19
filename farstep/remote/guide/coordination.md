@@ -2,10 +2,35 @@
 
 Before shared work, call {{coordinationTool}} with {{snapshot}}. Omit `target`
 locally or pass a saved SSH connection ID. The registry stores records per user
-and host. Project records use the canonical workspace directory. Follow
-`pagination.nextCursor` while `pagination.hasMore` is true. Use
-`allProjects:true` to read across projects. Shared job metadata grants no log
+and host. Project records use the canonical workspace directory. Snapshots
+default to actionable records: unfinished work, unexpired claims, and
+starting/running/unknown jobs, including persistent jobs with closed owners.
+Sessions appear while their presence is current or they own a live claim or
+nonterminal job. Completed work with a live claim remains visible.
+
+Use {{historySnapshot}} for all stored sessions, work, claims (including expired
+claims), and job records. History reads do not delete or refresh records.
+`allProjects:true` reads across projects. Shared job metadata grants no log
 access or process control.
+
+Follow `pagination.nextCursor` while `pagination.hasMore` is true. Keep
+`history`, `allProjects`, and `limit` unchanged across pages. Snapshot cursors
+are offsets applied independently to each filtered collection. The response
+budget can reduce the shared page width below `limit`. Inbox, thread, and event
+cursors instead identify the last returned record. Pages are not frozen
+snapshots, so concurrent changes or claim expiry can shift snapshot offsets.
+
+Only the initial actionable snapshot (`cursor:0`) observes native jobs, with a
+maximum of 100 nonterminal job records, prioritizing the oldest recorded
+observation attempts. Repeated initial snapshots rotate through the registry,
+including jobs whose state is unchanged or unavailable. This does not establish
+freshness for every returned job. A job's `updatedAt` records changes or
+observation attempts, not proof of process liveness. Continuation pages,
+history, inbox, thread, and events read recorded state without observing native
+jobs. Use the job tool for a specific job's current state. The CLI's
+`farstep work list` uses the same actionable filters without native refresh.
+Add `--history` for historical records, including expired claims and
+acknowledged handoffs.
 
 The project is the agent session's workspace on that target. A command's `cwd`
 changes its execution directory, not the coordination project. Scratch work does

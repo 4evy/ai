@@ -114,6 +114,10 @@ export const EXAMPLES = {
   },
   coordination: {
     snapshot: example(coordinationRequestSchema, { action: "snapshot" }),
+    historySnapshot: example(coordinationRequestSchema, {
+      action: "snapshot",
+      history: true,
+    }),
     createWork: example(coordinationRequestSchema, {
       action: "work",
       title: "Update documentation",

@@ -17,6 +17,7 @@ import {
   RESPONSE_BUDGET,
   type Session,
 } from "./context";
+import { actionableJobCondition } from "./jobs";
 import type { CoordinationStore } from "./store/store";
 import * as tables from "./store/tables";
 import type { CoordinationWork } from "./work";
@@ -63,12 +64,18 @@ export class CoordinationViews {
     };
   }
 
-  snapshot(allProjects: boolean, offset: number, limit: number): CoordinationResult {
+  snapshot(
+    allProjects: boolean,
+    offset: number,
+    limit: number,
+    history: boolean,
+  ): CoordinationResult {
     return CoordinationViews.snapshot(
       this.context.store,
       allProjects ? undefined : this.context.session.project,
       offset,
       limit,
+      { history },
     );
   }
 
@@ -77,9 +84,30 @@ export class CoordinationViews {
     project: string | undefined,
     offset: number,
     limit: number,
-    includeHandoffs = false,
+    options: { history?: boolean; includeHandoffs?: boolean } = {},
   ): CoordinationResult {
     const observedAt = Date.now();
+    const { history = false, includeHandoffs = false } = options;
+    // Build actor membership once instead of rescanning history for each session
+    const liveSessionClaim = sql`(${tables.sessions.project}, ${tables.sessions.actor}) IN (
+      SELECT ${tables.claims.project}, ${tables.claims.actor} FROM ${tables.claims}
+      WHERE ${and(
+        gt(tables.claims.expires, observedAt),
+        project === undefined ? undefined : eq(tables.claims.project, project),
+      )}
+    )`;
+    const liveSessionJob = sql`(${tables.sessions.project}, ${tables.sessions.actor}) IN (
+      SELECT ${tables.jobs.project}, ${tables.jobs.actor} FROM ${tables.jobs}
+      WHERE ${and(
+        actionableJobCondition,
+        project === undefined ? undefined : eq(tables.jobs.project, project),
+      )}
+    )`;
+    const liveWorkClaim = sql`EXISTS (
+      SELECT 1 FROM ${tables.claims}
+      WHERE ${tables.claims.work} = ${tables.works.id}
+        AND ${tables.claims.expires} > ${observedAt}
+    )`;
     const sessions = store.queries
       .select({
         payload: tables.sessions.payload,
@@ -87,7 +115,20 @@ export class CoordinationViews {
         connected: tables.sessions.connected,
       })
       .from(tables.sessions)
-      .where(project === undefined ? undefined : eq(tables.sessions.project, project))
+      .where(
+        and(
+          project === undefined ? undefined : eq(tables.sessions.project, project),
+          history
+            ? undefined
+            : sql`(
+                (${tables.sessions.connected} = 1
+                  AND json_extract(${tables.sessions.payload}, '$.presence') = 'active'
+                  AND json_extract(${tables.sessions.payload}, '$.lastSeenAt') >= ${observedAt - STALE_PRESENCE_MS})
+                OR ${liveSessionClaim}
+                OR ${liveSessionJob}
+              )`,
+        ),
+      )
       .orderBy(tables.sessions.project, tables.sessions.id)
       .limit(limit + 1)
       .offset(offset)
@@ -95,7 +136,15 @@ export class CoordinationViews {
     const works = store.queries
       .select({ payload: tables.works.payload })
       .from(tables.works)
-      .where(project === undefined ? undefined : eq(tables.works.project, project))
+      .where(
+        and(
+          project === undefined ? undefined : eq(tables.works.project, project),
+          history
+            ? undefined
+            : sql`(json_extract(${tables.works.payload}, '$.status') != 'done'
+                OR ${liveWorkClaim})`,
+        ),
+      )
       .orderBy(tables.works.project, tables.works.id)
       .limit(limit + 1)
       .offset(offset)
@@ -105,7 +154,7 @@ export class CoordinationViews {
       .from(tables.claims)
       .where(
         and(
-          gt(tables.claims.expires, observedAt),
+          history ? undefined : gt(tables.claims.expires, observedAt),
           project === undefined ? undefined : eq(tables.claims.project, project),
         ),
       )
@@ -117,7 +166,12 @@ export class CoordinationViews {
       // Budget raw stored bytes before decoding only the selected prefix
       .select({ payload: sql<string>`${tables.jobs.payload}` })
       .from(tables.jobs)
-      .where(project === undefined ? undefined : eq(tables.jobs.project, project))
+      .where(
+        and(
+          project === undefined ? undefined : eq(tables.jobs.project, project),
+          history ? undefined : actionableJobCondition,
+        ),
+      )
       .orderBy(tables.jobs.project, tables.jobs.scope, tables.jobs.name)
       .limit(limit + 1)
       .offset(offset)
@@ -130,7 +184,9 @@ export class CoordinationViews {
             and(
               project === undefined ? undefined : eq(tables.notes.project, project),
               sql`json_extract(${tables.notes.payload}, '$.kind') = 'handoff'`,
-              sql`json_extract(${tables.notes.payload}, '$.acknowledgedAt') IS NULL`,
+              history
+                ? undefined
+                : sql`json_extract(${tables.notes.payload}, '$.acknowledgedAt') IS NULL`,
             ),
           )
           .orderBy(tables.notes.project, tables.notes.sequence)

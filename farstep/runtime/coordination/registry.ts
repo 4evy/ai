@@ -4,7 +4,6 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { and, eq } from "drizzle-orm";
 import { Effect, Match } from "effect";
 import {
-  COORDINATION_ACTIONS,
   type CoordinationJob,
   type CoordinationOpen,
   type CoordinationRequest,
@@ -105,13 +104,15 @@ export class CoordinationRegistry {
       async (input, signal) => {
         requireHandshake();
         const session = this.presence.requireSession();
-        if (refreshJobs && COORDINATION_ACTIONS[input.action].refreshJobs) {
-          const project =
-            input.action === "snapshot" && input.allProjects
-              ? undefined
-              : session.project;
+        if (
+          refreshJobs &&
+          input.action === "snapshot" &&
+          !input.history &&
+          input.cursor === 0
+        ) {
+          const project = input.allProjects ? undefined : session.project;
           await this.refreshes.run(
-            attempt(() => refreshJobs(this.jobRecords(project)), {
+            attempt(() => refreshJobs(this.jobs.refreshCandidates(project, 100)), {
               awaitOnInterrupt: true,
             }),
             signal,
@@ -231,7 +232,12 @@ export class CoordinationRegistry {
       Match.withReturnType<CoordinationResult>(),
       Match.discriminatorsExhaustive("action")({
         snapshot: (request) =>
-          this.views.snapshot(request.allProjects, request.cursor, request.limit),
+          this.views.snapshot(
+            request.allProjects,
+            request.cursor,
+            request.limit,
+            request.history,
+          ),
         inbox: (request) => this.views.notes(request),
         thread: (request) => this.views.notes(request),
         events: (request) => this.views.events(request, session),
@@ -254,11 +260,6 @@ export class CoordinationRegistry {
     lifetime: "session" | "persist";
   }): Promise<void> {
     return this.jobs.beginJob(input);
-  }
-
-  jobRecords(project?: string): CoordinationJob[] {
-    if (this.shutdown) throw new Error("Coordination gateway is closed");
-    return this.jobs.jobRecords(project);
   }
 
   async observeJob(snapshot: JobSnapshot, reference?: CoordinationJob): Promise<void> {

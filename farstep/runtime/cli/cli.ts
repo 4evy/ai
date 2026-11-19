@@ -80,6 +80,7 @@ const parser = or(
       object({
         action: constant("work-list"),
         project: optional(option("--project", text)),
+        history: option("--history"),
         cursor: withDefault(option("--cursor", pageNumber(0)), 0),
         limit: withDefault(option("--limit", pageNumber(1, 100)), 50),
       }),

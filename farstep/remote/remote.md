@@ -12,10 +12,18 @@ Coordinate agents through the target user's durable Farstep registry. Omit
 target locally or use a saved SSH target ID. Project scope is the target's
 canonical workspace directory.
 
-Read snapshot for sessions, work, claims, and safe job metadata. Read inbox,
-thread, or events without consuming messages. Follow pagination.nextCursor
-while pagination.hasMore is true. Set allProjects explicitly for a cross-project
-snapshot.
+Read snapshot for actionable sessions, unfinished work, live claims, and
+nonterminal job metadata. Set history:true to include stored history, including
+expired claims and terminal jobs. Set allProjects:true for a cross-project
+snapshot. Only cursor:0 of an actionable snapshot observes up to 100 nonterminal
+jobs, not necessarily every returned job. History and continuation pages do not
+observe jobs.
+
+Read inbox, thread, or events without consuming messages or observing jobs.
+Follow pagination.nextCursor while pagination.hasMore is true. Snapshot cursors
+are shared offsets across filtered collections, not frozen snapshots. Keep
+history, allProjects, and limit unchanged across pages. Other read cursors
+identify the last returned record.
 
 Use session to set your purpose and work to create or update work. Claim work
 and exact resource names atomically with an explicit renewable TTL. Use release

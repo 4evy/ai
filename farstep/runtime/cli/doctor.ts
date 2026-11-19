@@ -69,7 +69,8 @@ export async function doctor(options: {
       return {
         ...unknown,
         endpoint: { state: "unknown", detail: "No scope selected" },
-        remedy: "Use work list to find scopeId, then doctor --scope SCOPE_ID",
+        remedy:
+          "Use work list --history to find recorded scopeId, then doctor --scope SCOPE_ID",
       };
     try {
       const directory = join(await realpath(location.state), "scopes", options.scope);
