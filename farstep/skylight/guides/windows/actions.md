@@ -2,7 +2,12 @@
 
 Select an app with "start". Set `observedElementIndex` from the latest
 accessibility tree. If the editable control supports `setValue`, pass its value
-directly and observe afterward. Actions may renumber controls:
+directly and observe afterward. Actions may renumber controls.
+
+Available accessibility trees carry an `Observation:` header with
+`kind: "full"`, a unique `snapshotId` and `baseline: null`. Replace your earlier
+tree with each observation. An unavailable accessibility state is not an empty
+tree. This metadata does not authorize input or replace screenshot identity.
 
 ``` js
 var field = { index: observedElementIndex, value: "replacement text" };

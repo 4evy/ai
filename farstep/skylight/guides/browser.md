@@ -40,6 +40,12 @@ facade's `getAXState()`, `getScreenshot()` and `getAXStateAndScreenshot()` also
 emit output automatically. Do not wrap those methods in `nodeRepl.write` or
 `nodeRepl.emitImage`. Use `var` for reusable REPL bindings.
 
+Browser AX reads request canonical full state and include an `Observation`
+header with `kind: "full"`, a snapshot identity, and `baseline: null`. Each
+replaces the previous tree, including when `disableDiffing: false` is passed.
+DOM-only tabs use the provider's full `playwright.domSnapshot()` unchanged,
+without Farstep AX revision metadata. Missing metadata does not imply a diff.
+
 Provider APIs return values without displaying them. For example, use
 `nodeRepl.write(await tab.playwright.domSnapshot())` to display a DOM snapshot,
 or `nodeRepl.emitImage(await tab.screenshot({}))` for a provider screenshot.

@@ -14,6 +14,10 @@ import {
 import { Effect, Exit, Record as Records, Scope, ScopedRef } from "effect";
 import { MAX_FRAME, type SkyTurn } from "../../protocol/sky/execution";
 import { VERSION } from "../state";
+import {
+  installBrowserServiceEffect,
+  installDesktopServiceEffect,
+} from "./runtime/desktop";
 import { installLinuxServiceEffect } from "./runtime/linux";
 import { WAYLAND } from "./runtime/paths";
 import { runtimeServerEffect } from "./runtime/server";
@@ -32,9 +36,11 @@ export class SkyKernel {
 
   private installSessionEffect(env: Record<string, string>) {
     return Effect.gen(function* () {
-      if (!WAYLAND) return;
       const directory = yield* temporaryDirectory(join(tmpdir(), "farstep-sky-"));
-      yield* installLinuxServiceEffect(env, directory.path);
+      if (WAYLAND) {
+        yield* installLinuxServiceEffect(env, directory.path);
+        yield* installBrowserServiceEffect(env, directory.path);
+      } else yield* installDesktopServiceEffect(env, directory.path);
     });
   }
 
@@ -74,8 +80,6 @@ export class SkyKernel {
         { ...process.env, ...config.env },
         (value) => value !== undefined,
       );
-      // CUA derives its trusted services from the enabled surfaces
-      if (!WAYLAND) delete env.NODE_REPL_TRUSTED_SERVICES;
       const { session } = yield* McpSession.acquireEffect(
         this.client(),
         new StdioClientTransport({

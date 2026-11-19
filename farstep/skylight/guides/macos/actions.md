@@ -14,13 +14,13 @@ Set `field.value` to the intended text. If `setValue` is unsupported or throws,
 fetch fresh state before choosing another method because the field may have
 changed. Never loop over cached indices.
 
-Default observations may show only tree changes. Apply the latest diff to your
-current tree before choosing a target. If that baseline is unclear, request
-`app.getAXStateAndScreenshot({ disableDiffing: true })` and select from the full
-tree. A full tree may renumber controls, so discard earlier indices.
-For programmatic presence or value checks, request
-`app.getAXState({ disableDiffing: true })`. A diff can omit an unchanged control
-that is still present.
+Farstep requests full app observations, including the initial `getApp()` state.
+The `Observation:` header identifies `kind: "full"`, a unique `snapshotId` and
+`baseline: null`. Each tree replaces the previous tree, rather than patching
+it. Full reads can renumber controls, so discard earlier indices. This
+canonical mode deliberately ignores `disableDiffing: false` because upstream
+does not expose trustworthy diff or baseline metadata. Browser observations
+have their own contract and are not changed by this app adapter.
 
 For an editable element exposing text selection, `selectText` can select a
 phrase or position the cursor without replacing the whole field. Set

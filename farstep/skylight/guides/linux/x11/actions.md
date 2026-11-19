@@ -8,6 +8,12 @@ coordinates when element input is unavailable. Use the exact Secondary Actions
 names with `app.performSecondaryAction(index, action)` when the tree exposes
 them.
 
+Linux app tree text is full, not a diff. Upstream's tree renderer does not
+display Farstep snapshot metadata. Raw `cua.computer.get_window_state()`
+results carry structured `observation` metadata with `kind: "full"`, a unique
+`snapshotId` and `baseline: null`, scoped to the requested window and query.
+Snapshot identity does not authorize reuse of earlier element indices.
+
 After choosing an element from the latest AT-SPI tree:
 
 ``` js
