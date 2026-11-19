@@ -37,7 +37,7 @@ diff --git a/dist/types/extensibility/extensions/compact-handler.d.ts b/dist/typ
 diff --git a/dist/types/extensibility/extensions/runner.d.ts b/dist/types/extensibility/extensions/runner.d.ts
 --- a/dist/types/extensibility/extensions/runner.d.ts
 +++ b/dist/types/extensibility/extensions/runner.d.ts
-@@ -87,6 +87,7 @@
+@@ -89,6 +89,7 @@
      private readonly localProtocolOptions?;
      /** Identity of the agent this runner's session runs; defaults to the top-level agent. */
      private readonly agent;
@@ -56,7 +56,7 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
  import type { CustomEditor } from "@oh-my-pi/pi-tui/prompt/custom-editor";
  import type { Theme } from "@oh-my-pi/pi-tui/theme";
  import type { NativeToolView } from "@oh-my-pi/pi-tui/tools/renderer";
-@@ -561,6 +562,8 @@
+@@ -594,6 +595,8 @@
      sessionManager: ReadonlySessionManager;
      /** Model registry for API key resolution */
      modelRegistry: ModelRegistry;
@@ -65,7 +65,7 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
      /** Calling session's `local://` root mapping for external tool bridges. */
      localProtocolOptions?: LocalProtocolOptions;
      /** Current model (may be undefined) */
-@@ -1606,8 +1609,13 @@
+@@ -1646,8 +1649,13 @@
      setActiveTools(toolNames: string[]): Promise<void>;
      /** Get available slash commands in the current session. */
      getCommands(): SlashCommandInfo[];
@@ -81,7 +81,7 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
      /** Get current thinking level. */
      getThinkingLevel(): ThinkingLevel | undefined;
      /** Set thinking level for the current session. */
-@@ -1801,7 +1809,7 @@
+@@ -1841,7 +1849,7 @@
  export type GetAllToolsHandler = () => ToolInfo[];
  export type GetCommandsHandler = () => SlashCommandInfo[];
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
@@ -93,7 +93,7 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
 diff --git a/dist/types/mcp/manager.d.ts b/dist/types/mcp/manager.d.ts
 --- a/dist/types/mcp/manager.d.ts
 +++ b/dist/types/mcp/manager.d.ts
-@@ -99,6 +99,7 @@
+@@ -102,6 +102,7 @@
  }
  /** Handles an MCP `WWW-Authenticate` challenge and returns refreshed config. */
  export type MCPAuthHandler = (serverName: string, challenge: MCPAuthChallenge) => Promise<MCPServerConfig | undefined>;
@@ -101,7 +101,7 @@ diff --git a/dist/types/mcp/manager.d.ts b/dist/types/mcp/manager.d.ts
  /**
   * Surface of an {@link MCPManager} that sessions reusing a manager (subagents, `mcp://` and
   * `skill://` handlers) use. Subagent worker threads receive a remote implementation whose calls
-@@ -131,6 +132,12 @@
+@@ -134,6 +135,12 @@
      addNotificationListener(listener: (serverName: string, method: string, params: unknown) => void): () => void;
      /** Names of currently connected servers. */
      getConnectedServers(): string[];
@@ -114,7 +114,7 @@ diff --git a/dist/types/mcp/manager.d.ts b/dist/types/mcp/manager.d.ts
      /** Cached resources/templates of one server. */
      getServerResources(name: string): {
          resources: MCPResource[];
-@@ -304,7 +311,7 @@
+@@ -313,7 +320,7 @@
       * Interactive enable (`/mcp enable`, `/extensions`) can pass a single
       * `{ [name]: config }` without wiping the rest of the registry.
       */
@@ -123,7 +123,7 @@ diff --git a/dist/types/mcp/manager.d.ts b/dist/types/mcp/manager.d.ts
      openToolScope(scope: MCPToolScope, seed?: MCPToolScope): void;
      trackToolCall(scope: MCPToolScope, toolCallId: string): () => void;
      getTools(scope?: MCPToolScope): CustomTool<TSchema, MCPToolDetails>[];
-@@ -322,7 +329,7 @@
+@@ -331,7 +338,7 @@
      /**
       * Get current connection status for a server.
       */
@@ -132,7 +132,7 @@ diff --git a/dist/types/mcp/manager.d.ts b/dist/types/mcp/manager.d.ts
      /**
       * Get the source metadata for a server.
       */
-@@ -352,6 +359,10 @@
+@@ -367,6 +374,10 @@
       * starting a fresh one against the new definition.
       */
      updateServerConfig(name: string, config: MCPServerConfig): Promise<MCPServerConnection | null> | undefined;
@@ -143,7 +143,7 @@ diff --git a/dist/types/mcp/manager.d.ts b/dist/types/mcp/manager.d.ts
      /**
       * Wait for a connection to complete (or fail).
       */
-@@ -385,9 +396,11 @@
+@@ -400,9 +411,11 @@
       */
      getAllServerNames(): string[];
      /**
@@ -208,19 +208,19 @@ diff --git a/dist/types/modes/components/extensions/mcp-runtime.d.ts b/dist/type
 diff --git a/dist/types/session/agent-session-types.d.ts b/dist/types/session/agent-session-types.d.ts
 --- a/dist/types/session/agent-session-types.d.ts
 +++ b/dist/types/session/agent-session-types.d.ts
-@@ -409,6 +409,8 @@
+@@ -405,6 +405,8 @@
      advisorConfigWarnings?: string[];
      /** Disconnect the MCP manager owned by this session during disposal. */
      disconnectOwnedMcpManager?: () => Promise<void>;
 +    /** Close turn-scoped MCP servers only at the owning session's final settle */
 +    disconnectMcpAtAgentEnd?: () => Promise<void>;
-     /** System prompt used by automatic session-title generation. */
-     titleSystemPrompt?: string;
      /**
+      * Reconnect the MCP manager owned by this session against the session's current cwd and
+      * rebind its tools; serialized. Resolves `undefined` once the session is disposed. Absent
 diff --git a/dist/types/session/agent-session.d.ts b/dist/types/session/agent-session.d.ts
 --- a/dist/types/session/agent-session.d.ts
 +++ b/dist/types/session/agent-session.d.ts
-@@ -1194,6 +1194,7 @@
+@@ -1322,6 +1322,7 @@
      /** Selects a model for this session without updating persisted model settings. */
      setModelTemporary(model: Model, thinkingLevel?: ConfiguredThinkingLevel, options?: {
          ephemeral?: boolean;
@@ -231,19 +231,19 @@ diff --git a/dist/types/session/agent-session.d.ts b/dist/types/session/agent-se
 diff --git a/dist/types/session/model-controls.d.ts b/dist/types/session/model-controls.d.ts
 --- a/dist/types/session/model-controls.d.ts
 +++ b/dist/types/session/model-controls.d.ts
-@@ -112,6 +112,7 @@
+@@ -106,6 +106,7 @@
      setModelTemporary(model: Model, thinkingLevel?: ConfiguredThinkingLevel, options?: {
          ephemeral?: boolean;
          prewalk?: boolean;
 +        recordUsage?: boolean;
-     }, selection?: "explicit" | "automatic"): Promise<void>;
+     }, selection?: "explicit" | "automatic", isCurrent?: () => boolean): Promise<boolean>;
      /**
       * Cycle to next/previous model.
-diff --git a/dist/types/ssh/transfer-compression.d.ts b/dist/types/ssh/transfer-compression.d.ts
+diff --git a/dist/types/ssh/endpoint.d.ts b/dist/types/ssh/endpoint.d.ts
 new file mode 100644
 --- /dev/null
-+++ b/dist/types/ssh/transfer-compression.d.ts
-@@ -0,0 +1,19 @@
++++ b/dist/types/ssh/endpoint.d.ts
+@@ -0,0 +1,7 @@
 +import { type SSHConnectionTarget } from "@oh-my-pi/pi-coding-agent/ssh/connection-manager";
 +/** Inspect the authenticated server's actual endpoint, not its OpenSSH alias */
 +export declare function isSameMachineSSH(target: SSHConnectionTarget, opts?: {
@@ -251,18 +251,30 @@ new file mode 100644
 +    signal?: AbortSignal | undefined;
 +    timeoutMs?: number;
 +}): Promise<boolean>;
-+export declare function requireZstd(): void;
-+/** Keep compression and process lifetimes out of upstream's file operations */
-+export declare function createFileTransfer(target: SSHConnectionTarget, opts: {
-+    signal?: AbortSignal;
-+    timeoutMs?: number;
-+}): Promise<{
+diff --git a/dist/types/ssh/file-transfer-policy.d.ts b/dist/types/ssh/file-transfer-policy.d.ts
+new file mode 100644
+--- /dev/null
++++ b/dist/types/ssh/file-transfer-policy.d.ts
+@@ -0,0 +1,2 @@
++import type { RemoteFileTransferAdapter } from "@oh-my-pi/pi-coding-agent/ssh/file-transfer";
++export declare const fileTransferAdapter: RemoteFileTransferAdapter | undefined;
+diff --git a/dist/types/ssh/file-transfer.d.ts b/dist/types/ssh/file-transfer.d.ts
+--- a/dist/types/ssh/file-transfer.d.ts
++++ b/dist/types/ssh/file-transfer.d.ts
+@@ -24,6 +24,13 @@
+     signal?: AbortSignal;
+     timeoutMs?: number;
+ }
++/** Byte transport policy, independent of path validation and staged commits */
++export interface RemoteFileTransfer {
 +    inputCommand: string;
 +    read(shell: "sh" | "bash" | "zsh", command: string, limit: number): Promise<Uint8Array>;
 +    write(shell: "sh" | "bash" | "zsh", command: string, content: Uint8Array): Promise<void>;
-+}>;
-+/** Drain without allowing a remote decoder to exceed the requested byte bound */
-+export declare function boundedTransferBytes(stream: ReadableStream<Uint8Array>, limit: number): Promise<Uint8Array>;
++}
++export type RemoteFileTransferAdapter = (target: SSHConnectionTarget, opts: RemoteFileWriteOptions) => Promise<RemoteFileTransfer>;
+ /** Resolve the remote account's HOME without shell-expanding any caller-supplied path. */
+ export declare function remoteHomeDirectory(target: SSHConnectionTarget, opts?: {
+     signal?: AbortSignal;
 diff --git a/dist/types/thread/services/mcp-remote.d.ts b/dist/types/thread/services/mcp-remote.d.ts
 --- a/dist/types/thread/services/mcp-remote.d.ts
 +++ b/dist/types/thread/services/mcp-remote.d.ts
@@ -299,6 +311,36 @@ diff --git a/dist/types/thread/services/mcp-remote.d.ts b/dist/types/thread/serv
      getServerResources(name: string): {
          resources: MCPResource[];
          templates: MCPResourceTemplate[];
+diff --git a/dist/types/tools/browser/launch-adapter.d.ts b/dist/types/tools/browser/launch-adapter.d.ts
+new file mode 100644
+--- /dev/null
++++ b/dist/types/tools/browser/launch-adapter.d.ts
+@@ -0,0 +1,18 @@
++import type { Browser, LaunchOptions, PuppeteerNode } from "puppeteer-core";
++export type BrowserLauncher = PuppeteerNode;
++export type BrowserLaunchOptions = LaunchOptions;
++export interface BrowserLaunchSpec {
++    executablePath: string;
++    args: string[];
++}
++/** Optional deployment policy, loaded before native browser and auth callers */
++export interface BrowserLaunchAdapter {
++    launch?(puppeteer: BrowserLauncher, options: BrowserLaunchOptions): Promise<Browser>;
++    adapt?(spec: BrowserLaunchSpec, headless: boolean, rejectProfileReuse: boolean): Promise<BrowserLaunchSpec>;
++    assertCanReuseApp?(): void;
++    sharedDaemonName?(headless: boolean): string | undefined;
++}
++export declare function launchBrowser(puppeteer: BrowserLauncher, options: BrowserLaunchOptions): Promise<Browser>;
++export declare function adaptBrowserLaunch(executablePath: string, args: string[], headless: boolean, rejectProfileReuse?: boolean): Promise<BrowserLaunchSpec>;
++export declare function assertBrowserAppReuseAllowed(): void;
++export declare function browserDaemonName(headless: boolean): string;
+diff --git a/dist/types/tools/browser/launch-policy.d.ts b/dist/types/tools/browser/launch-policy.d.ts
+new file mode 100644
+--- /dev/null
++++ b/dist/types/tools/browser/launch-policy.d.ts
+@@ -0,0 +1,2 @@
++import type { BrowserLaunchAdapter } from "@oh-my-pi/pi-coding-agent/tools/browser/launch-adapter";
++export declare const browserLaunchAdapter: BrowserLaunchAdapter | undefined;
 diff --git a/src/capability/mcp.ts b/src/capability/mcp.ts
 --- a/src/capability/mcp.ts
 +++ b/src/capability/mcp.ts
@@ -473,7 +515,7 @@ diff --git a/src/extensibility/extensions/loader.ts b/src/extensibility/extensio
 diff --git a/src/extensibility/extensions/runner.ts b/src/extensibility/extensions/runner.ts
 --- a/src/extensibility/extensions/runner.ts
 +++ b/src/extensibility/extensions/runner.ts
-@@ -529,6 +529,7 @@
+@@ -601,6 +601,7 @@
  });
  
  export class ExtensionRunner {
@@ -481,7 +523,7 @@ diff --git a/src/extensibility/extensions/runner.ts b/src/extensibility/extensio
  	#uiContext: ExtensionUIContext;
  	#mode: ExtensionMode = "print";
  	#toolApprovalPreviewWaiter?: (toolCallId: string) => Promise<void>;
-@@ -1736,6 +1737,7 @@
+@@ -1811,6 +1812,7 @@
  			cwd: this.cwd,
  			sessionManager: this.sessionManager,
  			modelRegistry: this.modelRegistry,
@@ -500,7 +542,7 @@ diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extension
  import type { CustomEditor } from "@oh-my-pi/pi-tui/prompt/custom-editor";
  import type { Theme } from "@oh-my-pi/pi-tui/theme";
  import type { NativeToolView } from "@oh-my-pi/pi-tui/tools/renderer";
-@@ -776,6 +777,8 @@
+@@ -815,6 +816,8 @@
  	sessionManager: ReadonlySessionManager;
  	/** Model registry for API key resolution */
  	modelRegistry: ModelRegistry;
@@ -509,7 +551,7 @@ diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extension
  	/** Calling session's `local://` root mapping for external tool bridges. */
  	localProtocolOptions?: LocalProtocolOptions;
  	/** Current model (may be undefined) */
-@@ -2138,8 +2141,11 @@
+@@ -2192,8 +2195,11 @@
  	/** Get available slash commands in the current session. */
  	getCommands(): SlashCommandInfo[];
  
@@ -523,7 +565,7 @@ diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extension
  
  	/** Get current thinking level. */
  	getThinkingLevel(): ThinkingLevel | undefined;
-@@ -2370,7 +2376,7 @@
+@@ -2424,7 +2430,7 @@
  
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
  
@@ -535,7 +577,7 @@ diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extension
 diff --git a/src/mcp/config.ts b/src/mcp/config.ts
 --- a/src/mcp/config.ts
 +++ b/src/mcp/config.ts
-@@ -42,6 +42,8 @@
+@@ -50,6 +50,8 @@
  	const transport = server.transport ?? (server.command ? "stdio" : server.url ? "http" : "stdio");
  	const shared = {
  		enabled: server.enabled,
@@ -544,7 +586,48 @@ diff --git a/src/mcp/config.ts b/src/mcp/config.ts
  		timeout: server.timeout,
  		requestIdFormat: server.requestIdFormat,
  		instructions: server.instructions,
-@@ -338,6 +340,12 @@
+@@ -154,12 +156,15 @@
+ 	const transformContext = options?.builtinTransforms;
+ 	const claimed = new Set<string>();
+ 	let dropped: Record<string, MCPDroppedServer> | undefined;
++	const disabledConfigs = new Map<string, MCPServer & { _source: SourceMeta }>();
+ 	const suppressServer = (server: MCPServer & { _source: SourceMeta }): boolean => {
+ 		const owner = !claimed.has(server.name);
+ 		claimed.add(server.name);
+-		if (disabledServers.has(server.name)) return true;
+ 		const forced = forcedEnabled.has(server.name);
+-		if (server.enabled === false && !forced) return true;
++		if (disabledServers.has(server.name) || (server.enabled === false && !forced)) {
++			if (owner) disabledConfigs.set(server.name, server);
++			return true;
++		}
+ 		if (!transformContext || forced || server.enabled === true) return false;
+ 		const drop = builtinDropFor(server, transformContext);
+ 		if (!drop) return false;
+@@ -187,7 +192,9 @@
+ 	let configs: Record<string, MCPServerConfig> = {};
+ 	let sources: Record<string, SourceMeta> = {};
+ 	for (const server of result.items) {
+-		configs[server.name] = convertToLegacyConfig(server);
++		const config = convertToLegacyConfig(server);
++		if (forcedEnabled.has(server.name)) config.enabled = true;
++		configs[server.name] = config;
+ 		sources[server.name] = server._source;
+ 	}
+ 
+@@ -205,6 +212,11 @@
+ 		configs = browserResult.configs;
+ 		sources = browserResult.sources;
+ 	}
++	// Disabled definitions remain inspectable, but never donate native API keys
++	for (const [name, server] of disabledConfigs) {
++		configs[name] = { ...convertToLegacyConfig(server), enabled: false };
++		sources[name] = server._source;
++	}
+ 
+ 	const loaded: LoadMCPConfigsResult = { configs, exaApiKeys, sources };
+ 	if (dropped) loaded.dropped = dropped;
+@@ -367,6 +379,12 @@
   */
  export function validateServerConfig(name: string, config: MCPServerConfig): string[] {
  	const errors: string[] = [];
@@ -567,9 +650,9 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
 -import { logger, untilAborted } from "@oh-my-pi/pi-utils";
 +import { logger, Serial, untilAborted } from "@oh-my-pi/pi-utils";
  import type { EffectiveExtensionRoots, SourceMeta } from "../capability/types";
- import { resolveConfigValue } from "../config/resolve-config-value";
+ import { invalidateCommandConfig, isCommandConfigValue, resolveConfigValue } from "../config/resolve-config-value";
  import type { CustomTool } from "../extensibility/custom-tools/types";
-@@ -248,6 +248,8 @@
+@@ -284,6 +284,8 @@
  	return signal.aborted && error instanceof Error && error.name === "AbortError";
  }
  
@@ -578,7 +661,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  /**
   * Surface of an {@link MCPManager} that sessions reusing a manager (subagents, `mcp://` and
   * `skill://` handlers) use. Subagent worker threads receive a remote implementation whose calls
-@@ -280,6 +282,12 @@
+@@ -316,6 +318,12 @@
  	addNotificationListener(listener: (serverName: string, method: string, params: unknown) => void): () => void;
  	/** Names of currently connected servers. */
  	getConnectedServers(): string[];
@@ -591,7 +674,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  	/** Cached resources/templates of one server. */
  	getServerResources(name: string): { resources: MCPResource[]; templates: MCPResourceTemplate[] } | undefined;
  	/** Wait until one server's resource catalog is loaded. */
-@@ -407,6 +415,9 @@
+@@ -447,6 +455,9 @@
  	#pendingReconnections = new Map<string, Promise<MCPServerConnection | null>>();
  	/** Preserved configs for reconnection after connection loss. */
  	#serverConfigs = new Map<string, MCPServerConfig>();
@@ -601,7 +684,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  	#discoverOptions: MCPDiscoverOptions | undefined;
  	#browserFilterMutationTail: Promise<void> = Promise.resolve();
  	/** Settles when the latest {@link MCPManager.discoverAndConnect} call does; reconciles wait on it. */
-@@ -883,6 +894,7 @@
+@@ -949,6 +960,7 @@
  		sources: Record<string, SourceMeta>,
  		onStatus?: (event: McpConnectionStatusEvent) => void,
  		startupTimeoutMs?: number,
@@ -609,26 +692,27 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  	): Promise<MCPLoadResult> {
  		const notify = (event: McpConnectionStatusEvent) => {
  			onStatus?.(event);
-@@ -907,7 +919,6 @@
+@@ -973,7 +985,6 @@
  		const connectionTasks: ConnectionTask[] = [];
  
  		for (const [name, config] of Object.entries(configs)) {
 -			this.#startupServers.add(name);
+ 			// Connecting a server by name (`/mcp enable`) ends its built-in drop.
+ 			this.#builtinDrops.delete(name);
  			if (sources[name]) {
- 				this.#sources.set(name, sources[name]);
- 				const existing = this.#connections.get(name);
-@@ -915,6 +926,10 @@
+@@ -983,6 +994,11 @@
  					existing._source = sources[name];
  				}
  			}
 +			this.#serverConfigs.set(name, config);
++			if (config.enabled === false) continue;
 +			if (explicitStart) this.#stoppedServers.delete(name);
 +			if (!explicitStart && (config.startup === "manual" || this.#stoppedServers.has(name))) continue;
 +			this.#startupServers.add(name);
  
  			// Skip if already connected
  			if (this.#connections.has(name)) {
-@@ -942,13 +957,12 @@
+@@ -1010,13 +1026,12 @@
  				continue;
  			}
  
@@ -647,7 +731,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  
  			// Resolve auth config before connecting, but do so per-server in parallel.
  			const connectionPromise = (async () => {
-@@ -971,7 +985,7 @@
+@@ -1039,7 +1054,7 @@
  						connection._source = sources[name];
  					}
  
@@ -656,7 +740,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  						this.#detachConnection(name, connection);
  						void disconnectServer(connection).catch(() => {});
  						throw new Error(`Server "${name}" was disconnected during initial connection`);
-@@ -1019,7 +1033,8 @@
+@@ -1072,7 +1087,8 @@
  
  			const toolsPromise = connectionPromise.then(async connection => {
  				try {
@@ -666,7 +750,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  					return { connection, serverTools };
  				} catch (error) {
  					// Detach and delete synchronously, then close in the background:
-@@ -1039,13 +1054,14 @@
+@@ -1092,13 +1108,14 @@
  
  			const startupUpdate = toolsPromise
  				.then(async ({ connection, serverTools }) => {
@@ -682,7 +766,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  					void this.toolCache?.set(name, config, serverTools);
  
  					notify({ type: "connected", serverName: name });
-@@ -1120,6 +1136,7 @@
+@@ -1173,6 +1190,7 @@
  			for (const task of connectionTasks) {
  				const { name } = task;
  				if (task.tracked.status === "fulfilled") {
@@ -690,7 +774,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  					const value = task.tracked.value;
  					if (!value) continue;
  					const { connection, serverTools } = value;
-@@ -1137,6 +1154,7 @@
+@@ -1190,6 +1208,7 @@
  					errors.set(name, message);
  					reportedErrors.add(name);
  				} else {
@@ -698,7 +782,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  					const cached = cachedTools.get(name);
  					if (cached) {
  						const source = this.#sources.get(name);
-@@ -1424,7 +1442,7 @@
+@@ -1477,7 +1496,7 @@
  	/**
  	 * Get current connection status for a server.
  	 */
@@ -707,7 +791,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  		if (this.#connections.has(name)) return "connected";
  		if (
  			this.#pendingConnections.has(name) ||
-@@ -1477,6 +1495,60 @@
+@@ -1539,6 +1558,63 @@
  		return this.#pendingReconnections.get(name);
  	}
  
@@ -756,7 +840,10 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
 +	async stopAgentEndServers(): Promise<void> {
 +		await Promise.all(
 +			this.getAllServerNames()
-+				.filter(name => this.getServerConfig(name)?.shutdown === "agent_end")
++				.filter(name => {
++					const config = this.getServerConfig(name);
++					return config?.enabled !== false && config?.shutdown === "agent_end";
++				})
 +				.map(name =>
 +					this.controlServer(name, "stop").catch(error => {
 +						logger.warn("Failed to stop turn-scoped MCP server", { path: `mcp:${name}`, error });
@@ -768,7 +855,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  	/**
  	 * Wait for a connection to complete (or fail).
  	 */
-@@ -1540,9 +1612,7 @@
+@@ -1619,9 +1695,7 @@
  	 * Get all known server names (connected, connecting, or discovered).
  	 */
  	getAllServerNames(): string[] {
@@ -779,7 +866,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  	}
  
  	/**
-@@ -1574,17 +1644,21 @@
+@@ -1653,17 +1727,21 @@
  	}
  
  	/**
@@ -805,7 +892,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  		this.#pendingResourceRefresh.delete(name);
  		this.#reconnectHistory.delete(name);
  		this.#forgetLostServer(name);
-@@ -1599,9 +1673,7 @@
+@@ -1678,9 +1756,7 @@
  		}
  		this.#subscribedResources.delete(name);
  
@@ -816,7 +903,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  
  		// Remove tools from this server and notify consumers
  		const hadTools = this.#tools.some(t => t.mcpServerName === name);
-@@ -1613,6 +1685,7 @@
+@@ -1692,6 +1768,7 @@
  
  		// Notify prompt consumers so stale commands are cleared
  		if (connection?.prompts?.length) this.#onPromptsChanged?.(name);
@@ -824,7 +911,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  	}
  
  	/**
-@@ -1628,6 +1701,9 @@
+@@ -1707,6 +1784,9 @@
  		this.#epoch++;
  		this.#connectAbort.abort();
  		this.#connectAbort = new AbortController();
@@ -834,7 +921,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  		for (const name of this.#lostRemoteServers.keys()) this.#forgetLostServer(name);
  		const promises = Array.from(this.#connections, ([name, connection]) => this.#discardConnection(name, connection));
  		await Promise.allSettled(promises);
-@@ -1670,8 +1746,10 @@
+@@ -1752,8 +1832,10 @@
  		options?: { manual?: boolean; authChallenge?: MCPAuthChallenge },
  	): Promise<MCPServerConnection | null> {
  		if (options?.manual) {
@@ -845,12 +932,12 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  
  		const pending = this.#pendingReconnections.get(name);
  		if (pending) return pending;
-@@ -1790,7 +1868,12 @@
+@@ -1872,7 +1954,12 @@
  		const oldConnection = this.#connections.get(name);
  		let config = oldConnection?.config ?? this.#serverConfigs.get(name);
  		const source = this.#sources.get(name) ?? oldConnection?._source;
 -		if (!config) return null;
-+		if (!config || this.#stoppedServers.has(name)) return null;
++		if (!config || config.enabled === false || this.#stoppedServers.has(name)) return null;
 +		const reconnectEpoch = this.#epoch;
 +		this.#serverAbort.get(name)?.abort();
 +		const controller = new AbortController();
@@ -859,7 +946,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  
  		if (authChallenge) {
  			if (!this.#authHandler) {
-@@ -1801,7 +1884,7 @@
+@@ -1883,7 +1970,7 @@
  			}
  			try {
  				const refreshedConfig = await this.#authHandler(name, authChallenge);
@@ -868,7 +955,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  				config = refreshedConfig;
  				this.#serverConfigs.set(name, config);
  			} catch (error) {
-@@ -1817,7 +1900,6 @@
+@@ -1902,7 +1989,6 @@
  		// Fire-and-forget: don't await the close — HttpTransport.close() sends a
  		// DELETE with config.timeout (30s default), and blocking here delays the
  		// reconnect loop by that amount on every server restart.
@@ -876,7 +963,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  		if (oldConnection) {
  			// From here the live remote connection is gone: the server is lost
  			// until a reconnect succeeds, and the schedule outlives this attempt.
-@@ -1836,7 +1918,7 @@
+@@ -1921,7 +2007,7 @@
  		// attempt is a single quiet probe; its pacing is the schedule itself.
  		const delays = scheduled ? [] : this.reconnectPolicy.ladderMs;
  		for (let attempt = 0; attempt <= delays.length; attempt++) {
@@ -885,7 +972,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  				logger.debug("MCP reconnect aborted before attempt after configuration changed", {
  					path: `mcp:${name}`,
  					storedEpoch: reconnectEpoch,
-@@ -1845,12 +1927,13 @@
+@@ -1930,12 +2016,13 @@
  				return null;
  			}
  			try {
@@ -901,7 +988,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  					logger.debug("MCP reconnect aborted after configuration changed", {
  						path: `mcp:${name}`,
  						storedEpoch: reconnectEpoch,
-@@ -1888,10 +1971,8 @@
+@@ -1974,10 +2061,8 @@
  		name: string,
  		config: MCPServerConfig,
  		source: SourceMeta | undefined,
@@ -913,7 +1000,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  		const resolvedConfig = await this.#resolveAuthConfig(config, { signal: connectSignal });
  		const connection = await connectToServer(name, resolvedConfig, {
  			signal: connectSignal,
-@@ -1908,7 +1989,7 @@
+@@ -1994,7 +2079,7 @@
  
  		// Bail out if the server was disconnected or the manager was reset
  		// while we were connecting (e.g. /mcp reload called disconnectAll).
@@ -922,7 +1009,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  			this.#detachConnection(name, connection);
  			void disconnectServer(connection).catch(() => {});
  			throw new Error(`Server "${name}" was disconnected during reconnection`);
-@@ -1933,7 +2014,8 @@
+@@ -2009,7 +2094,8 @@
  			void this.reconnectServer(name);
  		};
  		try {
@@ -932,7 +1019,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
  			const reconnect = (options?: { authChallenge?: MCPAuthChallenge }) => this.reconnectServer(name, options);
  			const customTools = MCPTool.fromTools(connection, serverTools, reconnect, this.#observeToolCall(name));
  			void this.toolCache?.set(name, config, serverTools);
-@@ -2031,6 +2113,7 @@
+@@ -2107,6 +2193,7 @@
  			if (callProvoked) this.#callProvokedToolRefreshes.add(name);
  			throw error;
  		}
@@ -943,8 +1030,8 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
 diff --git a/src/mcp/tool-bridge.ts b/src/mcp/tool-bridge.ts
 --- a/src/mcp/tool-bridge.ts
 +++ b/src/mcp/tool-bridge.ts
-@@ -281,6 +281,9 @@
- 	return false;
+@@ -321,6 +321,9 @@
+ 	);
  }
  
 +// Share native result formatting with in-process extension tools
@@ -964,11 +1051,11 @@ diff --git a/src/mcp/transports/stdio.ts b/src/mcp/transports/stdio.ts
 +const TERM_GRACE_MS = 30_000;
  /** Grace window to observe SIGKILL taking effect before `close()` gives up and returns. */
  const KILL_GRACE_MS = 500;
- 
+ /** Bun can report stdout EOF before `exited` settles; bound the wait for the exit status. */
 diff --git a/src/mcp/types.ts b/src/mcp/types.ts
 --- a/src/mcp/types.ts
 +++ b/src/mcp/types.ts
-@@ -73,6 +73,10 @@
+@@ -74,6 +74,10 @@
  interface MCPServerConfigBase {
  	/** Whether this server is enabled (default: true) */
  	enabled?: boolean;
@@ -991,7 +1078,7 @@ diff --git a/src/modes/acp/acp-agent.ts b/src/modes/acp/acp-agent.ts
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
  import { parseSkillInvocation } from "../../extensibility/skills";
  import { PYTHON_KERNEL_CANCEL_BUDGET_MS } from "../../eval/py/kernel";
-@@ -3082,14 +3082,7 @@
+@@ -3334,14 +3334,7 @@
  				getAllTools: () => record.session.getAllToolInfos(),
  				setActiveTools: toolNames => record.session.setActiveToolsByName(toolNames),
  				getCommands: () => getSessionSlashCommands(record.session),
@@ -1030,7 +1117,7 @@ diff --git a/src/modes/components/extensions/mcp-runtime.ts b/src/modes/componen
 diff --git a/src/modes/controllers/extension-ui-controller.ts b/src/modes/controllers/extension-ui-controller.ts
 --- a/src/modes/controllers/extension-ui-controller.ts
 +++ b/src/modes/controllers/extension-ui-controller.ts
-@@ -26,6 +26,7 @@
+@@ -27,6 +27,7 @@
  	SendUserMessageHandler,
  	TerminalInputHandler,
  } from "../../extensibility/extensions";
@@ -1038,7 +1125,7 @@ diff --git a/src/modes/controllers/extension-ui-controller.ts b/src/modes/contro
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
  import { cfgExtensionAssistantTextRenderers } from "../../extensibility/settings";
  import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
-@@ -251,12 +252,7 @@
+@@ -284,12 +285,7 @@
  			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
  			getAllTools: () => this.ctx.session.getAllToolInfos(),
  			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
@@ -1052,7 +1139,7 @@ diff --git a/src/modes/controllers/extension-ui-controller.ts b/src/modes/contro
  			getThinkingLevel: () => this.ctx.session.thinkingLevel,
  			setThinkingLevel: level => this.ctx.session.setThinkingLevel(level),
  			getServiceTiers: () => this.ctx.session.serviceTierByFamily,
-@@ -485,12 +481,7 @@
+@@ -509,12 +505,7 @@
  			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
  			getAllTools: () => this.ctx.session.getAllToolInfos(),
  			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
@@ -1069,7 +1156,7 @@ diff --git a/src/modes/controllers/extension-ui-controller.ts b/src/modes/contro
 diff --git a/src/modes/controllers/mcp-command-controller.ts b/src/modes/controllers/mcp-command-controller.ts
 --- a/src/modes/controllers/mcp-command-controller.ts
 +++ b/src/modes/controllers/mcp-command-controller.ts
-@@ -1008,7 +1008,7 @@
+@@ -905,7 +905,7 @@
  	async #syncManagerConnection(name: string, config: MCPServerConfig): Promise<void> {
  		if (!this.ctx.mcpManager) return;
  		if (this.ctx.mcpManager.getConnectionStatus(name) !== "disconnected") return;
@@ -1078,7 +1165,7 @@ diff --git a/src/modes/controllers/mcp-command-controller.ts b/src/modes/control
  		if (this.ctx.mcpManager.getConnectionStatus(name) === "connected") {
  			await this.ctx.session.refreshMCPTools(this.ctx.mcpManager.getTools());
  		}
-@@ -1810,7 +1810,7 @@
+@@ -1727,7 +1727,7 @@
  		}
  
  		const source = sources[name];
@@ -1090,7 +1177,7 @@ diff --git a/src/modes/controllers/mcp-command-controller.ts b/src/modes/control
 diff --git a/src/modes/runtime-init.ts b/src/modes/runtime-init.ts
 --- a/src/modes/runtime-init.ts
 +++ b/src/modes/runtime-init.ts
-@@ -128,7 +128,7 @@
+@@ -129,7 +129,7 @@
  			setActiveTools: (toolNames: string[]) =>
  				session.setActiveToolsByName(filterActiveTools ? filterActiveTools(toolNames) : toolNames),
  			getCommands: () => getSessionSlashCommands(session),
@@ -1102,7 +1189,7 @@ diff --git a/src/modes/runtime-init.ts b/src/modes/runtime-init.ts
 diff --git a/src/sdk.ts b/src/sdk.ts
 --- a/src/sdk.ts
 +++ b/src/sdk.ts
-@@ -3764,6 +3764,7 @@
+@@ -3960,6 +3960,7 @@
  			}),
  			createAnnotationsAPI,
  		);
@@ -1110,14 +1197,14 @@ diff --git a/src/sdk.ts b/src/sdk.ts
  		// A dialog waits for the user, not the agent: the session lets the display sleep while one is open.
  		const trackUserWait: UserWaitTracker = dialog => (hasSession ? session.waitForUser(dialog) : dialog());
  		extensionRunner.setUserWaitTracker(trackUserWait);
-@@ -5204,6 +5205,7 @@
+@@ -5616,6 +5617,7 @@
  				hostMcpServerInstructions = source;
  			},
  			disconnectOwnedMcpManager: ownedMcpManager ? () => ownedMcpManager.disconnectAll() : undefined,
 +			disconnectMcpAtAgentEnd: ownedMcpManager ? () => ownedMcpManager.stopAgentEndServers() : undefined,
+ 			reloadOwnedMcpServers,
  			ttsrManager,
  			obfuscator,
- 			agentId: resolvedAgentId,
 diff --git a/src/session/agent-session-types.ts b/src/session/agent-session-types.ts
 --- a/src/session/agent-session-types.ts
 +++ b/src/session/agent-session-types.ts
@@ -1127,39 +1214,157 @@ diff --git a/src/session/agent-session-types.ts b/src/session/agent-session-type
  	disconnectOwnedMcpManager?: () => Promise<void>;
 +	/** Close turn-scoped MCP servers only at the owning session's final settle */
 +	disconnectMcpAtAgentEnd?: () => Promise<void>;
- 	/** System prompt used by automatic session-title generation. */
- 	titleSystemPrompt?: string;
  	/**
+ 	 * Reconnect the MCP manager owned by this session against the session's current cwd and
+ 	 * rebind its tools; serialized. Resolves `undefined` once the session is disposed. Absent
 diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
 --- a/src/session/agent-session.ts
 +++ b/src/session/agent-session.ts
-@@ -1306,6 +1306,7 @@
+@@ -1166,6 +1166,8 @@
+ 	/** Settles when the open run ends or is abandoned; see {@link waitForRunEnd}. */
+ 	#runEnded: PromiseWithResolvers<void> | undefined;
+ 	#runCheckScheduled = false;
++	/** Accepted final-run teardown; new submissions and autonomous turns wait for it */
++	#runFinalization: Promise<void> | undefined;
+ 	/** In-flight settle-callback flushes; the stranded-message drain after each may still start a loop. */
+ 	#settleCallbackFlushes = 0;
+ 	#commandMetadataChangedListeners: CommandMetadataChangedListener[] = [];
+@@ -1380,6 +1382,7 @@
  	#sideStreamFn: StreamFn;
  	#convertToLlm: (messages: AgentMessage[]) => Message[] | Promise<Message[]>;
  	#disconnectOwnedMcpManager: (() => Promise<void>) | undefined;
 +	#disconnectMcpAtAgentEnd: (() => Promise<void>) | undefined;
- 
- 	readonly #ttsr: TtsrCoordinator;
- 	readonly #stats: SessionStatsTracker;
-@@ -2641,6 +2642,7 @@
+ 	#reloadOwnedMcpServers: (() => Promise<MCPLoadResult | undefined>) | undefined;
+ 	#projectScopeRefresher: (() => Promise<void>) | undefined;
+ 	#projectScopeRefresh: Promise<void> = Promise.resolve();
+@@ -1947,7 +1950,9 @@
+ 		// advertise one yield schema while the runtime enforces the other, so join
+ 		// the transition before building the turn from a consistent contract.
+ 		void this.whenWorkPoolYieldSettled()
+-			.then(() => {
++			.then(async () => {
++				if (this.#runFinalization) await this.#runFinalization;
++				if (this.#isDisposed || this.#promptGeneration !== generation) return;
+ 				// Synchronous ownership check, atomic with the dispatch below:
+ 				// agent.prompt() claims streaming with no await in between, and the
+ 				// yield contract above mutates synchronously, so no install can
+@@ -2619,6 +2624,8 @@
+ 			// settles, so a result from the outgoing session cannot start a turn in the target.
+ 			isStreaming: () => this.isStreaming || this.isSessionTransitioning,
+ 			injectIdle: async delivered => {
++				if (this.#runFinalization) await this.#runFinalization;
++				if (this.#isDisposed) return;
+ 				const first = delivered[0];
+ 				if (!first) return;
+ 				// A background job may have made a prelude's first call: its guide rides the job's delivery.
+@@ -2810,6 +2817,7 @@
  			skillsReloadable: config.skillsReloadable,
  		});
  		this.#disconnectOwnedMcpManager = config.disconnectOwnedMcpManager;
 +		this.#disconnectMcpAtAgentEnd = config.disconnectMcpAtAgentEnd;
+ 		this.#reloadOwnedMcpServers = config.reloadOwnedMcpServers;
  		const ttsrHost: TtsrCoordinatorHost = {
  			agent: this.agent,
- 			sessionManager: this.sessionManager,
-@@ -5866,6 +5868,9 @@
- 		// `yielded` alone also covers queued steer/follow-up and IRC continuations,
- 		// which `#flushPendingAgentEnd` re-tags non-terminal.
- 		const awaitingAsyncWork = options?.willContinue === true && options.awaitingAsyncWork === true;
-+		if (!options?.willContinue && !this.agent.hasQueuedMessages() && !this.#irc.hasPending()) {
-+			await this.#disconnectMcpAtAgentEnd?.();
+@@ -3997,6 +4005,7 @@
+ 	async #admitSubmission<T>(work: () => Promise<T>): Promise<T> {
+ 		this.#admittedSubmissionCount++;
+ 		try {
++			if (this.#runFinalization) await this.#runFinalization;
+ 			if (this.hasPendingDeferredExtensions) await this.loadDeferredExtensions();
+ 			return await this.#inLogContext(work);
+ 		} finally {
+@@ -5756,6 +5765,7 @@
+ 		onStart?: () => void,
+ 	): Promise<AgentContinueOutcome> {
+ 		try {
++			if (this.#runFinalization) await this.#runFinalization;
+ 			// During an automatic-retry saga the primary model's selector cooldown
+ 			// can expire while a chain-tail fallback is still mid-backoff. Restoring
+ 			// the primary then would reset the retry budget and re-enter a model
+@@ -6259,7 +6269,7 @@
+ 	 * without writing) therefore ends it here.
+ 	 */
+ 	#checkRun(): void {
+-		if (!this.#runActive || this.#isDisposed) return;
++		if (!this.#runActive || this.#isDisposed || this.#runFinalization) return;
+ 		if (this.isStreaming || this.#postPromptTasks.size > 0 || this.#abortUnwinds.size > 0) return;
+ 		if (this.#admittedSubmissionCount > 0 || this.#settleCallbackFlushes > 0) return;
+ 		// Transitions and `/compact` detach the agent while they abort and rebuild; the
+@@ -6285,16 +6295,57 @@
+ 			return;
+ 		}
+ 		const end = this.#loopEnd;
+-		this.#closeRun();
+-		void this.#emitSessionEvent(end.event).catch(error =>
+-			logger.warn("agent_end session event emission failed", { error: String(error) }),
++		const finalization = Promise.withResolvers<void>();
++		this.#runFinalization = finalization.promise;
++		this.#inFlightEventHandlers.add(finalization.promise);
++		void this.#finishRun(end, this.#runEnded, this.#sessionGeneration, finalization).catch(error =>
++			logger.warn("Run finalization failed", { error: String(error) }),
+ 		);
+-		// A subscriber may queue input from `agent_end` itself (a collab guest's steer racing
+-		// the settle): nothing polls the queue any more, so it starts the next run.
+-		this.#drainStrandedQueuedMessages();
+-		void this.#notifyExtensionsLoopEnd(end.activeMessages);
+ 	}
+ 
++	/** Finish accepted teardown and emit the final end before exposing idle */
++	async #finishRun(
++		end: LoopEnd,
++		runEnded: PromiseWithResolvers<void> | undefined,
++		sessionGeneration: number,
++		finalization: PromiseWithResolvers<void>,
++	): Promise<void> {
++		let finished = false;
++		try {
++			try {
++				await this.#disconnectMcpAtAgentEnd?.();
++			} catch (error) {
++				logger.warn("Failed to stop turn-scoped MCP servers", { error: String(error) });
++			}
++			// A transition may have abandoned this run while shutdown was pending
++			if (
++				this.#runEnded !== runEnded ||
++				this.#loopEnd !== end ||
++				this.#sessionGeneration !== sessionGeneration
++			) return;
++			void this.#emitSessionEvent(end.event).catch(error =>
++				logger.warn("agent_end session event emission failed", { error: String(error) }),
++			);
++			// Terminal listeners may synchronously replace or dispose the session
++			if (
++				this.#runEnded !== runEnded ||
++				this.#loopEnd !== end ||
++				this.#sessionGeneration !== sessionGeneration
++			) return;
++			this.#closeRun();
++			finished = true;
++		} finally {
++			this.#runFinalization = undefined;
++			this.#inFlightEventHandlers.delete(finalization.promise);
++			finalization.resolve();
++			// Extension end hooks may await a new prompt, so release its gate first
++			if (finished) void this.#notifyExtensionsLoopEnd(end.activeMessages);
++			if (!this.#isDisposed && this.#sessionGeneration === sessionGeneration) {
++				this.#drainStrandedQueuedMessages();
++			}
 +		}
- 		await this.#emitSessionEvent({
- 			...event,
- 			isTerminal: !options?.willContinue,
-@@ -6623,7 +6628,7 @@
++	}
++
+ 	/** Whether the latest model turn ended on its own with an answer: no error, abort, or stop mid-tool-use. */
+ 	#lastTurnSettledCleanly(): boolean {
+ 		const last = this.getLastAssistantMessage();
+@@ -7023,7 +7074,7 @@
+ 	beginDispose(): void {
+ 		this.#isDisposed = true;
+ 		for (const dispose of this.#disposers.splice(0)) dispose();
+-		if (this.#runActive) this.#closeRun();
++		if (this.#runActive && !this.#runFinalization) this.#closeRun();
+ 		this.#modelDiscoveryAbortController.abort();
+ 		this.#queuedMessageDrainBlocked = false;
+ 		this.#usagePreflightReadyForNextModelCall = false;
+@@ -7168,7 +7219,7 @@
  		try {
  			await withTimeout(
  				this.#disconnectOwnedMcpManager(),
@@ -1168,19 +1373,47 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  				"Timed out disconnecting owned MCP manager during dispose",
  			);
  		} catch (error) {
-@@ -12099,7 +12104,7 @@
- 	setModelTemporary(
+@@ -7190,6 +7241,7 @@
+ 
+ 	async #doDispose(options: AgentSessionDisposeOptions = {}): Promise<void> {
+ 		this.beginDispose();
++		if (this.#runFinalization) await this.#runFinalization;
+ 		// Stop cache warming before the drain windows below: an armed tick firing
+ 		// mid-dispose would issue a paid warm request and persist usage into the
+ 		// closing session writer.
+@@ -9915,6 +9967,10 @@
+ 		const setupAbort = new AbortController();
+ 		this.#promptSetupAbortController = setupAbort;
+ 		try {
++			if (this.#runFinalization) {
++				await this.#runFinalization;
++				if (this.#isDisposed || this.#promptGeneration !== generation) return false;
++			}
+ 			options?.onPromptAdmitted?.();
+ 			await this.#recovery.maybeRestoreRetryFallbackPrimary();
+ 			// Auto-prewalk: return from the previous task's handoff before the usage preflight checks the model,
+@@ -11136,6 +11192,8 @@
+ 		const setupAbort = new AbortController();
+ 		this.#promptSetupAbortController = setupAbort;
+ 		try {
++			if (this.#runFinalization) await this.#runFinalization;
++			if (this.#isDisposed || this.#sessionGeneration !== sessionGeneration) return false;
+ 			if (!(await this.#runUsageAwarePreflightForNextModelCall())) return false;
+ 			const acceptTerminalEmptyStop = options?.acceptTerminalEmptyStop === true;
+ 			if (acceptTerminalEmptyStop) {
+@@ -13098,7 +13156,7 @@
+ 	async setModelTemporary(
  		model: Model,
  		thinkingLevel?: ConfiguredThinkingLevel,
 -		options?: { ephemeral?: boolean },
 +		options?: { ephemeral?: boolean; recordUsage?: boolean },
  	): Promise<void> {
- 		return this.#models.setModelTemporary(model, thinkingLevel, options);
+ 		await this.#models.setModelTemporary(model, thinkingLevel, options);
  	}
 diff --git a/src/session/model-controls.ts b/src/session/model-controls.ts
 --- a/src/session/model-controls.ts
 +++ b/src/session/model-controls.ts
-@@ -355,7 +355,8 @@
+@@ -336,7 +336,8 @@
  	async setModelTemporary(
  		model: Model,
  		thinkingLevel?: ConfiguredThinkingLevel,
@@ -1188,20 +1421,20 @@ diff --git a/src/session/model-controls.ts b/src/session/model-controls.ts
 +		// Records model usage by default, including ephemeral switches
 +		options?: { ephemeral?: boolean; prewalk?: boolean; recordUsage?: boolean },
  		selection: "explicit" | "automatic" = "explicit",
- 	): Promise<void> {
- 		const previousEditMode = this.#host.resolveActiveEditMode();
-@@ -372,7 +373,10 @@
- 			`${targetModel.provider}/${targetModel.id}`,
- 			options?.prewalk ? PREWALK_MODEL_CHANGE_ROLE : options?.ephemeral ? EPHEMERAL_MODEL_CHANGE_ROLE : "temporary",
- 		);
--		this.#host.settings.getStorage()?.recordModelUsage(`${targetModel.provider}/${targetModel.id}`);
-+		// Auxiliary extension selections must not reorder model usage history
-+		if (options?.recordUsage !== false) {
-+			this.#host.settings.getStorage()?.recordModelUsage(`${targetModel.provider}/${targetModel.id}`);
-+		}
+ 		isCurrent?: () => boolean,
+ 	): Promise<boolean> {
+@@ -363,7 +364,10 @@
+ 						? EPHEMERAL_MODEL_CHANGE_ROLE
+ 						: TEMPORARY_MODEL_CHANGE_ROLE,
+ 			);
+-			this.#host.settings.getStorage()?.recordModelUsage(`${targetModel.provider}/${targetModel.id}`);
++			// Auxiliary extension selections must not reorder model usage history
++			if (options?.recordUsage !== false) {
++				this.#host.settings.getStorage()?.recordModelUsage(`${targetModel.provider}/${targetModel.id}`);
++			}
+ 		}
  
- 		// Apply explicit thinking level if given; otherwise prefer the model's
- 		// configured defaultLevel; otherwise re-clamp the current level (or auto).
+ 		// A user selection during the switch owns effort, even on the same model.
 diff --git a/src/ssh/connection-manager.ts b/src/ssh/connection-manager.ts
 --- a/src/ssh/connection-manager.ts
 +++ b/src/ssh/connection-manager.ts
@@ -1244,80 +1477,11 @@ diff --git a/src/ssh/connection-manager.ts b/src/ssh/connection-manager.ts
  }
  
  export async function closeConnection(hostName: string): Promise<void> {
-diff --git a/src/ssh/file-transfer.ts b/src/ssh/file-transfer.ts
---- a/src/ssh/file-transfer.ts
-+++ b/src/ssh/file-transfer.ts
-@@ -8,6 +8,7 @@
-  */
- import { type ShellFsDirEntry, ShellFsFileType } from "@oh-my-pi/pi-natives";
- import { ConcatSink, ptree } from "@oh-my-pi/pi-utils";
-+import { createFileTransfer } from "./transfer-compression";
- import { buildRemoteCommand, ensureConnection, ensureHostInfo, type SSHConnectionTarget } from "./connection-manager";
- import { quotePosixArgument } from "../utils/shell-quote";
- import { wrapInPosixShell } from "./utils";
-@@ -108,21 +109,19 @@
- 	remotePath: string,
- 	opts: RemoteFileReadOptions,
- ): Promise<RemoteFileReadResult> {
-+	if (!Number.isSafeInteger(opts.maxBytes) || opts.maxBytes < 0 || opts.maxBytes >= Number.MAX_SAFE_INTEGER) {
-+		throw new Error("ssh://: maxBytes must be a nonnegative safe byte bound");
-+	}
- 	const shell = await ensurePosixRemote(target);
-+	const transfer = await createFileTransfer(target, opts);
- 	const p = quotePosixArgument(remotePath);
--	// On a failed read, nothing at the path (not even a dangling symlink) exits with the reserved status;
--	// `head`'s own stderr stays the message either way.
-+	// Keep the reserved missing-path status through the compressed transfer
- 	const command =
- 		`head -c ${opts.maxBytes + 1} ${p} || { s=$?; ` +
- 		`if [ ! -e ${p} ] && [ ! -L ${p} ]; then exit ${REMOTE_MISSING_EXIT}; fi; exit $s; }`;
--	const args = await buildRemoteCommand(target, wrapInPosixShell(shell, command));
--	using child = ptree.spawn(["ssh", ...args], {
--		signal: ptree.combineSignals(opts.signal, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
--	});
--	// Drain stdout before awaiting exit so a full pipe can't deadlock the child.
--	const raw = await child.bytes();
-+	let raw: Uint8Array;
- 	try {
--		await child.exitedCleanly;
-+		raw = await transfer.read(shell, command, opts.maxBytes + 1);
- 	} catch (error) {
- 		if (error instanceof ptree.NonZeroExitError && error.exitCode === REMOTE_MISSING_EXIT) {
- 			throw Object.assign(new Error(error.message, { cause: error }), { code: "ENOENT" });
-@@ -167,6 +166,7 @@
- 	if (remotePath.endsWith("/")) {
- 		throw new Error("ssh://: destination is a directory path (trailing '/'); ssh:// write requires a file path");
- 	}
-+	const transfer = await createFileTransfer(target, opts);
- 	const dest = quotePosixArgument(remotePath);
- 	const tmp = quotePosixArgument(`${remotePath}.omp-tmp.${crypto.randomUUID()}`);
- 	// Stage stdin into the temp first (so the remote never blocks on an unread
-@@ -182,18 +182,13 @@
- 	const command =
- 		`t=${tmp}; trap 'rm -f -- "$t"' 0; ` +
- 		`mkdir -p -- "$(dirname "$t")" && ` +
--		`cat > "$t" && { ` +
-+		`${transfer.inputCommand} > "$t" && { ` +
- 		`if [ -d ${dest} ]; then echo 'ssh://: destination is a directory' >&2; exit 1; ` +
- 		`elif [ -f ${dest} ] && [ ! -L ${dest} ]; then cat "$t" > ${dest} || exit 1; ` +
- 		`elif [ -e ${dest} ] && [ ! -L ${dest} ]; then echo 'ssh://: destination is a special file (not a regular file)' >&2; exit 1; ` +
- 		`else mv "$t" ${dest}; fi; ` +
- 		`}`;
--	const args = await buildRemoteCommand(target, wrapInPosixShell(shell, command), { allowStdin: true });
--	using child = ptree.spawn(["ssh", ...args], {
--		stdin: content,
--		signal: ptree.combineSignals(opts.signal, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
--	});
--	await child.exitedCleanly;
-+	await transfer.write(shell, command, content);
- }
- 
- /** Classification of a remote path, used by the read handler's directory dispatch. */
-diff --git a/src/ssh/transfer-compression.ts b/src/ssh/transfer-compression.ts
+diff --git a/src/ssh/endpoint.ts b/src/ssh/endpoint.ts
 new file mode 100644
 --- /dev/null
-+++ b/src/ssh/transfer-compression.ts
-@@ -0,0 +1,162 @@
++++ b/src/ssh/endpoint.ts
+@@ -0,0 +1,53 @@
 +import { isIP } from "node:net";
 +import { networkInterfaces } from "node:os";
 +import {
@@ -1327,7 +1491,7 @@ new file mode 100644
 +  type SSHConnectionTarget,
 +} from "@oh-my-pi/pi-coding-agent/ssh/connection-manager";
 +import { wrapInPosixShell } from "@oh-my-pi/pi-coding-agent/ssh/utils";
-+import { $which, ptree } from "@oh-my-pi/pi-utils";
++import { ptree } from "@oh-my-pi/pi-utils";
 +import ipaddr from "ipaddr.js";
 +
 +function address(value: string): string {
@@ -1356,6 +1520,7 @@ new file mode 100644
 +  const signal = ptree.combineSignals(opts.signal, opts.timeoutMs ?? 30_000);
 +  using child = ptree.spawn(["ssh", ...args], signal ? { signal } : {});
 +  const connection = (await child.text()).trim().split(/\s+/);
++  await child.exitedCleanly;
 +  const serverAddress = connection[2];
 +  if (
 +    connection.length !== 4 ||
@@ -1370,8 +1535,25 @@ new file mode 100644
 +    entries?.some((entry) => address(entry.address) === endpoint),
 +  );
 +}
+diff --git a/src/ssh/file-transfer-policy.ts b/src/ssh/file-transfer-policy.ts
+new file mode 100644
+--- /dev/null
++++ b/src/ssh/file-transfer-policy.ts
+@@ -0,0 +1,123 @@
++import {
++  buildRemoteCommand,
++  type SSHConnectionTarget,
++} from "@oh-my-pi/pi-coding-agent/ssh/connection-manager";
++import type { RemoteFileTransferAdapter } from "@oh-my-pi/pi-coding-agent/ssh/file-transfer";
++import { wrapInPosixShell } from "@oh-my-pi/pi-coding-agent/ssh/utils";
++import { $which, ptree } from "@oh-my-pi/pi-utils";
++import { isSameMachineSSH } from "./endpoint";
 +
-+export function requireZstd(): void {
++// Static binding reaches native ssh:// and blob callers before extensions load
++export const fileTransferAdapter: RemoteFileTransferAdapter | undefined =
++  createFileTransfer;
++
++function requireZstd(): void {
 +  if (!$which("zstd"))
 +    throw new Error(
 +      "Remote file transfers require zstd on the local and remote PATH; no gzip fallback is used",
@@ -1379,7 +1561,7 @@ new file mode 100644
 +}
 +
 +/** Keep compression and process lifetimes out of upstream's file operations */
-+export async function createFileTransfer(
++async function createFileTransfer(
 +  target: SSHConnectionTarget,
 +  opts: { signal?: AbortSignal; timeoutMs?: number },
 +) {
@@ -1394,10 +1576,11 @@ new file mode 100644
 +      command: string,
 +      limit: number,
 +    ): Promise<Uint8Array> {
++      // Group the full producer list so every successful branch is compressed
 +      // Stage the bounded prefix so a producer failure cannot be hidden by a pipe
 +      const remote = compressed
 +        ? `command -v zstd >/dev/null 2>&1 || { echo 'ssh://: remote zstd is required' >&2; exit 1; }; ` +
-+          `t=$(mktemp) || exit 1; trap 'rm -f -- "$t"' 0; ${command} > "$t" && zstd -q -c -- "$t"`
++          `t=$(mktemp) || exit 1; trap 'rm -f -- "$t"' 0; {\n${command}\n} > "$t" && zstd -q -c -- "$t"`
 +        : command;
 +      const args = await buildRemoteCommand(target, wrapInPosixShell(shell, remote));
 +      using child = ptree.spawn(["ssh", ...args], options);
@@ -1453,7 +1636,7 @@ new file mode 100644
 +}
 +
 +/** Drain without allowing a remote decoder to exceed the requested byte bound */
-+export async function boundedTransferBytes(
++async function boundedTransferBytes(
 +  stream: ReadableStream<Uint8Array>,
 +  limit: number,
 +): Promise<Uint8Array> {
@@ -1480,10 +1663,116 @@ new file mode 100644
 +    await sink.end();
 +  }
 +}
+diff --git a/src/ssh/file-transfer.ts b/src/ssh/file-transfer.ts
+--- a/src/ssh/file-transfer.ts
++++ b/src/ssh/file-transfer.ts
+@@ -8,6 +8,7 @@
+  */
+ import { type ShellFsDirEntry, ShellFsFileType } from "@oh-my-pi/pi-natives";
+ import { ConcatSink, ptree } from "@oh-my-pi/pi-utils";
++import { fileTransferAdapter } from "./file-transfer-policy";
+ import { buildRemoteCommand, ensureConnection, ensureHostInfo, type SSHConnectionTarget } from "./connection-manager";
+ import { quotePosixArgument } from "../utils/shell-quote";
+ import { wrapInPosixShell } from "./utils";
+@@ -69,6 +70,18 @@
+ 	timeoutMs?: number;
+ }
+ 
++/** Byte transport policy, independent of path validation and staged commits */
++export interface RemoteFileTransfer {
++	inputCommand: string;
++	read(shell: "sh" | "bash" | "zsh", command: string, limit: number): Promise<Uint8Array>;
++	write(shell: "sh" | "bash" | "zsh", command: string, content: Uint8Array): Promise<void>;
++}
++
++export type RemoteFileTransferAdapter = (
++	target: SSHConnectionTarget,
++	opts: RemoteFileWriteOptions,
++) => Promise<RemoteFileTransfer>;
++
+ /** Resolve the remote account's HOME without shell-expanding any caller-supplied path. */
+ export async function remoteHomeDirectory(
+ 	target: SSHConnectionTarget,
+@@ -108,21 +121,28 @@
+ 	remotePath: string,
+ 	opts: RemoteFileReadOptions,
+ ): Promise<RemoteFileReadResult> {
++	if (!Number.isSafeInteger(opts.maxBytes) || opts.maxBytes < 0 || opts.maxBytes >= Number.MAX_SAFE_INTEGER) {
++		throw new Error("ssh://: maxBytes must be a nonnegative safe byte bound");
++	}
+ 	const shell = await ensurePosixRemote(target);
++	const transfer = await fileTransferAdapter?.(target, opts);
+ 	const p = quotePosixArgument(remotePath);
+-	// On a failed read, nothing at the path (not even a dangling symlink) exits with the reserved status;
+-	// `head`'s own stderr stays the message either way.
++	// Preserve the reserved missing-path status across any transport adapter
+ 	const command =
+ 		`head -c ${opts.maxBytes + 1} ${p} || { s=$?; ` +
+ 		`if [ ! -e ${p} ] && [ ! -L ${p} ]; then exit ${REMOTE_MISSING_EXIT}; fi; exit $s; }`;
+-	const args = await buildRemoteCommand(target, wrapInPosixShell(shell, command));
+-	using child = ptree.spawn(["ssh", ...args], {
+-		signal: ptree.combineSignals(opts.signal, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+-	});
+-	// Drain stdout before awaiting exit so a full pipe can't deadlock the child.
+-	const raw = await child.bytes();
++	let raw: Uint8Array;
+ 	try {
+-		await child.exitedCleanly;
++		if (transfer) {
++			raw = await transfer.read(shell, command, opts.maxBytes + 1);
++		} else {
++			const args = await buildRemoteCommand(target, wrapInPosixShell(shell, command));
++			using child = ptree.spawn(["ssh", ...args], {
++				signal: ptree.combineSignals(opts.signal, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
++			});
++			raw = await child.bytes();
++			await child.exitedCleanly;
++		}
+ 	} catch (error) {
+ 		if (error instanceof ptree.NonZeroExitError && error.exitCode === REMOTE_MISSING_EXIT) {
+ 			throw Object.assign(new Error(error.message, { cause: error }), { code: "ENOENT" });
+@@ -167,6 +187,7 @@
+ 	if (remotePath.endsWith("/")) {
+ 		throw new Error("ssh://: destination is a directory path (trailing '/'); ssh:// write requires a file path");
+ 	}
++	const transfer = await fileTransferAdapter?.(target, opts);
+ 	const dest = quotePosixArgument(remotePath);
+ 	const tmp = quotePosixArgument(`${remotePath}.omp-tmp.${crypto.randomUUID()}`);
+ 	// Stage stdin into the temp first (so the remote never blocks on an unread
+@@ -182,18 +203,22 @@
+ 	const command =
+ 		`t=${tmp}; trap 'rm -f -- "$t"' 0; ` +
+ 		`mkdir -p -- "$(dirname "$t")" && ` +
+-		`cat > "$t" && { ` +
++		`${transfer?.inputCommand ?? "cat"} > "$t" && { ` +
+ 		`if [ -d ${dest} ]; then echo 'ssh://: destination is a directory' >&2; exit 1; ` +
+ 		`elif [ -f ${dest} ] && [ ! -L ${dest} ]; then cat "$t" > ${dest} || exit 1; ` +
+ 		`elif [ -e ${dest} ] && [ ! -L ${dest} ]; then echo 'ssh://: destination is a special file (not a regular file)' >&2; exit 1; ` +
+ 		`else mv "$t" ${dest}; fi; ` +
+ 		`}`;
+-	const args = await buildRemoteCommand(target, wrapInPosixShell(shell, command), { allowStdin: true });
+-	using child = ptree.spawn(["ssh", ...args], {
+-		stdin: content,
+-		signal: ptree.combineSignals(opts.signal, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+-	});
+-	await child.exitedCleanly;
++	if (transfer) {
++		await transfer.write(shell, command, content);
++	} else {
++		const args = await buildRemoteCommand(target, wrapInPosixShell(shell, command), { allowStdin: true });
++		using child = ptree.spawn(["ssh", ...args], {
++			stdin: content,
++			signal: ptree.combineSignals(opts.signal, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
++		});
++		await child.exitedCleanly;
++	}
+ }
+ 
+ /** Classification of a remote path, used by the read handler's directory dispatch. */
 diff --git a/src/thread/services/integrations.ts b/src/thread/services/integrations.ts
 --- a/src/thread/services/integrations.ts
 +++ b/src/thread/services/integrations.ts
-@@ -331,6 +331,10 @@
+@@ -343,6 +343,10 @@
  				),
  			),
  		connectedServers: manager => manager.getConnectedServers(),
@@ -1542,3 +1831,185 @@ diff --git a/src/thread/services/mcp-remote.ts b/src/thread/services/mcp-remote.
  	getServerResources(name: string): { resources: MCPResource[]; templates: MCPResourceTemplate[] } | undefined {
  		return this.#remote.callSync("serverResources", name);
  	}
+diff --git a/src/tools/browser/launch-adapter.ts b/src/tools/browser/launch-adapter.ts
+new file mode 100644
+--- /dev/null
++++ b/src/tools/browser/launch-adapter.ts
+@@ -0,0 +1,52 @@
++import { browserLaunchAdapter } from "@oh-my-pi/pi-coding-agent/tools/browser/launch-policy";
++import type { Browser, LaunchOptions, PuppeteerNode } from "puppeteer-core";
++
++export type BrowserLauncher = PuppeteerNode;
++export type BrowserLaunchOptions = LaunchOptions;
++
++export interface BrowserLaunchSpec {
++  executablePath: string;
++  args: string[];
++}
++
++/** Optional deployment policy, loaded before native browser and auth callers */
++export interface BrowserLaunchAdapter {
++  launch?(puppeteer: BrowserLauncher, options: BrowserLaunchOptions): Promise<Browser>;
++  adapt?(
++    spec: BrowserLaunchSpec,
++    headless: boolean,
++    rejectProfileReuse: boolean,
++  ): Promise<BrowserLaunchSpec>;
++  assertCanReuseApp?(): void;
++  sharedDaemonName?(headless: boolean): string | undefined;
++}
++
++export function launchBrowser(
++  puppeteer: BrowserLauncher,
++  options: BrowserLaunchOptions,
++): Promise<Browser> {
++  return (
++    browserLaunchAdapter?.launch?.(puppeteer, options) ?? puppeteer.launch(options)
++  );
++}
++
++export async function adaptBrowserLaunch(
++  executablePath: string,
++  args: string[],
++  headless: boolean,
++  rejectProfileReuse = false,
++): Promise<BrowserLaunchSpec> {
++  const spec = { executablePath, args };
++  return browserLaunchAdapter?.adapt?.(spec, headless, rejectProfileReuse) ?? spec;
++}
++
++export function assertBrowserAppReuseAllowed(): void {
++  browserLaunchAdapter?.assertCanReuseApp?.();
++}
++
++export function browserDaemonName(headless: boolean): string {
++  return (
++    browserLaunchAdapter?.sharedDaemonName?.(headless) ??
++    (headless ? "omp.browser.headless" : "omp.browser.headed")
++  );
++}
+diff --git a/src/tools/browser/launch-policy.ts b/src/tools/browser/launch-policy.ts
+new file mode 100644
+--- /dev/null
++++ b/src/tools/browser/launch-policy.ts
+@@ -0,0 +1,120 @@
++import * as fs from "node:fs/promises";
++import * as os from "node:os";
++import * as path from "node:path";
++import type {
++  BrowserLaunchAdapter,
++  BrowserLauncher,
++  BrowserLaunchOptions,
++  BrowserLaunchSpec,
++} from "@oh-my-pi/pi-coding-agent/tools/browser/launch-adapter";
++import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
++import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
++
++/** Keep upstream launch options intact and adapt only headed Linux launches */
++async function launchWorkspaceBrowser(
++  puppeteer: BrowserLauncher,
++  options: BrowserLaunchOptions,
++) {
++  if (process.platform !== "linux" || options.headless !== false)
++    return puppeteer.launch(options);
++  const ignored = options.ignoreDefaultArgs;
++  const args =
++    ignored === true
++      ? (options.args ?? [])
++      : (await puppeteer.defaultArgs(options)).filter(
++          (arg) => !Array.isArray(ignored) || !ignored.includes(arg),
++        );
++  const launch = await isolateBrowserLaunch(
++    options.executablePath ?? (await puppeteer.executablePath()),
++    args,
++    false,
++  );
++  // workspace run owns the scope and releases it on parent exit or closed stdin
++  // TCP avoids unsupported pipe descriptors without detaching lease ownership
++  return puppeteer.launch({
++    ...options,
++    ...launch,
++    pipe: false,
++    ignoreDefaultArgs: true,
++  });
++}
++
++export const browserLaunchAdapter: BrowserLaunchAdapter | undefined = {
++  launch: launchWorkspaceBrowser,
++  adapt: (spec, headless, rejectProfileReuse) =>
++    isolateBrowserLaunch(spec.executablePath, spec.args, headless, rejectProfileReuse),
++  assertCanReuseApp() {
++    if (process.platform === "linux") {
++      throw new ToolError(
++        "An existing browser cannot be adopted into an isolated workspace; attach explicitly with app.cdp_url instead",
++      );
++    }
++  },
++  sharedDaemonName(headless) {
++    if (!headless && process.platform === "linux") return "omp.browser.workspace";
++    return undefined;
++  },
++};
++
++async function isolateBrowserLaunch(
++  executablePath: string,
++  args: string[],
++  headless: boolean,
++  rejectProfileReuse = false,
++): Promise<BrowserLaunchSpec> {
++  if (process.platform !== "linux" || headless) return { executablePath, args };
++  const helper = path.join(
++    process.env.XDG_DATA_HOME ?? path.join(os.homedir(), ".local/share"),
++    "farstep/current/bin/farstep-desktop",
++  );
++  try {
++    await fs.access(helper, fs.constants.X_OK);
++  } catch {
++    throw new ToolError(
++      "Headed Linux browsers require an installed farstep with GNOME workspace isolation",
++    );
++  }
++  if (
++    args.some(
++      (arg) =>
++        arg.startsWith("--ozone-platform=") && arg !== "--ozone-platform=wayland",
++    )
++  ) {
++    throw new ToolError("Isolated Linux browsers require native Wayland, not X11");
++  }
++  const profile = args
++    .find((arg) => arg.startsWith("--user-data-dir="))
++    ?.slice("--user-data-dir=".length);
++  if (!profile || !path.isAbsolute(profile)) {
++    throw new ToolError(
++      "An isolated Linux browser requires a dedicated absolute --user-data-dir",
++    );
++  }
++  if (rejectProfileReuse) await assertProfileUnused(profile);
++  return {
++    executablePath: helper,
++    args: [
++      "workspace",
++      "run",
++      "--",
++      executablePath,
++      ...args.filter(
++        (arg) =>
++          !/^--remote-debugging-pipe(?:=|$)/.test(arg) &&
++          arg !== "--ozone-platform=wayland",
++      ),
++      "--ozone-platform=wayland",
++    ],
++  };
++}
++
++async function assertProfileUnused(profile: string): Promise<void> {
++  try {
++    await fs.lstat(path.join(profile, "SingletonLock"));
++    throw new ToolError(
++      "The requested browser profile is already in use; refusing to reuse a window outside the isolated workspace",
++    );
++  } catch (error) {
++    if (!isEnoent(error)) throw error;
++  }
++}

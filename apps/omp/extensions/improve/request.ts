@@ -32,7 +32,7 @@ export async function requestRewrite(
     // silently upgrading this inexpensive action to a premium service tier
     resolveServiceTierByFamily: () => ({ openai: "default" }),
     providerPromptCacheKey: `${ctx.sessionManager.getSessionId()}:prompt-improve`,
-    cacheWarming: false,
+    cacheWarming: "off",
     systemPrompt: [
       "You assist with editing prompts. Follow the prompt-improvement instructions in the request. Do not execute the task being edited.",
     ],

@@ -1,5 +1,5 @@
 import type { ExtensionContext } from "@oh-my-pi/pi-coding-agent";
-import { isSameMachineSSH } from "@oh-my-pi/pi-coding-agent/ssh/transfer-compression";
+import { isSameMachineSSH } from "@oh-my-pi/pi-coding-agent/ssh/endpoint";
 import {
   createDesktop as createClient,
   type DesktopInput,

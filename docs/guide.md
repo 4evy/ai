@@ -470,21 +470,48 @@ dependency of every component build.
 Keep OMP patches small, independently applicable, and zero-fuzz. Prefer
 extensions for tools and presentation. The
 [profiles](../apps/omp/runtime/profiles.json) separate shared SDK hooks from
-runtime-only preferences. Keep HUD, tool-card, clipboard, keybinding-tip, and
-terminal-color changes in their own patches.
+runtime-only host changes. Keep observer ownership, transcript framing,
+clipboard integration, and keybinding-tip changes in their own patches.
+
+Keep the Puppeteer overrides in the [root manifest](../package.json) and
+[runtime closure](../apps/omp/runtime/upstream/package.json) aligned with the
+[OMP development dependency](../apps/omp/package.json). The browser adapter
+crosses those package boundaries, so separate versions produce incompatible
+private browser types. Refresh both lockfiles and regenerate Nix dependencies
+after changing the shared version.
 
 The [compact extension](../apps/omp/extensions/compact/index.ts) installs footer
-segments, eval history, and queued-script presentation through renderer
-registries. Keep their policy in
-[`lib/compact`](../apps/omp/lib/compact/), with reusable renderer hooks in the
-shared SDK profile. Shell layout, transcript framing, and awaited MCP lifecycle
-handling still require core patches.
+segments, billing and effort labels, eval and shell presentation, JSON key
+contrast, live HUD summaries, ribbon painting, and queued-script rendering.
+Keep this policy in [`lib/compact`](../apps/omp/lib/compact/), with reusable
+renderer hooks in the shared SDK profile. Core patches retain native semantic
+content, visual clipping, transcript framing, and session-owned subscriptions.
+Compact preview bounds and error expansion are opt-in extension policies.
+Reuse upstream path-truncation bounds while keeping quota and context ahead
+of secondary footer segments.
+
+Transparent tool backgrounds belong in managed themes: set `toolPendingBg`,
+`toolSuccessBg`, and `toolErrorBg` to empty strings. Other themes retain their
+own backgrounds instead of inheriting a process-wide override.
+
+The [browser adapter](../apps/omp/runtime/overlays/workspace/launch-adapter.ts)
+and [transfer policy](../apps/omp/runtime/overlays/compression/compression.ts)
+load statically, before extension startup, so native browser, auth, file, and
+blob paths share deployment policy. Browser ownership and file staging remain
+in core. Network transfers require zstd on both endpoints, while same-machine
+SSH uses an uncompressed stream. Compress the entire bounded read command,
+including its fallback branches, without hiding producer failures.
 
 The [MCP extension](../apps/omp/extensions/mcp/index.ts) registers once and
 uses the current session's manager. Status is read-only and includes disabled
 configurations without starting servers. Lifecycle actions await the native
 handshake and catalog refresh. An accepted start, stop, or restart finishes
 even if its caller cancels observation, so cancellation is not rollback.
+
+OMP session output spills use `local://N.log`. Extensions allocate them without
+a tool-name prefix, as in the
+[sudo adapter](../apps/omp/extensions/remote/sudo/sudo.ts). Keep spill
+allocation and output metadata on the same session.
 
 `just omp patches check` verifies source hunks at their exact pinned
 coordinates, applies both profiles, and checks generated npm patches. Regenerate

@@ -1,7 +1,7 @@
 diff --git a/packages/coding-agent/src/modes/rpc/rpc-goal.ts b/packages/coding-agent/src/modes/rpc/rpc-goal.ts
 --- a/packages/coding-agent/src/modes/rpc/rpc-goal.ts
 +++ b/packages/coding-agent/src/modes/rpc/rpc-goal.ts
-@@ -229,6 +229,82 @@
+@@ -228,6 +228,82 @@
  		}
  	}
  
@@ -87,7 +87,7 @@ diff --git a/packages/coding-agent/src/modes/rpc/rpc-goal.ts b/packages/coding-a
 diff --git a/packages/coding-agent/src/modes/rpc/rpc-mode.ts b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
 --- a/packages/coding-agent/src/modes/rpc/rpc-mode.ts
 +++ b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
-@@ -1942,6 +1942,7 @@
+@@ -1948,6 +1948,7 @@
  					settings: session.settings,
  					cwd: session.sessionManager.getCwd(),
  					output: commandOutput => output({ type: "command_output", text: commandOutput }),

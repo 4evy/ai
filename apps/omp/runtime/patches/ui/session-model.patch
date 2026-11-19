@@ -1,7 +1,7 @@
 diff --git a/packages/coding-agent/src/session/model-controls.ts b/packages/coding-agent/src/session/model-controls.ts
 --- a/packages/coding-agent/src/session/model-controls.ts
 +++ b/packages/coding-agent/src/session/model-controls.ts
-@@ -355,7 +355,8 @@
+@@ -336,7 +336,8 @@
  	async setModelTemporary(
  		model: Model,
  		thinkingLevel?: ConfiguredThinkingLevel,
@@ -9,36 +9,36 @@ diff --git a/packages/coding-agent/src/session/model-controls.ts b/packages/codi
 +		// Records model usage by default, including ephemeral switches
 +		options?: { ephemeral?: boolean; prewalk?: boolean; recordUsage?: boolean },
  		selection: "explicit" | "automatic" = "explicit",
- 	): Promise<void> {
- 		const previousEditMode = this.#host.resolveActiveEditMode();
-@@ -372,7 +373,10 @@
- 			`${targetModel.provider}/${targetModel.id}`,
- 			options?.prewalk ? PREWALK_MODEL_CHANGE_ROLE : options?.ephemeral ? EPHEMERAL_MODEL_CHANGE_ROLE : "temporary",
- 		);
--		this.#host.settings.getStorage()?.recordModelUsage(`${targetModel.provider}/${targetModel.id}`);
-+		// Auxiliary extension selections must not reorder model usage history
-+		if (options?.recordUsage !== false) {
-+			this.#host.settings.getStorage()?.recordModelUsage(`${targetModel.provider}/${targetModel.id}`);
-+		}
+ 		isCurrent?: () => boolean,
+ 	): Promise<boolean> {
+@@ -363,7 +364,10 @@
+ 						? EPHEMERAL_MODEL_CHANGE_ROLE
+ 						: TEMPORARY_MODEL_CHANGE_ROLE,
+ 			);
+-			this.#host.settings.getStorage()?.recordModelUsage(`${targetModel.provider}/${targetModel.id}`);
++			// Auxiliary extension selections must not reorder model usage history
++			if (options?.recordUsage !== false) {
++				this.#host.settings.getStorage()?.recordModelUsage(`${targetModel.provider}/${targetModel.id}`);
++			}
+ 		}
  
- 		// Apply explicit thinking level if given; otherwise prefer the model's
- 		// configured defaultLevel; otherwise re-clamp the current level (or auto).
+ 		// A user selection during the switch owns effort, even on the same model.
 diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
 --- a/packages/coding-agent/src/session/agent-session.ts
 +++ b/packages/coding-agent/src/session/agent-session.ts
-@@ -12099,7 +12099,7 @@
- 	setModelTemporary(
+@@ -13098,7 +13098,7 @@
+ 	async setModelTemporary(
  		model: Model,
  		thinkingLevel?: ConfiguredThinkingLevel,
 -		options?: { ephemeral?: boolean },
 +		options?: { ephemeral?: boolean; recordUsage?: boolean },
  	): Promise<void> {
- 		return this.#models.setModelTemporary(model, thinkingLevel, options);
+ 		await this.#models.setModelTemporary(model, thinkingLevel, options);
  	}
 diff --git a/packages/coding-agent/src/modes/runtime-init.ts b/packages/coding-agent/src/modes/runtime-init.ts
 --- a/packages/coding-agent/src/modes/runtime-init.ts
 +++ b/packages/coding-agent/src/modes/runtime-init.ts
-@@ -128,7 +128,7 @@
+@@ -129,7 +129,7 @@
  			setActiveTools: (toolNames: string[]) =>
  				session.setActiveToolsByName(filterActiveTools ? filterActiveTools(toolNames) : toolNames),
  			getCommands: () => getSessionSlashCommands(session),
@@ -50,7 +50,7 @@ diff --git a/packages/coding-agent/src/modes/runtime-init.ts b/packages/coding-a
 diff --git a/packages/coding-agent/src/modes/controllers/extension-ui-controller.ts b/packages/coding-agent/src/modes/controllers/extension-ui-controller.ts
 --- a/packages/coding-agent/src/modes/controllers/extension-ui-controller.ts
 +++ b/packages/coding-agent/src/modes/controllers/extension-ui-controller.ts
-@@ -26,6 +26,7 @@
+@@ -27,6 +27,7 @@
  	SendUserMessageHandler,
  	TerminalInputHandler,
  } from "../../extensibility/extensions";
@@ -58,7 +58,7 @@ diff --git a/packages/coding-agent/src/modes/controllers/extension-ui-controller
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
  import { cfgExtensionAssistantTextRenderers } from "../../extensibility/settings";
  import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
-@@ -251,12 +252,7 @@
+@@ -284,12 +285,7 @@
  			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
  			getAllTools: () => this.ctx.session.getAllToolInfos(),
  			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
@@ -72,7 +72,7 @@ diff --git a/packages/coding-agent/src/modes/controllers/extension-ui-controller
  			getThinkingLevel: () => this.ctx.session.thinkingLevel,
  			setThinkingLevel: level => this.ctx.session.setThinkingLevel(level),
  			getServiceTiers: () => this.ctx.session.serviceTierByFamily,
-@@ -485,12 +481,7 @@
+@@ -509,12 +505,7 @@
  			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
  			getAllTools: () => this.ctx.session.getAllToolInfos(),
  			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
@@ -134,7 +134,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/loader.ts b/pack
 diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packages/coding-agent/src/extensibility/extensions/types.ts
 --- a/packages/coding-agent/src/extensibility/extensions/types.ts
 +++ b/packages/coding-agent/src/extensibility/extensions/types.ts
-@@ -2138,8 +2138,11 @@
+@@ -2192,8 +2192,11 @@
  	/** Get available slash commands in the current session. */
  	getCommands(): SlashCommandInfo[];
  
@@ -148,7 +148,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packa
  
  	/** Get current thinking level. */
  	getThinkingLevel(): ThinkingLevel | undefined;
-@@ -2370,7 +2373,7 @@
+@@ -2424,7 +2427,7 @@
  
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
  
@@ -169,7 +169,7 @@ diff --git a/packages/coding-agent/src/modes/acp/acp-agent.ts b/packages/coding-
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
  import { parseSkillInvocation } from "../../extensibility/skills";
  import { PYTHON_KERNEL_CANCEL_BUDGET_MS } from "../../eval/py/kernel";
-@@ -3082,14 +3082,7 @@
+@@ -3334,14 +3334,7 @@
  				getAllTools: () => record.session.getAllToolInfos(),
  				setActiveTools: toolNames => record.session.setActiveToolsByName(toolNames),
  				getCommands: () => getSessionSlashCommands(record.session),

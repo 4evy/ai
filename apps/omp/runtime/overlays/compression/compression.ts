@@ -1,57 +1,17 @@
-import { isIP } from "node:net";
-import { networkInterfaces } from "node:os";
 import {
   buildRemoteCommand,
-  ensureConnection,
-  ensureHostInfo,
   type SSHConnectionTarget,
 } from "@oh-my-pi/pi-coding-agent/ssh/connection-manager";
+import type { RemoteFileTransferAdapter } from "@oh-my-pi/pi-coding-agent/ssh/file-transfer";
 import { wrapInPosixShell } from "@oh-my-pi/pi-coding-agent/ssh/utils";
 import { $which, ptree } from "@oh-my-pi/pi-utils";
-import ipaddr from "ipaddr.js";
+import { isSameMachineSSH } from "./endpoint";
 
-function address(value: string): string {
-  const bare = (value.replace(/^\[|\]$/g, "").split("%")[0] ?? "").toLowerCase();
-  return ipaddr.process(bare).toString();
-}
+// Static binding reaches native ssh:// and blob callers before extensions load
+export const fileTransferAdapter: RemoteFileTransferAdapter | undefined =
+  createFileTransfer;
 
-/** Inspect the authenticated server's actual endpoint, not its OpenSSH alias */
-export async function isSameMachineSSH(
-  target: SSHConnectionTarget,
-  opts: {
-    controlPath?: string;
-    signal?: AbortSignal | undefined;
-    timeoutMs?: number;
-  } = {},
-): Promise<boolean> {
-  await ensureConnection(target);
-  const info = await ensureHostInfo(target);
-  if (!info.transferShell)
-    throw new Error("SSH transfer requires a verified POSIX shell");
-  const args = await buildRemoteCommand(
-    target,
-    wrapInPosixShell(info.transferShell, 'printf "%s\\n" "$SSH_CONNECTION"'),
-  );
-  if (opts.controlPath) args.unshift("-o", `ControlPath=${opts.controlPath}`);
-  const signal = ptree.combineSignals(opts.signal, opts.timeoutMs ?? 30_000);
-  using child = ptree.spawn(["ssh", ...args], signal ? { signal } : {});
-  const connection = (await child.text()).trim().split(/\s+/);
-  const serverAddress = connection[2];
-  if (
-    connection.length !== 4 ||
-    !serverAddress ||
-    !isIP(serverAddress.split("%")[0] ?? "")
-  ) {
-    throw new Error("SSH server did not report its actual endpoint in SSH_CONNECTION");
-  }
-  const endpoint = address(serverAddress);
-  if (ipaddr.parse(endpoint).range() === "loopback") return true;
-  return Object.values(networkInterfaces()).some((entries) =>
-    entries?.some((entry) => address(entry.address) === endpoint),
-  );
-}
-
-export function requireZstd(): void {
+function requireZstd(): void {
   if (!$which("zstd"))
     throw new Error(
       "Remote file transfers require zstd on the local and remote PATH; no gzip fallback is used",
@@ -59,7 +19,7 @@ export function requireZstd(): void {
 }
 
 /** Keep compression and process lifetimes out of upstream's file operations */
-export async function createFileTransfer(
+async function createFileTransfer(
   target: SSHConnectionTarget,
   opts: { signal?: AbortSignal; timeoutMs?: number },
 ) {
@@ -74,10 +34,11 @@ export async function createFileTransfer(
       command: string,
       limit: number,
     ): Promise<Uint8Array> {
+      // Group the full producer list so every successful branch is compressed
       // Stage the bounded prefix so a producer failure cannot be hidden by a pipe
       const remote = compressed
         ? `command -v zstd >/dev/null 2>&1 || { echo 'ssh://: remote zstd is required' >&2; exit 1; }; ` +
-          `t=$(mktemp) || exit 1; trap 'rm -f -- "$t"' 0; ${command} > "$t" && zstd -q -c -- "$t"`
+          `t=$(mktemp) || exit 1; trap 'rm -f -- "$t"' 0; {\n${command}\n} > "$t" && zstd -q -c -- "$t"`
         : command;
       const args = await buildRemoteCommand(target, wrapInPosixShell(shell, remote));
       using child = ptree.spawn(["ssh", ...args], options);
@@ -133,7 +94,7 @@ export async function createFileTransfer(
 }
 
 /** Drain without allowing a remote decoder to exceed the requested byte bound */
-export async function boundedTransferBytes(
+async function boundedTransferBytes(
   stream: ReadableStream<Uint8Array>,
   limit: number,
 ): Promise<Uint8Array> {

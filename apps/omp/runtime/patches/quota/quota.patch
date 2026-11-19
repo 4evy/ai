@@ -1,62 +1,52 @@
 diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-line/segments.ts
 --- a/packages/tui/src/status-line/segments.ts
 +++ b/packages/tui/src/status-line/segments.ts
-@@ -305,11 +305,33 @@
- 	return state.thinkingLevel ?? ThinkingLevel.Off;
- }
- 
-+/** Compact effort labels without changing the underlying thinking-level token */
-+function thinkingLevelLabel(level: string): string {
-+	switch (level) {
-+		case "minimal":
-+			return "min";
-+		case "low":
-+			return "lo";
-+		case "medium":
-+			return "med";
-+		case "high":
-+			return "hi";
-+		case "xhigh":
-+			return "xhi";
-+		default:
-+			return level;
-+	}
-+}
-+
- /** Thinking-level display ("◉ xhigh", "⟳ auto", …), or "" when hidden or unsupported. */
- function modelThinkingDisplay(ctx: SegmentContext): string {
+@@ -19,6 +19,7 @@
+ import { summarizeLoopCondition } from "./loop";
+ import { formatMetric } from "../components/metric";
+ import { formatBillingSummary } from "./metrics";
++import { getStatusLinePresentation } from "./presentation";
+ import { sanitizeStatusText } from "../chrome/shared";
+ import {
+ 	formatContextUsage,
+@@ -312,6 +313,10 @@
  	const state = ctx.session.state;
  	const opts = ctx.options.model ?? {};
  	if (opts.showThinkingLevel === false || !state.model?.thinking) return "";
-+	if (!ctx.compactThinkingLevel) {
-+		const level = thinkingLevelWord(ctx.session);
-+		return level === undefined ? "" : thinkingLevelLabel(level);
++	const presentation = getStatusLinePresentation();
++	if (!ctx.compactThinkingLevel && presentation?.thinkingLevelLabel) {
++		return presentation.thinkingLevelLabel(thinkingLevelWord(ctx.session)!);
 +	}
  	if (ctx.session.isAutoThinking) {
  		// Pending (no turn classified yet / classifying) shows a symbol-theme
  		// question-box marker; once resolved it shows `<level>`.
-@@ -398,7 +420,8 @@
+@@ -400,7 +405,11 @@
  		if (advisor) spans.push(span(` ${advisor.icon}`, advisor.color));
  		if (ctx.session.isFastModeActive() && theme.icon.fast) spans.push(span(` ${theme.icon.fast}`, token));
  		const level = ctx.options.model?.showThinkingLevel === false ? undefined : thinkingLevelWord(ctx.session);
 -		if (level !== undefined) spans.push(span(" · ", "dim"), span(level, thinkingLevelToken(level)));
 +		if (level !== undefined)
-+			spans.push(span(" · ", "dim"), span(thinkingLevelLabel(level), thinkingLevelToken(level)));
++			spans.push(
++				span(" · ", "dim"),
++				span(getStatusLinePresentation()?.thinkingLevelLabel?.(level) ?? level, thinkingLevelToken(level)),
++			);
  		const slowModeLabel = ctx.session.getAnthropicSlowModeLabel?.();
  		if (slowModeLabel) spans.push(span(`${theme.sep.dot}${slowModeLabel}`, "warning"));
  		return segView(spans, "model", slowModeLabel ? "warning" : undefined);
-@@ -818,6 +841,7 @@
+@@ -820,6 +829,7 @@
  			usingSubscription,
  			premiumRequests,
  			fractionDigits: 2,
-+			hideSubagentCost: ctx.width > 0 && ctx.width < 100,
++			availableWidth: ctx.width,
  			pricingPeriod,
  			advisor: advisorCost
  				? { cost: advisorCost, usingSubscription: ctx.session.isAdvisorUsingSubscription?.() ?? false }
 diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status-line/component.ts
 --- a/packages/tui/src/status-line/component.ts
 +++ b/packages/tui/src/status-line/component.ts
-@@ -2795,7 +2795,7 @@
+@@ -2817,9 +2817,9 @@
+ 		};
+ 	}
  
 -	#subagentBadgeText(): string | undefined {
 -		if (this.#subagentCount === 0) return undefined;
@@ -67,7 +57,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  	}
  
  	/**
-@@ -3067,10 +3067,10 @@
+@@ -3129,10 +3129,10 @@
  	#separatorMetrics(plain: boolean, style: StatusLineSeparatorStyle): SeparatorMetrics {
  		const themeEpoch = getThemeEpoch();
  		const memo = plain ? this.#plainSeparatorMetrics : this.#styledSeparatorMetrics;
@@ -80,7 +70,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  		const metrics: SeparatorMetrics = {
  			themeRef: theme,
  			themeEpoch,
-@@ -3093,8 +3093,8 @@
+@@ -3155,8 +3155,8 @@
  	 *   (embedded in the editor's top border).
  	 * - `band`: the box layout opened by a soft flush-left cap, for the band
  	 *   composer's frameless full-width top row.
@@ -91,7 +81,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  	 * - `plain-left`: left segments only (claude composer; the right group
  	 *   lives in the editor's top rule).
  	 * - `plain-right`: right segments only (claude composer's top rule).
-@@ -3140,7 +3140,7 @@
+@@ -3208,7 +3208,7 @@
  		const transparentBg = bgAnsi === TRANSPARENT_BG_ANSI;
  		const fgAnsi = theme.getFgAnsi("text");
  		const sepAnsi = theme.getFgAnsi("statusLineSep");
@@ -100,7 +90,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  
  		// Collect visible segment contents
  		const leftParts: string[] = [];
-@@ -3188,8 +3188,12 @@
+@@ -3264,8 +3264,12 @@
  				const glance = widget ? formatJobWidgetGlance(widget.view, theme, JOBS_SEGMENT_SPARK_CELLS) : "";
  				const count = theme.fg("statusLineSubagents", `${theme.icon.job} ${runningBackgroundJobs}`);
  				rightParts.unshift(glance ? `${count} ${glance}` : count);
@@ -114,7 +104,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  		}
  		const topFillWidth = Math.max(0, width);
  		// These arrays are local to this render; overflow handling can mutate them.
-@@ -3240,14 +3244,20 @@
+@@ -3316,14 +3320,20 @@
  		const totalWidth = () => leftWidth + rightWidth + minimumGapWidth();
  
  		if (topFillWidth > 0) {
@@ -139,7 +129,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  				const currentNameVW = rightWidths[nameIdx];
  				const minNameVW = 8;
  				const shrinkBy = Math.min(Math.max(0, currentNameVW - minNameVW), totalWidth() - topFillWidth);
-@@ -3258,23 +3268,17 @@
+@@ -3334,12 +3344,6 @@
  					rightWidths[nameIdx] = nameWidth;
  				}
  			}
@@ -152,29 +142,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  			// Shrink path before dropping left segments — path is the only elastic segment
  			const pathIdx = leftSegIds.indexOf("path");
  			if (pathIdx >= 0 && totalWidth() > topFillWidth) {
- 				const overflow = totalWidth() - topFillWidth;
- 				const currentPathVW = leftWidths[pathIdx];
--				const minPathVW = 8; // icon + ellipsis + a few chars
-+				const minPathVW = 5;
- 				const shrinkable = currentPathVW - minPathVW;
- 				if (shrinkable > 0) {
- 					const shrinkBy = Math.min(shrinkable, overflow);
- 					const currentMaxLen = ctx.options.path?.maxLength ?? 40;
--					let newMaxLen = Math.max(4, Math.min(currentMaxLen, currentPathVW) - shrinkBy);
-+					let newMaxLen = Math.max(3, Math.min(currentMaxLen, currentPathVW) - shrinkBy);
- 					const pathCtx = (maxLen: number): SegmentContext => ({
- 						...ctx,
- 						options: { ...ctx.options, path: { ...ctx.options.path, maxLength: maxLen } },
-@@ -3286,7 +3290,7 @@
- 						for (let i = 0; i < 8; i++) {
- 							const saved = currentPathVW - pathWidth;
- 							if (saved >= shrinkBy) break;
--							const nextMaxLen = Math.max(4, newMaxLen - (shrinkBy - saved));
-+							const nextMaxLen = Math.max(3, newMaxLen - (shrinkBy - saved));
- 							if (nextMaxLen >= newMaxLen) break; // no progress or hit floor
- 							newMaxLen = nextMaxLen;
- 							const adjusted = renderSegment("path", pathCtx(newMaxLen));
-@@ -3300,6 +3304,15 @@
+@@ -3376,6 +3380,15 @@
  					}
  				}
  			}
@@ -190,7 +158,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  			const leftOverflowDropIndex = (): number => {
  				// Preserve the current working directory as long as possible. The
  				// previous right-to-left pop could collapse a normal-width bar to
-@@ -3319,6 +3332,14 @@
+@@ -3395,6 +3408,14 @@
  				leftSegIds.splice(dropIdx, 1);
  				leftWidth = left.length > 0 ? leftWidth - removedWidth - leftSepWidth - 2 : 0;
  			}
@@ -205,7 +173,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  		}
  
  		const renderGroup = (parts: string[], direction: "left" | "right"): string => {
-@@ -3943,7 +3964,7 @@
+@@ -4019,7 +4040,7 @@
  			if (action) props.actions = { click: action };
  			segs.push(describeSeg(key, props, view, dim));
  		};
@@ -214,7 +182,9 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  		leftSegments.forEach((id, index) => {
  			if (subagentBadge && id === "subagents") return;
  			const view = describeSegment(id, ctx);
-@@ -3953,10 +3974,5 @@
+@@ -4027,12 +4048,7 @@
+ 		});
+ 		// Live-work badges lead the right group, as in the ANSI bar; they sit on
  		// the inner edge, so they drop before any configured segment.
 -		if (subagentBadge) {
 -			push("subagent-badge", "right", 0, {
@@ -229,95 +199,28 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
 diff --git a/packages/tui/src/status-line/metrics.ts b/packages/tui/src/status-line/metrics.ts
 --- a/packages/tui/src/status-line/metrics.ts
 +++ b/packages/tui/src/status-line/metrics.ts
-@@ -12,6 +12,8 @@
+@@ -1,5 +1,6 @@
+ import { formatNumber, normalizePremiumRequests } from "@oh-my-pi/pi-utils";
+ import type { Theme } from "../theme";
++import { getStatusLinePresentation } from "./presentation";
+ 
+ export { normalizePremiumRequests } from "@oh-my-pi/pi-utils";
+ 
+@@ -12,6 +13,8 @@
  	readonly pricingPeriod?: "peak" | "off-peak";
  	/** Subagent-tree spend, rendered `(+…)` after the session's own spend; `cost` excludes it. */
  	readonly subagentCost?: number;
-+	/** Omit the secondary tree amount when the footer needs a compact cost */
-+	readonly hideSubagentCost?: boolean;
++	/** Available row width, or zero when the native host owns layout */
++	readonly availableWidth?: number;
  	readonly advisor?: {
  		readonly cost: number;
  		readonly usingSubscription: boolean;
-@@ -20,41 +22,22 @@
- 
- type BillingUnit = "metered" | "subscription";
- 
--/** `showUnit: false` omits the `$`/subscription symbol when the summary already printed it. */
--function formatSpend(
--	amount: number,
--	usingSubscription: boolean,
--	fractionDigits: number,
--	uiTheme: Theme,
--	showUnit: boolean,
--): string {
-+/** `showUnit: false` omits the dollar sign when the summary already printed it */
-+function formatSpend(amount: number, fractionDigits: number, showUnit: boolean): string {
- 	const formatted = amount.toFixed(fractionDigits);
- 	if (!showUnit) return formatted;
--	if (!usingSubscription) return `$${formatted}`;
--	if (uiTheme.getSymbolPreset() === "nerd") {
--		const icon = uiTheme.icon.subscription;
--		return icon ? `${icon} ${formatted}` : `S${formatted}`;
--	}
--	return `S${formatted}`;
-+	return `$${formatted}`;
- }
- 
--function formatAdvisorSpend(
--	amount: number,
--	usingSubscription: boolean,
--	fractionDigits: number,
--	uiTheme: Theme,
--	showUnit: boolean,
--): string {
--	const spend = formatSpend(amount, usingSubscription, fractionDigits, uiTheme, showUnit);
-+function formatAdvisorSpend(amount: number, fractionDigits: number, uiTheme: Theme, showUnit: boolean): string {
-+	const spend = formatSpend(amount, fractionDigits, showUnit);
- 	const icon = uiTheme.icon.advisor;
- 	return icon && icon !== "(adv)" ? `${icon} ${spend}` : `${spend} (adv)`;
- }
- 
- /**
-- * Shared billing metric presentation. Callers select precision explicitly so
-- * the legacy footer keeps three decimals while current status segments keep two.
-- * A unit symbol (`$` or the subscription mark) is printed at most once; later
-- * amounts billed the same way render bare.
-+ * Shared billing presentation uses a plain dollar sign for every billing mode
-+ * Callers select precision explicitly, and compact footers omit tree detail
+@@ -57,6 +60,8 @@
+  * amounts billed the same way render bare.
   */
  export function formatBillingSummary(options: BillingSummaryOptions, uiTheme: Theme): string | undefined {
++	const formatter = getStatusLinePresentation()?.billingSummary;
++	if (formatter) return formatter(options, uiTheme);
  	const premiumRequests = normalizePremiumRequests(options.premiumRequests);
-@@ -75,29 +58,21 @@
- 	let shownUnit: BillingUnit | undefined;
- 	const primaryUnit: BillingUnit = options.usingSubscription ? "subscription" : "metered";
- 	if (options.cost || options.pricingPeriod || subagentCost) {
--		parts.push(formatSpend(options.cost, options.usingSubscription, options.fractionDigits, uiTheme, true));
-+		parts.push(formatSpend(options.cost, options.fractionDigits, true));
- 		shownUnit = primaryUnit;
- 	} else if (options.usingSubscription) {
--		parts.push(
--			uiTheme.getSymbolPreset() === "nerd" && uiTheme.icon.subscription ? uiTheme.icon.subscription : "(sub)",
--		);
-+		parts.push(formatSpend(0, options.fractionDigits, true));
- 		shownUnit = primaryUnit;
- 	}
- 	// Always follows the primary spend, which already carries the unit.
--	if (subagentCost) parts.push(`(+${subagentCost.toFixed(options.fractionDigits)})`);
-+	if (subagentCost && !options.hideSubagentCost) parts.push(`(+${subagentCost.toFixed(options.fractionDigits)})`);
- 	if (options.pricingPeriod) parts.push(options.pricingPeriod === "peak" ? "↑" : "↓");
- 	if (premiumRequests) parts.push(`★ ${formatNumber(premiumRequests)}`);
- 	if (advisorCost && options.advisor) {
- 		const prefix = parts.length > 0 ? "+ " : "";
- 		const advisorUnit: BillingUnit = options.advisor.usingSubscription ? "subscription" : "metered";
- 		parts.push(
--			`${prefix}${formatAdvisorSpend(
--				advisorCost,
--				options.advisor.usingSubscription,
--				options.fractionDigits,
--				uiTheme,
--				shownUnit !== advisorUnit,
--			)}`,
-+			`${prefix}${formatAdvisorSpend(advisorCost, options.fractionDigits, uiTheme, shownUnit !== advisorUnit)}`,
- 		);
- 	}
- 	return parts.length > 0 ? parts.join(" ") : undefined;
+ 	const advisorCost = options.advisor?.cost ?? 0;
+ 	const subagentCost = options.subagentCost ?? 0;

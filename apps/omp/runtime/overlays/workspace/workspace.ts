@@ -1,17 +1,19 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { loadPuppeteer } from "@oh-my-pi/pi-coding-agent/tools/browser/launch";
+import type {
+  BrowserLaunchAdapter,
+  BrowserLauncher,
+  BrowserLaunchOptions,
+  BrowserLaunchSpec,
+} from "@oh-my-pi/pi-coding-agent/tools/browser/launch-adapter";
 import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
 import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
 
-type Puppeteer = Awaited<ReturnType<typeof loadPuppeteer>>;
-type LaunchOptions = NonNullable<Parameters<Puppeteer["launch"]>[0]>;
-
 /** Keep upstream launch options intact and adapt only headed Linux launches */
-export async function launchWorkspaceBrowser(
-  puppeteer: Puppeteer,
-  options: LaunchOptions,
+async function launchWorkspaceBrowser(
+  puppeteer: BrowserLauncher,
+  options: BrowserLaunchOptions,
 ) {
   if (process.platform !== "linux" || options.headless !== false)
     return puppeteer.launch(options);
@@ -27,7 +29,8 @@ export async function launchWorkspaceBrowser(
     args,
     false,
   );
-  // The workspace helper does not forward Puppeteer's extra pipe descriptors
+  // workspace run owns the scope and releases it on parent exit or closed stdin
+  // TCP avoids unsupported pipe descriptors without detaching lease ownership
   return puppeteer.launch({
     ...options,
     ...launch,
@@ -36,17 +39,29 @@ export async function launchWorkspaceBrowser(
   });
 }
 
-export interface WorkspaceBrowserLaunch {
-  executablePath: string;
-  args: string[];
-}
+export const browserLaunchAdapter: BrowserLaunchAdapter | undefined = {
+  launch: launchWorkspaceBrowser,
+  adapt: (spec, headless, rejectProfileReuse) =>
+    isolateBrowserLaunch(spec.executablePath, spec.args, headless, rejectProfileReuse),
+  assertCanReuseApp() {
+    if (process.platform === "linux") {
+      throw new ToolError(
+        "An existing browser cannot be adopted into an isolated workspace; attach explicitly with app.cdp_url instead",
+      );
+    }
+  },
+  sharedDaemonName(headless) {
+    if (!headless && process.platform === "linux") return "omp.browser.workspace";
+    return undefined;
+  },
+};
 
-export async function isolateBrowserLaunch(
+async function isolateBrowserLaunch(
   executablePath: string,
   args: string[],
   headless: boolean,
   rejectProfileReuse = false,
-): Promise<WorkspaceBrowserLaunch> {
+): Promise<BrowserLaunchSpec> {
   if (process.platform !== "linux" || headless) return { executablePath, args };
   const helper = path.join(
     process.env.XDG_DATA_HOME ?? path.join(os.homedir(), ".local/share"),
@@ -83,7 +98,11 @@ export async function isolateBrowserLaunch(
       "run",
       "--",
       executablePath,
-      ...args,
+      ...args.filter(
+        (arg) =>
+          !/^--remote-debugging-pipe(?:=|$)/.test(arg) &&
+          arg !== "--ozone-platform=wayland",
+      ),
       "--ozone-platform=wayland",
     ],
   };

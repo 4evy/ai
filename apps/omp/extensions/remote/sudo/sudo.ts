@@ -31,7 +31,7 @@ export async function runSudo(
       .done();
   const scope = session.current(ctx);
   const client = await session.client(scope, connection);
-  const artifact = await ctx.sessionManager.allocateArtifactPath("remote_sudo");
+  const artifact = await ctx.sessionManager.allocateArtifactPath();
   const sink = new OutputSink({
     ...(artifact.path === undefined ? {} : { artifactPath: artifact.path }),
     ...(artifact.id === undefined ? {} : { artifactId: artifact.id }),

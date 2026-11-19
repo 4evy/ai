@@ -5,11 +5,30 @@ diff --git a/packages/coding-agent/src/ssh/file-transfer.ts b/packages/coding-ag
   */
  import { type ShellFsDirEntry, ShellFsFileType } from "@oh-my-pi/pi-natives";
  import { ConcatSink, ptree } from "@oh-my-pi/pi-utils";
-+import { createFileTransfer } from "./transfer-compression";
++import { fileTransferAdapter } from "./file-transfer-policy";
  import { buildRemoteCommand, ensureConnection, ensureHostInfo, type SSHConnectionTarget } from "./connection-manager";
  import { quotePosixArgument } from "../utils/shell-quote";
  import { wrapInPosixShell } from "./utils";
-@@ -108,21 +109,19 @@
+@@ -69,6 +70,18 @@
+ 	timeoutMs?: number;
+ }
+ 
++/** Byte transport policy, independent of path validation and staged commits */
++export interface RemoteFileTransfer {
++	inputCommand: string;
++	read(shell: "sh" | "bash" | "zsh", command: string, limit: number): Promise<Uint8Array>;
++	write(shell: "sh" | "bash" | "zsh", command: string, content: Uint8Array): Promise<void>;
++}
++
++export type RemoteFileTransferAdapter = (
++	target: SSHConnectionTarget,
++	opts: RemoteFileWriteOptions,
++) => Promise<RemoteFileTransfer>;
++
+ /** Resolve the remote account's HOME without shell-expanding any caller-supplied path. */
+ export async function remoteHomeDirectory(
+ 	target: SSHConnectionTarget,
+@@ -108,21 +121,28 @@
  	remotePath: string,
  	opts: RemoteFileReadOptions,
  ): Promise<RemoteFileReadResult> {
@@ -17,11 +36,11 @@ diff --git a/packages/coding-agent/src/ssh/file-transfer.ts b/packages/coding-ag
 +		throw new Error("ssh://: maxBytes must be a nonnegative safe byte bound");
 +	}
  	const shell = await ensurePosixRemote(target);
-+	const transfer = await createFileTransfer(target, opts);
++	const transfer = await fileTransferAdapter?.(target, opts);
  	const p = quotePosixArgument(remotePath);
 -	// On a failed read, nothing at the path (not even a dangling symlink) exits with the reserved status;
 -	// `head`'s own stderr stays the message either way.
-+	// Keep the reserved missing-path status through the compressed transfer
++	// Preserve the reserved missing-path status across any transport adapter
  	const command =
  		`head -c ${opts.maxBytes + 1} ${p} || { s=$?; ` +
  		`if [ ! -e ${p} ] && [ ! -L ${p} ]; then exit ${REMOTE_MISSING_EXIT}; fi; exit $s; }`;
@@ -34,24 +53,33 @@ diff --git a/packages/coding-agent/src/ssh/file-transfer.ts b/packages/coding-ag
 +	let raw: Uint8Array;
  	try {
 -		await child.exitedCleanly;
-+		raw = await transfer.read(shell, command, opts.maxBytes + 1);
++		if (transfer) {
++			raw = await transfer.read(shell, command, opts.maxBytes + 1);
++		} else {
++			const args = await buildRemoteCommand(target, wrapInPosixShell(shell, command));
++			using child = ptree.spawn(["ssh", ...args], {
++				signal: ptree.combineSignals(opts.signal, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
++			});
++			raw = await child.bytes();
++			await child.exitedCleanly;
++		}
  	} catch (error) {
  		if (error instanceof ptree.NonZeroExitError && error.exitCode === REMOTE_MISSING_EXIT) {
  			throw Object.assign(new Error(error.message, { cause: error }), { code: "ENOENT" });
-@@ -167,6 +166,7 @@
+@@ -167,6 +187,7 @@
  	if (remotePath.endsWith("/")) {
  		throw new Error("ssh://: destination is a directory path (trailing '/'); ssh:// write requires a file path");
  	}
-+	const transfer = await createFileTransfer(target, opts);
++	const transfer = await fileTransferAdapter?.(target, opts);
  	const dest = quotePosixArgument(remotePath);
  	const tmp = quotePosixArgument(`${remotePath}.omp-tmp.${crypto.randomUUID()}`);
  	// Stage stdin into the temp first (so the remote never blocks on an unread
-@@ -182,18 +182,13 @@
+@@ -182,18 +203,22 @@
  	const command =
  		`t=${tmp}; trap 'rm -f -- "$t"' 0; ` +
  		`mkdir -p -- "$(dirname "$t")" && ` +
 -		`cat > "$t" && { ` +
-+		`${transfer.inputCommand} > "$t" && { ` +
++		`${transfer?.inputCommand ?? "cat"} > "$t" && { ` +
  		`if [ -d ${dest} ]; then echo 'ssh://: destination is a directory' >&2; exit 1; ` +
  		`elif [ -f ${dest} ] && [ ! -L ${dest} ]; then cat "$t" > ${dest} || exit 1; ` +
  		`elif [ -e ${dest} ] && [ ! -L ${dest} ]; then echo 'ssh://: destination is a special file (not a regular file)' >&2; exit 1; ` +
@@ -63,7 +91,16 @@ diff --git a/packages/coding-agent/src/ssh/file-transfer.ts b/packages/coding-ag
 -		signal: ptree.combineSignals(opts.signal, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
 -	});
 -	await child.exitedCleanly;
-+	await transfer.write(shell, command, content);
++	if (transfer) {
++		await transfer.write(shell, command, content);
++	} else {
++		const args = await buildRemoteCommand(target, wrapInPosixShell(shell, command), { allowStdin: true });
++		using child = ptree.spawn(["ssh", ...args], {
++			stdin: content,
++			signal: ptree.combineSignals(opts.signal, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
++		});
++		await child.exitedCleanly;
++	}
  }
  
  /** Classification of a remote path, used by the read handler's directory dispatch. */

@@ -1,7 +1,7 @@
 diff --git a/packages/tui/src/theme/schema.ts b/packages/tui/src/theme/schema.ts
 --- a/packages/tui/src/theme/schema.ts
 +++ b/packages/tui/src/theme/schema.ts
-@@ -45,6 +45,8 @@
+@@ -53,6 +53,8 @@
  	$schema?: string;
  	name: string;
  	vars?: Record<string, ColorValue>;
@@ -13,7 +13,7 @@ diff --git a/packages/tui/src/theme/schema.ts b/packages/tui/src/theme/schema.ts
 diff --git a/packages/tui/src/theme/schema-validation.ts b/packages/tui/src/theme/schema-validation.ts
 --- a/packages/tui/src/theme/schema-validation.ts
 +++ b/packages/tui/src/theme/schema-validation.ts
-@@ -99,6 +99,7 @@
+@@ -107,6 +107,7 @@
  	"$schema?": "string",
  	name: "string",
  	"vars?": { "[string]": "string | number" },
@@ -37,82 +37,74 @@ diff --git a/packages/tui/src/theme/theme-schema.json b/packages/tui/src/theme/t
 +		},
  		"colors": {
  			"type": "object",
- 			"description": "Theme color definitions (all required except thinkingMax and assistantMessageText)",
+ 			"description": "Theme color definitions (all required except thinkingMax, assistantMessageText, mdExtensionLink and subagent1-subagent6)",
 diff --git a/packages/tui/src/theme/theme-class.ts b/packages/tui/src/theme/theme-class.ts
 --- a/packages/tui/src/theme/theme-class.ts
 +++ b/packages/tui/src/theme/theme-class.ts
-@@ -193,6 +193,7 @@
+@@ -12,6 +12,7 @@
+ 	type ThemeColor,
+ } from "./schema";
+ import type { SessionAccentTheme } from "./session-color";
++import type { ThemeRuleRenderer } from "./rules";
+ import {
+ 	type SlashCommandIconName,
+ 	SPINNER_FRAMES,
+@@ -197,6 +198,7 @@
  	#sessionAccentInputs: SessionAccentTheme | undefined;
  	#symbols: SymbolMap;
  	#spinnerFramesOverrides: Partial<Record<SpinnerType, string[]>>;
-+	readonly #ribbon: readonly string[] | undefined;
++	readonly #ruleRenderer: ThemeRuleRenderer | undefined;
  	/**
  	 * Perceptual luma (0..1) of the status-line background — used to classify the
  	 * theme light/dark. Undefined when it can't be resolved. Classified against the
-@@ -211,9 +212,12 @@
- 		symbolOverrides: Partial<Record<SymbolKey, string>>,
+@@ -216,9 +218,11 @@
  		spinnerFramesOverrides: Partial<Record<SpinnerType, string[]>> = {},
  		ansiPalette: ReadonlyArray<string | number> = [],
-+		ribbonColors?: readonly (string | number)[],
-+		terminalBackground?: string | number,
+ 		terminalBackground?: string | number,
++		ruleRenderer?: ThemeRuleRenderer,
  	) {
 -		this.statusLineLuminance = colorLuma(bgColors.statusLineBg);
 -		this.#statusLineContrastLuminance = relativeLuminance(bgColors.statusLineBg);
 +		const statusBackground = bgColors.statusLineBg === "" ? (terminalBackground ?? "") : bgColors.statusLineBg;
 +		this.statusLineLuminance = colorLuma(statusBackground);
 +		this.#statusLineContrastLuminance = relativeLuminance(statusBackground);
- 		const slIsLight = this.statusLineLuminance !== undefined && this.statusLineLuminance > 0.5;
+ 		const slIsLight = isLightLuma(this.statusLineLuminance);
  
  		this.#fgColors = {} as Record<ThemeColor, string>;
-@@ -253,8 +257,24 @@
+@@ -266,8 +270,14 @@
  		// `status.done` aliases `status.success` unless a theme overrides it explicitly.
  		if (!("status.done" in symbolOverrides)) this.#symbols["status.done"] = this.#symbols["status.success"];
  		this.#spinnerFramesOverrides = spinnerFramesOverrides;
-+		this.#ribbon = ribbonColors?.map(color => fgAnsi(color, mode));
++		this.#ruleRenderer = ruleRenderer;
  	}
  
-+	/**
-+	 * Paint a one-cell rule in five stripes, preserving the terminal background
-+	 * Offset and total width keep stripes aligned across embedded labels
-+	 */
-+	ribbonRule(glyph: string, width: number, offset = 0, totalWidth = width): string | undefined {
-+		if (!this.#ribbon) return undefined;
-+		let result = "";
-+		for (let index = 0; index < this.#ribbon.length; index++) {
-+			const start = Math.max(offset, Math.floor((index * totalWidth) / this.#ribbon.length));
-+			const end = Math.min(offset + width, Math.floor(((index + 1) * totalWidth) / this.#ribbon.length));
-+			if (end > start) result += this.#ribbon[index] + glyph.repeat(end - start);
-+		}
-+		return result ? result + "\x1b[39m" : "";
++	/** Optional rule decoration; semantic warning and error colors stay with callers */
++	renderRule(glyph: string, width: number, offset = 0, totalWidth = width): string | undefined {
++		return this.#ruleRenderer?.(glyph, width, offset, totalWidth);
 +	}
 +
  	/** True when the active theme has a light status-line background. */
  	get isLight(): boolean {
- 		return this.statusLineLuminance !== undefined && this.statusLineLuminance > 0.5;
+ 		return isLightLuma(this.statusLineLuminance);
 diff --git a/packages/tui/src/theme/loader.ts b/packages/tui/src/theme/loader.ts
 --- a/packages/tui/src/theme/loader.ts
 +++ b/packages/tui/src/theme/loader.ts
-@@ -180,7 +180,19 @@
- 	const symbolOverrides = themeJson.symbols?.overrides ?? {};
- 	const spinnerFramesOverrides = normalizeSpinnerFramesOverride(themeJson.symbols?.spinnerFrames);
- 	const ansiPalette = themeJson.terminal?.ansi?.map(color => resolveVarRefs(color, themeJson.vars ?? {}));
--	return new Theme(fgColors, bgColors, colorMode, symbolPreset, symbolOverrides, spinnerFramesOverrides, ansiPalette);
-+	const ribbonColors = themeJson.ribbon?.map(color => resolveVarRefs(color, themeJson.vars ?? {}));
-+	const terminalBackground = themeJson.terminal?.background;
-+	return new Theme(
-+		fgColors,
-+		bgColors,
-+		colorMode,
-+		symbolPreset,
-+		symbolOverrides,
-+		spinnerFramesOverrides,
-+		ansiPalette,
-+		ribbonColors,
-+		terminalBackground === undefined ? undefined : resolveVarRefs(terminalBackground, themeJson.vars ?? {}),
-+	);
+@@ -10,6 +10,7 @@
+ import type { ColorMode, ThemeBg, ThemeColor, ThemeJson } from "./schema";
+ import { normalizeSpinnerFramesOverride, type SymbolPreset } from "./symbols";
+ import { Theme } from "./theme-class";
++import { createThemeRuleRenderer } from "./rules";
+ 
+ // ============================================================================
+ // Theme Loading
+@@ -223,6 +224,7 @@
+ 		spinnerFramesOverrides,
+ 		ansiPalette,
+ 		terminalBackground,
++		createThemeRuleRenderer(themeJson, colorMode),
+ 	);
  }
  
- export async function loadTheme(name: string, options: CreateThemeOptions = {}): Promise<Theme> {
 diff --git a/packages/tui/src/components/composer/pi.ts b/packages/tui/src/components/composer/pi.ts
 --- a/packages/tui/src/components/composer/pi.ts
 +++ b/packages/tui/src/components/composer/pi.ts
@@ -129,8 +121,8 @@ diff --git a/packages/tui/src/components/composer/pi.ts b/packages/tui/src/compo
  
  	renderTop(ctx: ComposerChromeContext): string {
 -		return ctx.borderColor(ctx.box.horizontal.repeat(ctx.width));
-+		const ribbon = typeof theme === "undefined" ? undefined : theme.ribbonRule(ctx.box.horizontal, ctx.width);
-+		return ribbon ?? ctx.borderColor(ctx.box.horizontal.repeat(ctx.width));
++		const decoration = typeof theme === "undefined" ? undefined : theme.renderRule(ctx.box.horizontal, ctx.width);
++		return decoration ?? ctx.borderColor(ctx.box.horizontal.repeat(ctx.width));
  	},
  
  	renderRow(ctx: ComposerRowContext): string[] {
@@ -141,7 +133,7 @@ diff --git a/packages/tui/src/chrome/dynamic-border.ts b/packages/tui/src/chrome
   */
  export class DynamicBorder implements Component {
  	#color: (str: string) => string;
-+	readonly #ribbon: boolean;
++	readonly #decorate: boolean;
  	#label: string | (() => string) | undefined;
  	#cachedWidth = -1;
  	#cachedLabel: string | undefined;
@@ -150,7 +142,7 @@ diff --git a/packages/tui/src/chrome/dynamic-border.ts b/packages/tui/src/chrome
 -	constructor(color: (str: string) => string = str => fgOrPlain("border", str)) {
 -		this.#color = color;
 +	constructor(color?: (str: string) => string) {
-+		this.#ribbon = color === undefined;
++		this.#decorate = color === undefined;
 +		this.#color = color ?? (str => fgOrPlain("border", str));
  	}
  
@@ -175,9 +167,9 @@ diff --git a/packages/tui/src/chrome/dynamic-border.ts b/packages/tui/src/chrome
  	}
 +
 +	#ruleSegment(horizontal: string, width: number, offset: number, totalWidth: number): string {
-+		const ribbon =
-+			this.#ribbon && typeof theme !== "undefined" ? theme.ribbonRule(horizontal, width, offset, totalWidth) : undefined;
-+		return ribbon ?? this.#color(horizontal.repeat(width));
++		const decoration =
++			this.#decorate && typeof theme !== "undefined" ? theme.renderRule(horizontal, width, offset, totalWidth) : undefined;
++		return decoration ?? this.#color(horizontal.repeat(width));
 +	}
  }
 diff --git a/packages/tui/src/render/output-block.ts b/packages/tui/src/render/output-block.ts
@@ -189,8 +181,8 @@ diff --git a/packages/tui/src/render/output-block.ts b/packages/tui/src/render/o
  
 +	const fillRule = (count: number, offset: number): string => {
 +		if (state !== "error" && state !== "warning" && options.borderColor === undefined) {
-+			const ribbon = theme.ribbonRule(h, count, offset, lineWidth);
-+			if (ribbon !== undefined) return ribbon;
++			const decoration = theme.renderRule(h, count, offset, lineWidth);
++			if (decoration !== undefined) return decoration;
 +		}
 +		return border(h.repeat(count));
 +	};

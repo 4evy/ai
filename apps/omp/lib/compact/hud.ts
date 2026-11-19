@@ -1,11 +1,16 @@
 import { Text, truncateToWidth, visibleWidth } from "@oh-my-pi/pi-tui";
+import type { LiveHudRenderer } from "@oh-my-pi/pi-tui/chrome/live-hud";
 import { node, text } from "@oh-my-pi/pi-tui/native/describe";
 import type { NativeNode } from "@oh-my-pi/pi-tui/native/node";
 import { styledSpans } from "@oh-my-pi/pi-tui/native/spans";
 import type { ObservableSession } from "@oh-my-pi/pi-tui/overlays/session-observer-registry";
 import { theme } from "@oh-my-pi/pi-tui/theme";
+import {
+  todoChecklistPhases,
+  todoMatchesAnyDescription,
+} from "@oh-my-pi/pi-tui/tools/todo";
 import type { TspChecklistPhase } from "@oh-my-pi/pi-wire";
-import type { TodoSummary } from "../todo/summary";
+import { summarizeTodos, type TodoSummary } from "../todo/summary";
 
 /** One responsive overview row, with details yielding space to counts and hints */
 export class CompactHudComponent extends Text {
@@ -73,11 +78,8 @@ export function compactTodoHud(
   hubKey: string,
 ) {
   const progress = `${summary.closed}/${summary.total}`;
-  const head = [
-    `${theme.bold(theme.fg("accent", "TODO"))} ${progress}`,
-    ...(summary.blocked > 0 ? [theme.fg("warning", `${summary.blocked} blocked`)] : []),
-  ].join(" · ");
-  const smallHead = `${progress}${summary.blocked > 0 ? ` ${summary.blocked}blocked` : ""}`;
+  const head = `${theme.bold(theme.fg("accent", "TODO"))} ${progress}`;
+  const smallHead = progress;
   const agentHint = agents && hubKey ? `${hubKey} agents` : "";
   const hints = [
     ["/todo expand", agentHint].filter(Boolean).join(" · "),
@@ -165,15 +167,45 @@ export function compactSubagentState(
   };
 }
 
-export function compactSubagentHud(
-  sessions: readonly ObservableSession[],
-  key: string,
-): CompactHudComponent | undefined {
-  const state = compactSubagentState(sessions);
-  return state
-    ? new CompactHudComponent([state.full, state.compact, state.essential], undefined, [
-        key ? `${key} agents` : "",
-        key,
-      ])
-    : undefined;
-}
+/** Compact policy installed by the extension, with host-owned state and lifetime */
+export const compactLiveHudRenderer: LiveHudRenderer = {
+  showWorkingTitle: false,
+  compactTodoInStatus: false,
+  renderTodo(state) {
+    if (state.todoHidden || state.todoExpanded) return undefined;
+    const phases = state.phases.filter((phase) => phase.tasks.length > 0);
+    if (phases.length === 0) return undefined;
+    const isMatched = (todo: { content: string }) =>
+      state.activeDescriptions.length > 0 &&
+      todoMatchesAnyDescription(todo.content, state.activeDescriptions);
+    const agents =
+      state.agentsMode !== "off" && !state.agentsExpanded
+        ? compactSubagentState(state.sessions)
+        : undefined;
+    return compactTodoHud(
+      summarizeTodos(phases, isMatched),
+      todoChecklistPhases(phases, isMatched),
+      agents,
+      state.shortcuts.agentsHub,
+    );
+  },
+  renderSubagents(state) {
+    if (state.agentsMode === "off" || state.agentsExpanded) return undefined;
+    const agents = compactSubagentState(state.sessions);
+    const merged =
+      !state.todoExpanded &&
+      !state.todoHidden &&
+      state.phases.some((phase) => phase.tasks.length > 0);
+    const key = state.shortcuts.agentsHub;
+    const renderKey = JSON.stringify(["compact", agents, key, merged]);
+    if (merged || !agents) return { key: renderKey, mergedWithTodo: merged };
+    return {
+      key: renderKey,
+      component: new CompactHudComponent(
+        [agents.full, agents.compact, agents.essential],
+        undefined,
+        [key ? `${key} agents` : "", key],
+      ),
+    };
+  },
+};

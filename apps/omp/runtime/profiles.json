@@ -13,7 +13,6 @@
       "ui/tool-cards.patch",
       "ui/clipboard.patch",
       "ui/keybinding-tips.patch",
-      "ui/terminal-colors.patch",
       "ui/goal.patch",
       "ui/session-model.patch",
       "ui/ribbon.patch"
@@ -32,23 +31,38 @@
   "overlays": [
     {
       "source": "overlays/workspace/workspace.ts",
-      "target": "packages/coding-agent/src/tools/browser/workspace.ts",
-      "profiles": ["runtime"]
-    },
-    {
-      "source": "overlays/compression/compression.ts",
-      "target": "packages/coding-agent/src/ssh/transfer-compression.ts",
+      "target": "packages/coding-agent/src/tools/browser/launch-policy.ts",
       "profiles": ["runtime", "sdk"]
     },
     {
-      "source": "../lib/todo/summary.ts",
-      "target": "packages/tui/src/lib/todo/summary.ts",
-      "profiles": ["runtime"]
+      "source": "overlays/workspace/launch-adapter.ts",
+      "target": "packages/coding-agent/src/tools/browser/launch-adapter.ts",
+      "profiles": ["runtime", "sdk"]
     },
     {
-      "source": "../lib/compact/hud.ts",
-      "target": "packages/tui/src/lib/compact/hud.ts",
-      "profiles": ["runtime"]
+      "source": "overlays/compression/compression.ts",
+      "target": "packages/coding-agent/src/ssh/file-transfer-policy.ts",
+      "profiles": ["runtime", "sdk"]
+    },
+    {
+      "source": "overlays/compression/endpoint.ts",
+      "target": "packages/coding-agent/src/ssh/endpoint.ts",
+      "profiles": ["runtime", "sdk"]
+    },
+    {
+      "source": "overlays/ui/live-hud.ts",
+      "target": "packages/tui/src/chrome/live-hud.ts",
+      "profiles": ["runtime", "sdk"]
+    },
+    {
+      "source": "overlays/ui/status-line.ts",
+      "target": "packages/tui/src/status-line/presentation.ts",
+      "profiles": ["runtime", "sdk"]
+    },
+    {
+      "source": "overlays/ui/theme-rules.ts",
+      "target": "packages/tui/src/theme/rules.ts",
+      "profiles": ["runtime", "sdk"]
     }
   ]
 }
