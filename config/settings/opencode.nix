@@ -10,7 +10,7 @@ in
     update = "auto";
     snapshots = true;
     plugins = [
-      "@slkiser/opencode-quota@6.2.2"
+      "@slkiser/opencode-quota@6.3.0"
     ];
     references = {
       opencode = {
