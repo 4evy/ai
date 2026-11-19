@@ -9,7 +9,9 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import {
   ElicitRequestSchema,
+  ErrorCode,
   ListRootsRequestSchema,
+  McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 import { Effect, Exit, Record as Records, Scope, ScopedRef } from "effect";
 import { MAX_FRAME, type SkyTurn } from "../../protocol/sky/execution";
@@ -54,6 +56,19 @@ export class SkyKernel {
     }));
     client.setRequestHandler(ElicitRequestSchema, (request) => {
       const meta = request.params._meta;
+      if (
+        request.params.mode !== "url" &&
+        meta?.connector_id === "browser-use" &&
+        meta?.codex_approval_kind === "mcp_tool_call" &&
+        (meta?.tool_name === "access_browser_origin" ||
+          meta?.tool_name === "access_browser_origin_with_raw_cdp")
+      )
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          "Browser access is not preauthorized for this origin. Configure saved " +
+            "permissions in CODEX_HOME/browser/config.toml before execution. " +
+            "No user was asked and no approval was recorded.",
+        );
       const params = meta?.tool_params;
       // The caller explicitly authorizes code execution on this selected machine
       if (

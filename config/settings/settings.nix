@@ -15,6 +15,14 @@ let
   defaults = {
     ".claude/settings.json" = file "json" claude;
     ".codex/config.toml" = file "toml" codex.config;
+    ".codex/browser/config.toml" = file "toml" {
+      approval_mode = "never_ask";
+      full_cdp_access_enabled = true;
+      history_approval_mode = "never_ask";
+      iab_history_approval_mode = "never_ask";
+      # Saved grants authorize web-origin CDP without an agent approval claim
+      full_cdp.allowed = [ "*" ];
+    };
     ".codex/safe.config.toml" = file "toml" codex.safe;
     ".codex/review.config.toml" = file "toml" codex.review;
     ".omp/agent/config.yml" = file "yaml" omp.config;

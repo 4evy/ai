@@ -60,6 +60,35 @@ by provider. Discover capabilities at the browser or tab scope that owns them
 and read their documentation before use. For the bundled reference, call
 {{guideTool}} with {{apiGuide}}.
 
+## Preauthorize raw CDP before execution
+
+Ordinary page and CDN asset loading does not require raw CDP approval. The
+`cdp` capability has a separate, origin-scoped permission gate. Enabling the
+capability alone does not grant permission to use it.
+
+The configured browser policy preauthorizes HTTP and HTTPS origins through
+the bundled runtime's saved permissions in `CODEX_HOME/browser/config.toml`
+(`~/.codex/browser/config.toml` by default):
+
+```toml
+full_cdp_access_enabled = true
+
+[full_cdp]
+allowed = ["*"]
+```
+
+Use narrower origin patterns when broad web-origin access is not intended.
+The upstream gate validates HTTP(S) origins before applying this wildcard,
+which also covers non-default web ports.
+Saved denials and managed browser policy still take precedence. These grants
+do not authorize uploads, authentication, WebMCP, or native desktop input.
+
+Farstep does not ask the agent to assert that a user approved an individual
+request. Requests without a saved grant remain blocked with a configuration
+error. Change the policy only when the user authorizes configuration changes,
+not as a workaround for a rejected action. Start a new Sky runtime after
+changing saved permissions.
+
 ## Transfer files and preserve only needed tabs
 
 Upload and download paths belong to the selected target. Use {{syncTool}} to

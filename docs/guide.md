@@ -410,6 +410,15 @@ settings. See [options](../tools/nix/common/common.nix) and the
 Activation preserves undeclared writable settings. `just config generate` and
 `just config export` stage settings for inspection, not activation.
 
+The [browser policy](../config/settings/settings.nix) also exports
+`.codex/browser/config.toml`. It preauthorizes raw CDP on HTTP(S) origins
+through the runtime's saved grants, including non-default ports, without a
+per-request claim of user approval. Managed policy and saved denials still
+apply. Restrict `full_cdp.allowed` with a destination override when broad
+web-origin access is not intended. See the
+[browser guide](../farstep/skylight/guides/browser.md) for the permission
+boundary.
+
 OpenCode quota v6 reads
 [`opencode-quota/settings.jsonc`](../config/settings/opencode.nix) under the
 OpenCode config directory, replacing `quota-toast.json`. The managed settings
