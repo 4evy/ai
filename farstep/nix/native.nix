@@ -90,6 +90,8 @@ let
   sources = names: cargo.sourceFor (lib.concatMap (name: implementations.${name}) names);
   commonArgs = {
     inherit (metadata) version;
+    # Metadata must not realize a target-platform source derivation
+    cargoToml = ../../Cargo.toml;
     cargoVendorDir = cargo.vendorDir;
     cargoExtraArgs = "--locked --package farstep-desktop";
     CARGO_PROFILE = "release";

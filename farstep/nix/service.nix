@@ -11,6 +11,8 @@ let
   metadata = lib.trivial.importJSON ../package.json;
   commonArgs = {
     inherit (metadata) version;
+    # Metadata must not realize a target-platform source derivation
+    cargoToml = ../../Cargo.toml;
     cargoVendorDir = cargo.vendorDir;
     cargoExtraArgs = "--locked --package farstep-service";
     CARGO_PROFILE = "release";
