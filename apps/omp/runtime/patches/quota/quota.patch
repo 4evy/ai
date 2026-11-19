@@ -146,9 +146,9 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  					}
  				}
  			}
-+			// Shorten the path before sacrificing useful right-hand metrics
++			// After shortening the path, drop secondary metrics before context and quota
 +			while (totalWidth() > topFillWidth && right.length > 1) {
-+				const dropIdx = rightSegIds.findIndex(id => id !== "usage" && id !== "cost");
++				const dropIdx = rightSegIds.findIndex(id => id !== "usage" && !isContextSegment(id));
 +				if (dropIdx < 0) break;
 +				right.splice(dropIdx, 1);
 +				rightWidths.splice(dropIdx, 1);
