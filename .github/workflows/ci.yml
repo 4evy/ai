@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        task: [evaluate, just, github, format]
+        task: [evaluate, tooling, format]
     uses: $/.github/workflows/nix-check.yml
     permissions:
       contents: read

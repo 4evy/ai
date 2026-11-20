@@ -8,8 +8,7 @@ const system = choice("NIX_SYSTEM", [
 ]);
 const task = choice("TASK", [
   "evaluate",
-  "just",
-  "github",
+  "tooling",
   "format",
   "native-lint",
   "native-tests",
@@ -40,18 +39,16 @@ switch (task) {
       "--no-update-lock-file",
     ]);
     break;
-  case "just":
+  case "tooling":
     await run([...shell, "nixpkgs#just", "--command", "just", "check", "just"]);
-    break;
-  case "github":
     await run([
       ...shell,
       "nixpkgs#actionlint",
-      "nixpkgs#zizmor",
+      "nixpkgs#shellcheck",
       "--command",
       process.execPath,
-      "run",
-      "check:github",
+      "--no-install",
+      ".github/scripts/actionlint/actionlint.ts",
     ]);
     break;
   case "format":
