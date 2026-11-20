@@ -14,16 +14,12 @@ on:
         description: Flake system matching the runner
         default: x86_64-linux
         type: string
-      package:
-        description: Flake package to build
-        default: ai-configs
-        type: string
 permissions: {}
 jobs:
   check:
     name: ${{ inputs.task }} (${{ inputs.system }})
     runs-on: ${{ inputs.runner }}
-    timeout-minutes: ${{ inputs.system == 'aarch64-linux' && inputs.package == 'farstep' && 180 || 90 }}
+    timeout-minutes: ${{ inputs.task == 'packages' && 180 || 90 }}
     permissions:
       contents: read
     defaults:
@@ -34,12 +30,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Reclaim space for Nix builds
-        if: runner.os == 'Linux'
-        run: |
-          df -h /
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /usr/share/swift
-          df -h /
       - name: Install the repository's Bun version
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
@@ -52,9 +42,16 @@ jobs:
           extra_nix_config: |
             extra-substituters = https://nix-community.cachix.org
             extra-trusted-public-keys = nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=
+      - name: Cache Nix build outputs
+        if: inputs.task == 'packages' || inputs.task == 'format'
+        uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        continue-on-error: true
+        with:
+          use-gha-cache: enabled
+          use-flakehub: disabled
+          diagnostic-endpoint: ""
       - name: Run the selected check
         env:
           TASK: ${{ inputs.task }}
           NIX_SYSTEM: ${{ inputs.system }}
-          PACKAGE: ${{ inputs.package }}
-        run: bun .github/scripts/nix/nix.ts
+        run: bun --no-install .github/scripts/nix/nix.ts

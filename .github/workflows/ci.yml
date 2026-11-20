@@ -63,45 +63,6 @@ jobs:
       task: ${{ matrix.task }}
       runner: ${{ matrix.platform.runner }}
       system: ${{ matrix.platform.system }}
-  packages:
-    name: Package ${{ matrix.package }} (${{ matrix.platform.system }})
-    strategy:
-      fail-fast: false
-      matrix:
-        package:
-          - ai-javascript
-          - ai-shared
-          - farstep-modules
-          - farstep-javascript
-          - farstep-desktop
-          - farstep-service
-          - ai-configs
-          - farstep
-          - ghidra-mcp
-        platform:
-          - runner: ubuntu-26.04
-            system: x86_64-linux
-          - runner: ubuntu-26.04-arm
-            system: aarch64-linux
-          - runner: macos-26
-            system: aarch64-darwin
-        include:
-          - package: farstep-extensions
-            platform:
-              runner: ubuntu-26.04
-              system: x86_64-linux
-          - package: farstep-kde-bridge
-            platform:
-              runner: ubuntu-26.04
-              system: x86_64-linux
-    uses: $/.github/workflows/nix-check.yml
-    permissions:
-      contents: read
-    with:
-      task: package
-      package: ${{ matrix.package }}
-      runner: ${{ matrix.platform.runner }}
-      system: ${{ matrix.platform.system }}
   powershell:
     name: PowerShell (${{ matrix.shell }})
     runs-on: windows-2025

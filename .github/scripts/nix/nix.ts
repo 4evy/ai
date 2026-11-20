@@ -12,7 +12,7 @@ const task = choice("TASK", [
   "format",
   "native-lint",
   "native-tests",
-  "package",
+  "packages",
 ]);
 const shell = ["nix", "shell", "--inputs-from", ".", "--no-update-lock-file"];
 const develop = [
@@ -68,49 +68,48 @@ switch (task) {
   case "native-tests":
     await run([...develop, "bun", "--no-install", ".github/scripts/native/native.ts"]);
     break;
-  case "package": {
-    const name = choice("PACKAGE", [
-      "ai-javascript",
-      "ai-shared",
-      "farstep-modules",
-      "farstep-javascript",
-      "farstep-desktop",
-      "farstep-service",
-      "farstep-extensions",
-      "farstep-kde-bridge",
-      "ai-configs",
-      "farstep",
-      "ghidra-mcp",
-    ]);
+  case "packages": {
     const temporary = process.env.RUNNER_TEMP;
     if (!temporary) throw new Error("RUNNER_TEMP is required for package builds");
-    const artifact = join(temporary, "ci-package");
-    await run([
-      "nix",
-      "build",
-      "--no-update-lock-file",
-      "--print-build-logs",
-      "--out-link",
-      artifact,
-      `.#packages.${system}.${name}`,
-    ]);
-    if (name === "farstep-desktop" || name === "farstep-service") {
-      await run([join(artifact, "bin", name), "--help"]);
-    } else if (name === "ghidra-mcp") {
-      await run([join(artifact, "libexec", "ghidra-mcp-headless"), "--help"]);
-    } else if (name === "ai-configs") {
-      const manifest = await Bun.file(join(artifact, "manifest.json")).json();
-      if (
-        manifest?.version !== 1 ||
-        !Array.isArray(manifest.files) ||
-        !manifest.files.length
-      )
-        throw new Error("Invalid configuration manifest");
-      for (const file of manifest.files) {
-        if (typeof file?.path !== "string" || typeof file.private !== "boolean")
-          throw new Error("Invalid configuration manifest entry");
-        if (!(await Bun.file(join(artifact, file.path)).exists()))
-          throw new Error(`Missing configuration artifact: ${file.path}`);
+    // The aggregate packages already build their JS and desktop components
+    const packages = [
+      "farstep",
+      "ai-javascript",
+      "farstep-desktop",
+      "farstep-service",
+      "ai-configs",
+      "ghidra-mcp",
+    ];
+    for (const name of packages) {
+      console.log(`Building ${name} (${system})`);
+      const artifact = join(temporary, name);
+      await run([
+        "nix",
+        "build",
+        "--no-update-lock-file",
+        "--print-build-logs",
+        "--out-link",
+        artifact,
+        `.#packages.${system}.${name}`,
+      ]);
+      if (name === "farstep-desktop" || name === "farstep-service") {
+        await run([join(artifact, "bin", name), "--help"]);
+      } else if (name === "ghidra-mcp") {
+        await run([join(artifact, "libexec", "ghidra-mcp-headless"), "--help"]);
+      } else if (name === "ai-configs") {
+        const manifest = await Bun.file(join(artifact, "manifest.json")).json();
+        if (
+          manifest?.version !== 1 ||
+          !Array.isArray(manifest.files) ||
+          !manifest.files.length
+        )
+          throw new Error("Invalid configuration manifest");
+        for (const file of manifest.files) {
+          if (typeof file?.path !== "string" || typeof file.private !== "boolean")
+            throw new Error("Invalid configuration manifest entry");
+          if (!(await Bun.file(join(artifact, file.path)).exists()))
+            throw new Error(`Missing configuration artifact: ${file.path}`);
+        }
       }
     }
     break;
