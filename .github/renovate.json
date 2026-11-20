@@ -150,7 +150,7 @@
       "description": "Track the PowerShell analyzer",
       "managerFilePatterns": [
         "/^tools/nix/fmt/analyzer\\.nix$/",
-        "/^\\.github/scripts/powershell/powershell\\.ts$/",
+        "/^\\.github/workflows/ci\\.yml$/",
         "/^tools/scripts/powershell/powershell\\.ps1$/"
       ],
       "matchStrings": [

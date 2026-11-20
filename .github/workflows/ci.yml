@@ -120,19 +120,18 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install the repository's Bun version
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: package.json
-          no-cache: true
       - name: Install PSScriptAnalyzer
-        env:
-          POWERSHELL: ${{ matrix.shell }}
-        run: bun .github/scripts/powershell/powershell.ts install
+        run: |
+          if ($PSVersionTable.PSVersion.Major -lt 6) {
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Scope CurrentUser -Force
+          }
+          Install-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force -Repository PSGallery
       - name: Check PowerShell formatting, syntax, and lint
-        env:
-          POWERSHELL: ${{ matrix.shell }}
-        run: bun .github/scripts/powershell/powershell.ts
+        run: |
+          $paths = @(git ls-files -- '*.ps1' '*.psm1' '*.psd1')
+          if ($LASTEXITCODE -ne 0 -or $paths.Count -eq 0) { throw 'Cannot discover PowerShell sources' }
+          & ./tools/scripts/powershell/powershell.ps1 -Check -Paths $paths
   windows-native:
     name: Windows native (${{ matrix.task }})
     runs-on: windows-2025
