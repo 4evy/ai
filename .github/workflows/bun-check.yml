@@ -6,10 +6,6 @@ on:
         description: Repository check to run
         required: true
         type: string
-      workspace:
-        description: Workspace to typecheck or build
-        default: root
-        type: string
       runner:
         description: GitHub-hosted runner
         default: ubuntu-26.04
@@ -17,7 +13,7 @@ on:
 permissions: {}
 jobs:
   check:
-    name: ${{ inputs.task }} (${{ inputs.workspace }})
+    name: ${{ inputs.task }}
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 30
     permissions:
@@ -36,9 +32,31 @@ jobs:
           bun-version-file: package.json
           no-cache: true
       - name: Install frozen dependencies without lifecycle scripts
-        run: bun .github/scripts/bun/bun.ts install
-      - name: Run the selected check
-        env:
-          TASK: ${{ inputs.task }}
-          WORKSPACE: ${{ inputs.workspace }}
-        run: bun .github/scripts/bun/bun.ts
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Install architecture checker dependencies
+        if: inputs.task == 'quality'
+        run: bun install --cwd tools/scripts/dependencies --frozen-lockfile --ignore-scripts
+      - name: Check lint and formatting
+        if: inputs.task == 'quality'
+        run: bun run check:biome
+      - name: Check dependencies
+        if: inputs.task == 'quality'
+        run: bun run check:dependencies
+      - name: Check import boundaries
+        if: inputs.task == 'quality'
+        run: bun run check:architecture
+      - name: Check pinned Sky declarations
+        if: inputs.task == 'pins'
+        run: bun run check:sky
+      - name: Check pinned OMP patches
+        if: inputs.task == 'pins'
+        run: bun run check:patches
+      - name: Typecheck the root and workspaces
+        if: inputs.task == 'typecheck'
+        run: bun run typecheck
+      - name: Build the root and workspaces
+        if: inputs.task == 'build'
+        run: bun run build
+      - name: Run process tests
+        if: inputs.task == 'test'
+        run: bun run test

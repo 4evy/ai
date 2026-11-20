@@ -9,30 +9,17 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  quality:
-    name: ${{ matrix.task }}
+  bun:
+    name: Bun ${{ matrix.task }}
     strategy:
       fail-fast: false
       matrix:
-        task: [biome, dependencies, architecture, sky, patches]
+        task: [quality, pins, typecheck, build]
     uses: $/.github/workflows/bun-check.yml
     permissions:
       contents: read
     with:
       task: ${{ matrix.task }}
-  workspaces:
-    name: ${{ matrix.task }} (${{ matrix.workspace }})
-    strategy:
-      fail-fast: false
-      matrix:
-        task: [typecheck, build]
-        workspace: [root, values, runtime, toolkit, chatgpt, omp, farstep]
-    uses: $/.github/workflows/bun-check.yml
-    permissions:
-      contents: read
-    with:
-      task: ${{ matrix.task }}
-      workspace: ${{ matrix.workspace }}
   tests:
     name: Process tests (${{ matrix.runner }})
     strategy:
