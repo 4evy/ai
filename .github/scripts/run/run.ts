@@ -1,18 +1,15 @@
 import { resolve } from "node:path";
-import { run as runEffect } from "@ai/runtime/effect/effect";
-import { executeCommand } from "@ai/runtime/effect/process/process";
 
 export const root = resolve(import.meta.dir, "../../..");
 
 export async function run(command: string[], stdin?: Uint8Array): Promise<void> {
-  const { code } = await runEffect(
-    executeCommand(command, {
-      cwd: root,
-      stdin: stdin ?? "inherit",
-      stdout: "inherit",
-      stderr: "inherit",
-    }),
-  );
+  const child = Bun.spawn(command, {
+    cwd: root,
+    stdin: stdin ?? "inherit",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  const code = await child.exited;
   if (code !== 0) throw new Error(`${command.join(" ")} failed (${code})`);
 }
 

@@ -65,11 +65,11 @@ switch (task) {
     ]);
     break;
   case "native-lint":
-    await run([...develop, "just", "install"]);
+    await run([process.execPath, "install", "--frozen-lockfile", "--ignore-scripts"]);
     await run([...develop, "just", "check", "rust"]);
     break;
   case "native-tests":
-    await run([...develop, "bun", ".github/scripts/native/native.ts", "tests"]);
+    await run([...develop, "bun", "--no-install", ".github/scripts/native/native.ts"]);
     break;
   case "package": {
     const name = choice("PACKAGE", [

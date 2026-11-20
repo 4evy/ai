@@ -133,15 +133,11 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or $paths.Count -eq 0) { throw 'Cannot discover PowerShell sources' }
           & ./tools/scripts/powershell/powershell.ps1 -Check -Paths $paths
   windows-native:
-    name: Windows native (${{ matrix.task }})
+    name: Windows native
     runs-on: windows-2025
     timeout-minutes: 60
     permissions:
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        task: [clippy, tests]
     defaults:
       run:
         shell: pwsh
@@ -155,9 +151,27 @@ jobs:
         with:
           bun-version-file: package.json
           no-cache: true
-      - name: Install the declared minimum Rust version
-        run: bun .github/scripts/native/native.ts rust-install
-      - name: Check Windows native code
-        env:
-          TASK: ${{ matrix.task }}
-        run: bun .github/scripts/native/native.ts
+      - name: Read the declared minimum Rust version
+        id: rust
+        shell: bash
+        run: |
+          bun -e '
+            const { workspace } = Bun.TOML.parse(await Bun.file("Cargo.toml").text());
+            const version = workspace?.package?.["rust-version"];
+            if (typeof version !== "string" || !/^\d+\.\d+(?:\.\d+)?$/.test(version))
+              throw new Error("Invalid Cargo workspace rust-version");
+            console.log("version=" + version);
+          ' >> "$GITHUB_OUTPUT"
+      - name: Install Rust and cache Cargo dependencies
+        uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 # v2.0.1
+        with:
+          toolchain: ${{ steps.rust.outputs.version }}
+          components: clippy
+          build-warnings: warn
+          cache-bin: false
+          cache-on-failure: false
+          cache-save-if: ${{ github.ref == 'refs/heads/master' }}
+      - name: Lint Windows native code
+        run: cargo clippy --locked --workspace --all-targets --all-features
+      - name: Test and smoke-check Windows native executables
+        run: bun --no-install .github/scripts/native/native.ts
