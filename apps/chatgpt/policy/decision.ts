@@ -151,10 +151,36 @@ function rewriteDecisionFunctions(source: string, filename: string): string {
   return next;
 }
 
-// Sky 0.7.13 uses a named getter with bindings, a type guard, and a return
+// Bundles may read nodeRepl directly or through a module-local getter
 // Keep its name and callers intact, and reject unfamiliar or oversized bodies
 function rewriteElicitationResolver(source: string, filename: string): string {
   const tree = parse(source, { ecmaVersion: "latest", sourceType: "module" });
+  const topLevel = new Set(tree.body);
+  const nodeReplGetters = new Set<string>();
+  for (const node of tree.body) {
+    if (
+      node.type !== "FunctionDeclaration" ||
+      node.async ||
+      node.generator ||
+      node.params.length !== 0 ||
+      node.body.body.length !== 1
+    ) {
+      continue;
+    }
+    const [result] = node.body.body;
+    if (
+      result?.type === "ReturnStatement" &&
+      result.argument?.type === "MemberExpression" &&
+      !result.argument.computed &&
+      !result.argument.optional &&
+      result.argument.object.type === "Identifier" &&
+      result.argument.object.name === "globalThis" &&
+      result.argument.property.type === "Identifier" &&
+      result.argument.property.name === "nodeRepl"
+    ) {
+      nodeReplGetters.add(node.id.name);
+    }
+  }
   const bodies: { start: number; end: number }[] = [];
   simple(tree, {
     FunctionDeclaration(node) {
@@ -179,7 +205,23 @@ function rewriteElicitationResolver(source: string, filename: string): string {
       ) {
         return;
       }
+      const initializer = bindings.declarations[0]?.init;
       let nodeRepl = false;
+      if (
+        node.id !== null &&
+        topLevel.has(node) &&
+        initializer?.type === "CallExpression" &&
+        !initializer.optional &&
+        initializer.arguments.length === 0 &&
+        initializer.callee.type === "Identifier"
+      ) {
+        const getter = initializer.callee.name;
+        nodeRepl =
+          nodeReplGetters.has(getter) &&
+          bindings.declarations.every(
+            ({ id }) => id.type === "Identifier" && id.name !== getter,
+          );
+      }
       let elicitation = false;
       simple(node.body, {
         MemberExpression(member) {
