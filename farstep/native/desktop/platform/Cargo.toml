@@ -75,7 +75,6 @@ backon = { workspace = true, features = [
 ] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-base64.workspace = true
 win-custody.workspace = true
 windows = { workspace = true, features = [
   "Win32_Foundation",

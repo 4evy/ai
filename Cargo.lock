@@ -629,7 +629,6 @@ dependencies = [
  "async-trait",
  "axuielement",
  "backon",
- "base64",
  "clap",
  "command-fds",
  "core-foundation",
