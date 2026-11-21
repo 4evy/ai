@@ -1,9 +1,13 @@
 {
-  "rev": "5185dde30920e9967ec3f4a28f9561783e859e69",
-  "version": "7.0.0-unstable-2026-11-18",
-  "hash": "sha256-lEmkmWh8EaYvZs7we84b/2B1UbDfWhs9DBQ97L2N0SI=",
-  "upstreamVersion": "7.0.0",
-  "patches": ["explicit-backend.patch", "sdk-server.patch", "sdk-transports.patch"],
+  "rev": "8dbbb1f677166fe483d605f925d60da080e448f2",
+  "version": "7.1.0-unstable-2026-11-20",
+  "hash": "sha256-4xWLBpdkktFCf2yI4bHDqpE+jXqZ8k8QdPM9Nh0Yf1w=",
+  "upstreamVersion": "7.1.0",
+  "patches": [
+    "explicit-backend.patch",
+    "sdk-server.patch",
+    "sdk-transports.patch"
+  ],
   "sdk": {
     "version": "2.3.0",
     "hash": "sha256-CnXi78zYxm0/R4fON/DzRYMSDYM/XM/9SE3s+Cf1BR0="
