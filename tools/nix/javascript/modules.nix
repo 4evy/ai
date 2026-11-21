@@ -2,7 +2,7 @@
   lib,
   stdenvNoCC,
   bun,
-  ai-javascript-dependencies,
+  ai-module-compiler-dependencies,
 }:
 {
   pname,
@@ -37,11 +37,11 @@ stdenvNoCC.mkDerivation {
   env.AI_BUILD_PROJECTS = lib.strings.concatStringsSep "," projects;
   buildPhase = ''
     runHook preBuild
-    bash ${./link-dependencies.sh} ${ai-javascript-dependencies} node_modules
+    bash ${./link-dependencies.sh} ${ai-module-compiler-dependencies} node_modules
     mkdir -p node_modules/@ai
     ln -s "$PWD/packages/values" node_modules/@ai/values
     ${lib.strings.concatMapStringsSep "\n" (project: ''
-      bun ${ai-javascript-dependencies}/node_modules/vite/bin/vite.js build \
+      bun ${ai-module-compiler-dependencies}/node_modules/vite/bin/vite.js build \
         --config ${
           lib.strings.escapeShellArg (
             if project == "." then "vite.config.ts" else "${project}/vite.config.ts"

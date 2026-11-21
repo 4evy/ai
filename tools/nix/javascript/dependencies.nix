@@ -44,20 +44,7 @@ let
     );
   platform = if stdenv.hostPlatform.isDarwin then "darwin" else "linux";
   arch = if stdenv.hostPlatform.isAarch64 then "arm64" else "x64";
-  platforms = lib.trivial.importJSON ./platforms.json;
-  matchesPlatform =
-    target: values:
-    let
-      allowed = builtins.filter (value: !lib.strings.hasPrefix "!" value) values;
-    in
-    !builtins.elem "!${target}" values
-    && (allowed == [ ] || builtins.elem target allowed || builtins.elem "any" allowed);
-  forHost =
-    name: _:
-    let
-      constraints = platforms.${name} or { };
-    in
-    matchesPlatform platform (constraints.os or [ ]) && matchesPlatform arch (constraints.cpu or [ ]);
+  forHost = import ./platform-filter.nix { inherit lib stdenv; } ./platforms.json;
 in
 assert lib.asserts.assertMsg (manifest.packageManager == "bun@${bun.version}")
   "The JavaScript workspace requires ${manifest.packageManager}, but Nix supplies bun@${bun.version}";

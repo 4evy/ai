@@ -62,14 +62,17 @@ runCommand "ai-javascript-${metadata.version}"
     for package in values runtime toolkit; do
       ln -s ${ai-shared}/packages/"$package" "$out/packages/$package"
     done
-    ln -s ${farstep-javascript}/farstep "$out/farstep"
+    # Resolve Farstep against the same dependencies as the apps in this tree
+    cp -R ${farstep-javascript.modules}/. "$out/"
+    chmod u+w "$out/farstep"
+    ln -s ${farstep-javascript.skyTypes}/farstep/sky "$out/farstep/sky"
     bash ${./link-dependencies.sh} ${ai-javascript-dependencies.production} "$out/node_modules"
     mkdir -p "$out/node_modules/@ai" "$out/node_modules/@oai"
     for package in values runtime toolkit; do
       ln -s ${ai-shared}/packages/"$package" "$out/node_modules/@ai/$package"
     done
-    ln -s ${farstep-javascript}/farstep "$out/node_modules/farstep"
-    ln -s ${farstep-javascript}/farstep/sky "$out/node_modules/@oai/sky"
+    ln -s ../farstep "$out/node_modules/farstep"
+    ln -s ../../farstep/sky "$out/node_modules/@oai/sky"
     ln -s ../apps/omp "$out/node_modules/omp-agent-runtime"
     for package in ${ai-javascript-dependencies}/node_modules/@biomejs/*; do
       ln -s "$package" "$biome/node_modules/@biomejs/$(basename "$package")"

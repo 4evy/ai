@@ -1,0 +1,112 @@
+{
+  "@rolldown/binding-android-arm-eabi@1.2.19": {
+    "os": ["android"],
+    "cpu": ["arm"]
+  },
+  "@rolldown/binding-android-arm64@1.2.19": {
+    "os": ["android"],
+    "cpu": ["arm64"]
+  },
+  "@rolldown/binding-darwin-arm64@1.2.19": {
+    "os": ["darwin"],
+    "cpu": ["arm64"]
+  },
+  "@rolldown/binding-darwin-x64@1.2.19": {
+    "os": ["darwin"],
+    "cpu": ["x64"]
+  },
+  "@rolldown/binding-freebsd-x64@1.2.19": {
+    "os": ["freebsd"],
+    "cpu": ["x64"]
+  },
+  "@rolldown/binding-linux-arm-gnueabihf@1.2.19": {
+    "os": ["linux"],
+    "cpu": ["arm"]
+  },
+  "@rolldown/binding-linux-arm64-gnu@1.2.19": {
+    "os": ["linux"],
+    "cpu": ["arm64"]
+  },
+  "@rolldown/binding-linux-arm64-musl@1.2.19": {
+    "os": ["linux"],
+    "cpu": ["arm64"]
+  },
+  "@rolldown/binding-linux-ppc64-gnu@1.2.19": {
+    "os": ["linux"],
+    "cpu": ["ppc64"]
+  },
+  "@rolldown/binding-linux-s390x-gnu@1.2.19": {
+    "os": ["linux"],
+    "cpu": ["s390x"]
+  },
+  "@rolldown/binding-linux-x64-gnu@1.2.19": {
+    "os": ["linux"],
+    "cpu": ["x64"]
+  },
+  "@rolldown/binding-linux-x64-musl@1.2.19": {
+    "os": ["linux"],
+    "cpu": ["x64"]
+  },
+  "@rolldown/binding-openharmony-arm64@1.2.19": {
+    "os": ["none"],
+    "cpu": ["arm64"]
+  },
+  "@rolldown/binding-wasm32-wasi@1.2.19": {
+    "cpu": ["none"]
+  },
+  "@rolldown/binding-win32-arm64-msvc@1.2.19": {
+    "os": ["win32"],
+    "cpu": ["arm64"]
+  },
+  "@rolldown/binding-win32-x64-msvc@1.2.19": {
+    "os": ["win32"],
+    "cpu": ["x64"]
+  },
+  "fsevents@2.3.3": {
+    "os": ["darwin"]
+  },
+  "lightningcss-android-arm64@1.33.0": {
+    "os": ["android"],
+    "cpu": ["arm64"]
+  },
+  "lightningcss-darwin-arm64@1.33.0": {
+    "os": ["darwin"],
+    "cpu": ["arm64"]
+  },
+  "lightningcss-darwin-x64@1.33.0": {
+    "os": ["darwin"],
+    "cpu": ["x64"]
+  },
+  "lightningcss-freebsd-x64@1.33.0": {
+    "os": ["freebsd"],
+    "cpu": ["x64"]
+  },
+  "lightningcss-linux-arm-gnueabihf@1.33.0": {
+    "os": ["linux"],
+    "cpu": ["arm"]
+  },
+  "lightningcss-linux-arm64-gnu@1.33.0": {
+    "os": ["linux"],
+    "cpu": ["arm64"]
+  },
+  "lightningcss-linux-arm64-musl@1.33.0": {
+    "os": ["linux"],
+    "cpu": ["arm64"]
+  },
+  "lightningcss-linux-x64-gnu@1.33.0": {
+    "os": ["linux"],
+    "cpu": ["x64"]
+  },
+  "lightningcss-linux-x64-musl@1.33.0": {
+    "os": ["linux"],
+    "cpu": ["x64"]
+  },
+  "lightningcss-win32-arm64-msvc@1.33.0": {
+    "os": ["win32"],
+    "cpu": ["arm64"]
+  },
+  "lightningcss-win32-x64-msvc@1.33.0": {
+    "os": ["win32"],
+    "cpu": ["x64"]
+  }
+}

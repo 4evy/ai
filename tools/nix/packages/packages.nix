@@ -29,6 +29,9 @@ let
       };
       bun2nix = bunTools;
       ai-javascript-dependencies = self.callPackage ../javascript/dependencies.nix { };
+      ai-module-compiler-dependencies =
+        (self.callPackage ../javascript/locked-dependencies.nix { })
+          ../javascript/compiler;
       ai-shared = self.callPackage ../javascript/shared.nix { };
       ai-javascript = self.callPackage ../javascript/javascript.nix { };
       # Nixpkgs now supplies Ghidra's JDK 25 runtime directly
@@ -135,6 +138,7 @@ in
 # Keep the public package set limited to derivations, without scope helpers
 removeAttrs (scope.packages scope) [
   "aiUpdateScript"
+  "ai-module-compiler-dependencies"
   "craneLib"
   "farstep-cargo"
   "ghidra-bin"

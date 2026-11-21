@@ -28,7 +28,8 @@ This includes SwiftPM and SDK Swift overlays required by the Rust bridge crates.
 `just install` uses frozen lockfiles without lifecycle scripts. Root workspaces
 share `bun.lock`. Distribution manifests under `tools/runtime/`,
 `farstep/dependencies/`, and `apps/omp/runtime/upstream/` have separate
-lockfiles.
+lockfiles. Nix uses a separate
+[module compiler lockfile](../tools/nix/javascript/compiler/bun.lock).
 
 | Command                                      | Purpose                               |
 | -------------------------------------------- | ------------------------------------- |
@@ -456,10 +457,12 @@ extension or bridge edit rebuilds that component and final assembly, not the
 JavaScript runtime. Core implementation edits rebuild core and runtime
 assemblies, not Farstep or app module compilation.
 
-Some coupling remains explicit. JavaScript dependency installation shares the
-root lockfile, dependency declarations, and npm patches. Changes to those
-inputs can invalidate every JavaScript consumer, unlike source-only edits.
-Manifest scripts and exports do not enter the dependency install.
+Standalone Farstep installs its runtime dependencies from the same
+[lockfile](../farstep/dependencies/bun.lock) as the Windows distribution.
+The module compiler uses its own lockfile. Changes to the root workspace
+lockfile or OMP patches no longer invalidate either input. The aggregate
+`ai-javascript` distribution still uses the root lockfile. Run
+`just nix deps` after updating a lockfile used by Nix.
 
 The [native builder](../farstep/nix/native.nix) uses Crane to cache external
 Rust dependencies, protocol, backend API, image processing, MCP runtime, and

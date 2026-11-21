@@ -30,6 +30,16 @@ export async function syncNixDependencies(
 ): Promise<void> {
   for (const { lock, prefix, output } of [
     { lock: "bun.lock", prefix: "../../../", output: "tools/nix/javascript/bun.nix" },
+    {
+      lock: "farstep/dependencies/bun.lock",
+      prefix: "./",
+      output: "farstep/dependencies/bun.nix",
+    },
+    {
+      lock: "tools/nix/javascript/compiler/bun.lock",
+      prefix: "./",
+      output: "tools/nix/javascript/compiler/bun.nix",
+    },
   ]) {
     await runCommand([
       "nix",

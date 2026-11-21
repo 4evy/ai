@@ -3,7 +3,6 @@
   callPackage,
   runCommand,
   ai-shared,
-  ai-javascript-dependencies,
 }:
 let
   metadata = lib.trivial.importJSON ../package.json;
@@ -34,10 +33,11 @@ let
     ];
   };
   skyTypes = source [ ../sky ];
+  dependencies = (callPackage ../../tools/nix/javascript/locked-dependencies.nix { }) ../dependencies;
 in
 runCommand "farstep-javascript-${metadata.version}"
   {
-    passthru = { inherit modules; };
+    passthru = { inherit modules skyTypes dependencies; };
     meta = {
       description = "Farstep JavaScript runtime and harness-independent APIs";
       license = lib.licenses.mit;
@@ -49,17 +49,16 @@ runCommand "farstep-javascript-${metadata.version}"
     };
   }
   ''
-    mkdir -p "$out/packages"
+    mkdir -p "$out"
     cp -R ${modules}/. "$out/"
-    chmod -R u+w "$out/farstep"
+    chmod -R u+w "$out"
     ln -s ${skyTypes}/farstep/sky "$out/farstep/sky"
-    for package in values runtime toolkit; do
-      ln -s ${ai-shared}/packages/"$package" "$out/packages/$package"
-    done
-    bash ${../../tools/nix/javascript/link-dependencies.sh} ${ai-javascript-dependencies.production} "$out/node_modules"
+    # Keep Farstep and its shared packages in one module-resolution tree
+    cp -R ${ai-shared.modules}/. "$out/"
+    bash ${../../tools/nix/javascript/link-dependencies.sh} ${dependencies} "$out/node_modules"
     mkdir -p "$out/node_modules/@ai" "$out/node_modules/@oai"
     for package in values runtime toolkit; do
-      ln -s ${ai-shared}/packages/"$package" "$out/node_modules/@ai/$package"
+      ln -s "../../packages/$package" "$out/node_modules/@ai/$package"
     done
     ln -s ../../farstep/sky "$out/node_modules/@oai/sky"
     ln -s ../farstep "$out/node_modules/farstep"

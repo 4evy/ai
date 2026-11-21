@@ -52,6 +52,7 @@ await updateSources(changed);
 await run(["bun", "install", "--ignore-scripts"]);
 for (const directory of [
   "farstep/dependencies",
+  "tools/nix/javascript/compiler",
   "tools/runtime",
   "tools/scripts/dependencies",
   "apps/omp/runtime/upstream",

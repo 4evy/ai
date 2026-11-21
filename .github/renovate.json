@@ -274,6 +274,8 @@
       "**/bun.lock",
       "**/package.json",
       "**/bun.nix",
+      "farstep/dependencies/platforms.json",
+      "tools/nix/javascript/**/platforms.json",
       "apps/omp/runtime/**",
       "farstep/runtime/sky/runtime/pins.json",
       "farstep/sky/**",

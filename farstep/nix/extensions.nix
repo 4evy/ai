@@ -2,7 +2,8 @@
   lib,
   stdenvNoCC,
   bun,
-  ai-javascript-dependencies,
+  ai-module-compiler-dependencies,
+  farstep-javascript,
 }:
 let
   source = import ../../tools/nix/source/source.nix { inherit lib; };
@@ -27,7 +28,8 @@ stdenvNoCC.mkDerivation {
 
   postPatch = ''
     bash ${../../tools/nix/javascript/link-dependencies.sh} \
-      ${ai-javascript-dependencies} "$PWD/node_modules"
+      ${farstep-javascript.dependencies} "$PWD/node_modules"
+    ln -s ${ai-module-compiler-dependencies}/node_modules/vite node_modules/vite
     mkdir -p node_modules/@ai
     ln -s ../../packages/runtime node_modules/@ai/runtime
   '';
