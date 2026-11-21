@@ -1,7 +1,6 @@
 {
   lib,
   runCommand,
-  rustPlatform,
   stdenv,
   craneLib,
 }:
@@ -31,10 +30,30 @@ let
   ) crates;
   # Crane reads target names, not their contents, when generating dummy sources
   dummy = craneLib.mkDummySrc { src = source (manifests ++ targets); };
-  vendor = rustPlatform.importCargoLock { lockFile = ../../Cargo.lock; };
+  swiftCrates = [
+    "apple-cf"
+    "apple-metal"
+    "axuielement"
+    "screencapturekit"
+  ];
+  vendorDir = craneLib.vendorMultipleCargoDeps {
+    cargoLockList = [ ../../Cargo.lock ];
+    outputHashes."git+https://github.com/enigo-rs/enigo?rev=a9da6367f189d6d6ca95f1d3de34a5ff2f6c2a68#a9da6367f189d6d6ca95f1d3de34a5ff2f6c2a68" =
+      "sha256-5/rGiCl0+ZAs7bLC1KVxev+hdRF5alqI8lSwgoY9m/w=";
+    overrideVendorCargoPackage =
+      pkg: drv:
+      if stdenv.hostPlatform.isDarwin && builtins.elem pkg.name swiftCrates then
+        drv.overrideAttrs (old: {
+          postPatch = (old.postPatch or "") + ''
+            cp ${../packaging/swift/swift.rs} build.rs
+          '';
+        })
+      else
+        drv;
+  };
 in
 {
-  inherit crates;
+  inherit crates vendorDir;
   # Keep the same unpacked path, manifests and profile in every compilation stage
   sourceFor =
     implementations:
@@ -56,19 +75,4 @@ in
         fi
       ''}
     '';
-  vendorDir =
-    if stdenv.hostPlatform.isDarwin then
-      runCommand "cargo-vendor-dir" { } ''
-        cp -R ${vendor} "$out"
-        chmod u+w "$out"
-        for crate in "$out"/{apple-cf-*,apple-metal-*,axuielement-*,screencapturekit-*}; do
-          source=$(readlink "$crate")
-          rm "$crate"
-          cp -R "$source" "$crate"
-          chmod -R u+w "$crate"
-          cp ${../packaging/swift/swift.rs} "$crate/build.rs"
-        done
-      ''
-    else
-      vendor;
 }

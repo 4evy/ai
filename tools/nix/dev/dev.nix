@@ -17,10 +17,7 @@ let
         vendor = farstep.desktop.cargoVendorDir;
       in
       pkgs.writeShellScriptBin "cargo" ''
-        configuration=(
-          --config 'source.crates-io.replace-with="nix-vendor"'
-          --config 'source.nix-vendor.directory="${vendor}"'
-        )
+        configuration=(--config "${vendor}/config.toml")
         # Clippy forwards subcommand arguments to its nested Cargo invocation
         if [[ "''${1-}" == clippy ]]; then
           shift
