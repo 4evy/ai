@@ -13,12 +13,7 @@ name = "farstep-service"
 path = "src/main.rs"
 
 [dependencies]
-process-wrap = { workspace = true, features = [
-  "tokio1",
-  "process-group",
-  "job-object",
-  "kill-on-drop",
-] }
+process-wrap = { workspace = true, features = ["tokio1", "kill-on-drop"] }
 clap = { workspace = true, features = [
   "std",
   "derive",
@@ -33,7 +28,6 @@ tokio = { workspace = true, features = [
   "rt-multi-thread",
   "net",
   "io-util",
-  "io-std",
   "process",
   "signal",
   "sync",
@@ -43,6 +37,7 @@ tokio-util = { workspace = true, features = ["rt"] }
 scopeguard = { workspace = true, features = ["use_std"] }
 
 [target.'cfg(unix)'.dependencies]
+process-wrap = { workspace = true, features = ["process-group"] }
 backon = { workspace = true, features = ["std", "tokio-sleep"] }
 rustix = { workspace = true, features = ["fs", "process"] }
 tempfile.workspace = true
@@ -52,6 +47,8 @@ futures-util.workspace = true
 zbus_systemd = { workspace = true, features = ["systemd1", "zbus-async-tokio"] }
 
 [target.'cfg(windows)'.dependencies]
+process-wrap = { workspace = true, features = ["job-object"] }
+tokio = { workspace = true, features = ["io-std"] }
 base64.workspace = true
 win-custody.workspace = true
 windows-service.workspace = true
@@ -59,5 +56,4 @@ windows = { workspace = true, features = [
   "Win32_Foundation",
   "Win32_Security",
   "Win32_Security_Authorization",
-  "Win32_System_Pipes",
 ] }
