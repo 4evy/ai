@@ -277,31 +277,31 @@
     "os": ["win32"],
     "cpu": ["x64"]
   },
-  "@typescript/typescript-darwin-arm64@7.1.0-dev.20261119.1": {
+  "@typescript/typescript-darwin-arm64@7.1.0-dev.20261121.1": {
     "os": ["darwin"],
     "cpu": ["arm64"]
   },
-  "@typescript/typescript-darwin-x64@7.1.0-dev.20261119.1": {
+  "@typescript/typescript-darwin-x64@7.1.0-dev.20261121.1": {
     "os": ["darwin"],
     "cpu": ["x64"]
   },
-  "@typescript/typescript-linux-arm@7.1.0-dev.20261119.1": {
+  "@typescript/typescript-linux-arm@7.1.0-dev.20261121.1": {
     "os": ["linux"],
     "cpu": ["arm"]
   },
-  "@typescript/typescript-linux-arm64@7.1.0-dev.20261119.1": {
+  "@typescript/typescript-linux-arm64@7.1.0-dev.20261121.1": {
     "os": ["linux"],
     "cpu": ["arm64"]
   },
-  "@typescript/typescript-linux-x64@7.1.0-dev.20261119.1": {
+  "@typescript/typescript-linux-x64@7.1.0-dev.20261121.1": {
     "os": ["linux"],
     "cpu": ["x64"]
   },
-  "@typescript/typescript-win32-arm64@7.1.0-dev.20261119.1": {
+  "@typescript/typescript-win32-arm64@7.1.0-dev.20261121.1": {
     "os": ["win32"],
     "cpu": ["arm64"]
   },
-  "@typescript/typescript-win32-x64@7.1.0-dev.20261119.1": {
+  "@typescript/typescript-win32-x64@7.1.0-dev.20261121.1": {
     "os": ["win32"],
     "cpu": ["x64"]
   },

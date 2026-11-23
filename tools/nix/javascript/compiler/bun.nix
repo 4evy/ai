@@ -26,9 +26,9 @@
     url = "https://registry.npmjs.org/@napi-rs/wasm-runtime/-/wasm-runtime-1.2.6.tgz";
     hash = "sha512-mRyDmEw9/fCDXCGfL1sbgIw/GUK0PVxRW4YwgPN61F3LQ+fSyoBFarJVzgGyhF6kRzEQZ0FejDqm4WLXSeqQmw==";
   };
-  "@optique/core@1.3.7" = fetchurl {
-    url = "https://registry.npmjs.org/@optique/core/-/core-1.3.7.tgz";
-    hash = "sha512-pD/17kPw/UQfFwNNFtyCG0S79dSutqiJSr13w6vwFcjWV6tckFwmKpJFAG2leSJHPX+hNOaI9cxF0xsCdTSoIg==";
+  "@optique/core@1.4.0" = fetchurl {
+    url = "https://registry.npmjs.org/@optique/core/-/core-1.4.0.tgz";
+    hash = "sha512-ERjwixdopjgnHDX/E+nC/549QXWjWr7hnerw0v9+jdtYZBE9wq7uiPraE82ZDa0jLFECxO9umPz2wwaPG09z/g==";
   };
   "@oxc-project/types@0.156.0" = fetchurl {
     url = "https://registry.npmjs.org/@oxc-project/types/-/types-0.156.0.tgz";
@@ -110,9 +110,9 @@
     url = "https://registry.npmjs.org/detect-libc/-/detect-libc-2.1.2.tgz";
     hash = "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==";
   };
-  "effect@4.1.4" = fetchurl {
-    url = "https://registry.npmjs.org/effect/-/effect-4.1.4.tgz";
-    hash = "sha512-Tgrv/9FN+TZYyOn8XSli+fVqAfwDrDAkiX5Uu9vztINb675VTQdhD0gWI5Kzvhlh9QqzjZvw72iugqw5pwoghQ==";
+  "effect@4.1.5" = fetchurl {
+    url = "https://registry.npmjs.org/effect/-/effect-4.1.5.tgz";
+    hash = "sha512-xyR20KhQI0vg2gD8ILUSQRTTESEYJ0JKdP+QD8J37xbwPTqXRxFM/l0+vUVD9fuSvoYruoTqyt33C4FZv1s4TQ==";
   };
   "fdir@6.5.0" = fetchurl {
     url = "https://registry.npmjs.org/fdir/-/fdir-6.5.0.tgz";
