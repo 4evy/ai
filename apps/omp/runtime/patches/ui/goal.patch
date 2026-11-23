@@ -87,7 +87,7 @@ diff --git a/packages/coding-agent/src/modes/rpc/rpc-goal.ts b/packages/coding-a
 diff --git a/packages/coding-agent/src/modes/rpc/rpc-mode.ts b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
 --- a/packages/coding-agent/src/modes/rpc/rpc-mode.ts
 +++ b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
-@@ -1948,6 +1948,7 @@
+@@ -2141,6 +2141,7 @@
  					settings: session.settings,
  					cwd: session.sessionManager.getCwd(),
  					output: commandOutput => output({ type: "command_output", text: commandOutput }),

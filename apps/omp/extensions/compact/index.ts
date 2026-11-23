@@ -81,5 +81,5 @@ export default function compact(_api: ExtensionAPI) {
   installCompactRendererPolicies();
   toolRenderers.todo = compactTodoRenderer;
   toolRenderers.eval = compactEvalRenderer;
-  toolRenderers["xdev:queued"] = queuedScriptRenderer;
+  toolRenderers["tool-command:queued"] = queuedScriptRenderer;
 }

@@ -13,16 +13,22 @@ diff --git a/packages/coding-agent/src/modes/controllers/todo-command-controller
 diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/coding-agent/src/modes/interactive-mode.ts
 --- a/packages/coding-agent/src/modes/interactive-mode.ts
 +++ b/packages/coding-agent/src/modes/interactive-mode.ts
-@@ -62,7 +62,7 @@
+@@ -62,14 +62,12 @@
  import type { WorkingRowSpec } from "@oh-my-pi/pi-tui/components/loader";
  import { formatDoubleTap } from "@oh-my-pi/pi-tui/key-hint-format";
  import { thinkingLevelWord } from "@oh-my-pi/pi-tui/status-line/segments";
--import type { TspChecklistItem, TspChecklistPhase, TspSpan, TspText, TspTreeNode } from "@oh-my-pi/pi-wire";
-+import type { TspSpan, TspText, TspTreeNode } from "@oh-my-pi/pi-wire";
+ import {
+-	type TspChecklistItem,
+-	type TspChecklistPhase,
+ 	type TspSpan,
+ 	type TspText,
+ 	type TspTreeNode,
+ 	toolIntentLabel,
+ } from "@oh-my-pi/pi-wire";
  import { isInsideTerminalMultiplexer } from "@oh-my-pi/pi-tui/terminal-capabilities";
  import {
  	$env,
-@@ -232,8 +232,14 @@
+@@ -239,8 +237,14 @@
  	isClosedTodo,
  	selectCollapsedTodos,
  	setActiveTodoDescriptionsProvider,
@@ -37,7 +43,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  import { vocalizer } from "../tts/vocalizer";
  import { applyFileLinkSetting, applyHyperlinkSetting, fileHyperlink } from "@oh-my-pi/pi-tui/render/hyperlink";
  import {
-@@ -1186,7 +1192,7 @@
+@@ -1198,7 +1202,7 @@
   * rows and hit-testing can never disagree.
   */
  export function layoutPinnedHud(runningTotal: number, expanded: boolean): PinnedHudLayout {
@@ -46,7 +52,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		return { itemRows: runningTotal, toggle: undefined, toggleRow: undefined };
  	}
  	if (!expanded) {
-@@ -1566,6 +1572,7 @@
+@@ -1587,6 +1591,7 @@
  	/** Band composer: the status band hides `session_name`, so the title docks
  	 * onto the working row instead — right-aligned, dim, italic. */
  	#workingTitleTrailer(): string | undefined {
@@ -54,7 +60,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		if (cfgComposerShape.get(settings) !== "band") return undefined;
  		const name = this.sessionManager.getSessionName();
  		if (!name) return undefined;
-@@ -2133,12 +2140,12 @@
+@@ -2157,12 +2162,12 @@
  		return this.composer.viewportClickCandidates(index);
  	}
  
@@ -69,7 +75,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		this.ui.requestRender();
  	}
  
-@@ -2147,7 +2154,7 @@
+@@ -2171,7 +2176,7 @@
  		// An explicit settings change wins over click state: without the reset,
  		// reselecting the current value would keep showing the old override.
  		this.#pinnedHudOverride = undefined;
@@ -78,7 +84,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		this.ui.requestRender();
  	}
  
-@@ -2424,6 +2431,13 @@
+@@ -2449,6 +2454,13 @@
  		this.statusContainer = new StatusHudContainer(this);
  		this.todoContainer = new TodoHudContainer(this);
  		this.subagentContainer = new AnchoredLiveContainer();
@@ -92,7 +98,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		this.btwContainer = new AnchoredLiveContainer();
  		this.omfgContainer = new AnchoredLiveContainer();
  		this.cleanseContainer = new AnchoredLiveContainer();
-@@ -5450,14 +5464,43 @@
+@@ -5456,14 +5468,43 @@
  		this.#cancelSubagentPreviewTick();
  	}
  
@@ -138,7 +144,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		const expanded = this.todoExpanded;
  		const multiPhase = phases.length > 1;
  		const activeIdx = phases.indexOf(this.#getActivePhase(phases) ?? phases[0]);
-@@ -5655,27 +5698,7 @@
+@@ -5661,27 +5702,7 @@
  			"todo",
  		);
  		// A `checklist` HUD is a pill with the whole plan as its popover.
@@ -167,7 +173,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		this.#todoHudNative = {
  			checklist: node(
  				"checklist",
-@@ -5685,9 +5708,11 @@
+@@ -5691,9 +5712,11 @@
  			),
  			fallback,
  		};
@@ -179,7 +185,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		const rows = this.ui?.terminal?.rows ?? process.stdout.rows ?? 24;
  		return rows < TODO_COMPACT_TERMINAL_ROWS_THRESHOLD;
  	}
-@@ -5800,8 +5825,20 @@
+@@ -5806,8 +5829,20 @@
  	 * appear and advance, so a repaint is armed for when the marker first shows
  	 * and then once a second while a listed agent stays mid-call.
  	 */
@@ -201,7 +207,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
  		const view = this.#buildSubagentHudView();
  		if (!view) {
  			const changed = this.subagentContainer.children.length > 0;
-@@ -5815,7 +5852,10 @@
+@@ -5821,7 +5856,10 @@
  		this.#subagentHudKey = key;
  		const hud = this.subagentContainer.children[0];
  		if (hud instanceof SubagentHudComponent) hud.update(view.lines, view.order, view.toggleRow);
@@ -216,7 +222,7 @@ diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/codi
 diff --git a/packages/coding-agent/src/modes/settings.ts b/packages/coding-agent/src/modes/settings.ts
 --- a/packages/coding-agent/src/modes/settings.ts
 +++ b/packages/coding-agent/src/modes/settings.ts
-@@ -748,10 +748,10 @@
+@@ -735,10 +735,10 @@
  		group: "Display",
  		label: "Pinned Agents",
  		description:

@@ -140,24 +140,28 @@ diff --git a/packages/ai/src/dialect/inventory.ts b/packages/ai/src/dialect/inve
  		lines.push(params === "{}" ? `type ${tool.name} = ();` : `type ${tool.name} = (_: ${params});`);
  		return lines.join("\n");
  	});
-diff --git a/packages/coding-agent/src/tools/xdev.ts b/packages/coding-agent/src/tools/xdev.ts
---- a/packages/coding-agent/src/tools/xdev.ts
-+++ b/packages/coding-agent/src/tools/xdev.ts
-@@ -121,7 +121,8 @@
+diff --git a/packages/coding-agent/src/exec/tool-cli.ts b/packages/coding-agent/src/exec/tool-cli.ts
+--- a/packages/coding-agent/src/exec/tool-cli.ts
++++ b/packages/coding-agent/src/exec/tool-cli.ts
+@@ -1,5 +1,6 @@
+ import * as fs from "node:fs";
+ import * as path from "node:path";
++import { jsonSchemaToTypeScript } from "@oh-my-pi/pi-ai/utils/schema";
+ 
+ /** One invocation of a tool command in the embedded shell. */
+ export interface ToolCliRequest {
+@@ -467,7 +468,13 @@
+ 	if (cli.ambiguousFields.length > 0) {
+ 		rendered += `\nAmbiguous schema fields:\n  ${cli.ambiguousFields.join(", ")}  Set through -j/--json; their derived flag names collide.\n`;
+ 	}
+-	return `${rendered}  -j, --json <JSON>  Merge one raw JSON object.\n  @FILE             Merge a JSON object from FILE, or bind its text to the next argument.\n  -                 Same as @FILE, read from stdin.\n  -h, --help        Show this help.\n`;
++	rendered += "  -j, --json <JSON>  Merge one raw JSON object.\n  @FILE             Merge a JSON object from FILE, or bind its text to the next argument.\n  -                 Same as @FILE, read from stdin.\n  -h, --help        Show this help.\n";
++	const definitions = new Map<string, string>();
++	const schema = jsonSchemaToTypeScript(definition.schema, { definitions });
++	rendered += "\nJSON argument schema (TypeScript):\n";
++	for (const [name, value] of definitions) rendered += `type ${name} = ${value};\n`;
++	rendered += `type Args = ${schema};\n`;
++	return rendered;
  }
  
- function renderDocs(inst: Tool, heading = "#", descriptionCap?: number): string {
--	const schema = jsonSchemaToTypeScript(toolWireSchema(inst as AiTool));
-+	const definitions = new Map<string, string>();
-+	const schema = jsonSchemaToTypeScript(toolWireSchema(inst as AiTool), { definitions });
- 	let description = inst.description ?? "";
- 	if (descriptionCap !== undefined && description.length > descriptionCap) {
- 		description = `${description.slice(0, descriptionCap).trimEnd()}… (full docs: read ${XD_URL_PREFIX}${inst.name})`;
-@@ -133,6 +134,7 @@
- 		"",
- 		`${heading}# Schema`,
- 		"```ts",
-+		...Array.from(definitions, ([name, value]) => `type ${name} = ${value};`),
- 		`type Args = ${schema};`,
- 		"```",
- 		`Execute by writing JSON to ${XD_URL_PREFIX}${inst.name}.`,
+ function valueAt(root: JsonObject, propertyPath: string[]): unknown {

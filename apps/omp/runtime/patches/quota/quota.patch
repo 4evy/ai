@@ -6,10 +6,10 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
  import { formatMetric } from "../components/metric";
  import { formatBillingSummary } from "./metrics";
 +import { getStatusLinePresentation } from "./presentation";
- import { sanitizeStatusText } from "../chrome/shared";
+ import { sanitizeInlineStatusText, sanitizeStatusText } from "../chrome/shared";
  import {
  	formatContextUsage,
-@@ -312,6 +313,10 @@
+@@ -317,6 +318,10 @@
  	const state = ctx.session.state;
  	const opts = ctx.options.model ?? {};
  	if (opts.showThinkingLevel === false || !state.model?.thinking) return "";
@@ -20,7 +20,7 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
  	if (ctx.session.isAutoThinking) {
  		// Pending (no turn classified yet / classifying) shows a symbol-theme
  		// question-box marker; once resolved it shows `<level>`.
-@@ -400,7 +405,11 @@
+@@ -405,7 +410,11 @@
  		if (advisor) spans.push(span(` ${advisor.icon}`, advisor.color));
  		if (ctx.session.isFastModeActive() && theme.icon.fast) spans.push(span(` ${theme.icon.fast}`, token));
  		const level = ctx.options.model?.showThinkingLevel === false ? undefined : thinkingLevelWord(ctx.session);
@@ -33,7 +33,7 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
  		const slowModeLabel = ctx.session.getAnthropicSlowModeLabel?.();
  		if (slowModeLabel) spans.push(span(`${theme.sep.dot}${slowModeLabel}`, "warning"));
  		return segView(spans, "model", slowModeLabel ? "warning" : undefined);
-@@ -820,6 +829,7 @@
+@@ -825,6 +834,7 @@
  			usingSubscription,
  			premiumRequests,
  			fractionDigits: 2,
@@ -44,7 +44,7 @@ diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-
 diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status-line/component.ts
 --- a/packages/tui/src/status-line/component.ts
 +++ b/packages/tui/src/status-line/component.ts
-@@ -2817,9 +2817,9 @@
+@@ -2819,9 +2819,9 @@
  		};
  	}
  
@@ -57,7 +57,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  	}
  
  	/**
-@@ -3129,10 +3129,10 @@
+@@ -3131,10 +3131,10 @@
  	#separatorMetrics(plain: boolean, style: StatusLineSeparatorStyle): SeparatorMetrics {
  		const themeEpoch = getThemeEpoch();
  		const memo = plain ? this.#plainSeparatorMetrics : this.#styledSeparatorMetrics;
@@ -70,7 +70,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  		const metrics: SeparatorMetrics = {
  			themeRef: theme,
  			themeEpoch,
-@@ -3155,8 +3155,8 @@
+@@ -3157,8 +3157,8 @@
  	 *   (embedded in the editor's top border).
  	 * - `band`: the box layout opened by a soft flush-left cap, for the band
  	 *   composer's frameless full-width top row.
@@ -81,7 +81,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  	 * - `plain-left`: left segments only (claude composer; the right group
  	 *   lives in the editor's top rule).
  	 * - `plain-right`: right segments only (claude composer's top rule).
-@@ -3208,7 +3208,7 @@
+@@ -3210,7 +3210,7 @@
  		const transparentBg = bgAnsi === TRANSPARENT_BG_ANSI;
  		const fgAnsi = theme.getFgAnsi("text");
  		const sepAnsi = theme.getFgAnsi("statusLineSep");
@@ -90,7 +90,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  
  		// Collect visible segment contents
  		const leftParts: string[] = [];
-@@ -3264,8 +3264,12 @@
+@@ -3266,8 +3266,12 @@
  				const glance = widget ? formatJobWidgetGlance(widget.view, theme, JOBS_SEGMENT_SPARK_CELLS) : "";
  				const count = theme.fg("statusLineSubagents", `${theme.icon.job} ${runningBackgroundJobs}`);
  				rightParts.unshift(glance ? `${count} ${glance}` : count);
@@ -104,7 +104,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  		}
  		const topFillWidth = Math.max(0, width);
  		// These arrays are local to this render; overflow handling can mutate them.
-@@ -3316,14 +3320,20 @@
+@@ -3318,14 +3322,20 @@
  		const totalWidth = () => leftWidth + rightWidth + minimumGapWidth();
  
  		if (topFillWidth > 0) {
@@ -129,7 +129,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  				const currentNameVW = rightWidths[nameIdx];
  				const minNameVW = 8;
  				const shrinkBy = Math.min(Math.max(0, currentNameVW - minNameVW), totalWidth() - topFillWidth);
-@@ -3334,12 +3344,6 @@
+@@ -3336,12 +3346,6 @@
  					rightWidths[nameIdx] = nameWidth;
  				}
  			}
@@ -142,7 +142,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  			// Shrink path before dropping left segments — path is the only elastic segment
  			const pathIdx = leftSegIds.indexOf("path");
  			if (pathIdx >= 0 && totalWidth() > topFillWidth) {
-@@ -3376,6 +3380,15 @@
+@@ -3378,6 +3382,15 @@
  					}
  				}
  			}
@@ -158,7 +158,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  			const leftOverflowDropIndex = (): number => {
  				// Preserve the current working directory as long as possible. The
  				// previous right-to-left pop could collapse a normal-width bar to
-@@ -3395,6 +3408,14 @@
+@@ -3397,6 +3410,14 @@
  				leftSegIds.splice(dropIdx, 1);
  				leftWidth = left.length > 0 ? leftWidth - removedWidth - leftSepWidth - 2 : 0;
  			}
@@ -173,7 +173,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  		}
  
  		const renderGroup = (parts: string[], direction: "left" | "right"): string => {
-@@ -4019,7 +4040,7 @@
+@@ -4021,7 +4042,7 @@
  			if (action) props.actions = { click: action };
  			segs.push(describeSeg(key, props, view, dim));
  		};
@@ -182,7 +182,7 @@ diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status
  		leftSegments.forEach((id, index) => {
  			if (subagentBadge && id === "subagents") return;
  			const view = describeSegment(id, ctx);
-@@ -4027,12 +4048,7 @@
+@@ -4029,12 +4050,7 @@
  		});
  		// Live-work badges lead the right group, as in the ANSI bar; they sit on
  		// the inner edge, so they drop before any configured segment.

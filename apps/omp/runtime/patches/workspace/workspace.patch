@@ -42,9 +42,9 @@ diff --git a/packages/coding-agent/src/tools/browser/registry.ts b/packages/codi
  } from "./launch";
 +import { adaptBrowserLaunch, assertBrowserAppReuseAllowed } from "./launch-adapter";
  import { reapOrphanSharedTargets, type SharedTargetScope } from "./orphan-registry";
- import { ensureRelayDaemon, isLoopbackRelayUrl, restartRelayDaemon } from "./relay/daemon";
  import type { RelayKind } from "./relay/kind";
-@@ -385,6 +386,7 @@
+ import { requestRelayRestart, UPDATE_RELAY_EXTENSION, waitForRelayExtension } from "./relay/probe";
+@@ -363,6 +364,7 @@
  	}
  	const appArgs = kind.args ?? [];
  	const reused = await findReusableCdp(exe, { signal: opts.signal, appArgs });
@@ -52,7 +52,7 @@ diff --git a/packages/coding-agent/src/tools/browser/registry.ts b/packages/codi
  	let cdpUrl: string;
  	let pid: number;
  	let subprocess: Subprocess | undefined;
-@@ -395,7 +397,8 @@
+@@ -373,7 +375,8 @@
  	} else {
  		const port = await findFreeCdpPort();
  		const launchArgs = [...appArgs, `--remote-debugging-port=${port}`];

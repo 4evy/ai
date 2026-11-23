@@ -26,7 +26,7 @@ diff --git a/packages/coding-agent/src/session/model-controls.ts b/packages/codi
 diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
 --- a/packages/coding-agent/src/session/agent-session.ts
 +++ b/packages/coding-agent/src/session/agent-session.ts
-@@ -13098,7 +13098,7 @@
+@@ -13185,7 +13185,7 @@
  	async setModelTemporary(
  		model: Model,
  		thinkingLevel?: ConfiguredThinkingLevel,
@@ -134,7 +134,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/loader.ts b/pack
 diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packages/coding-agent/src/extensibility/extensions/types.ts
 --- a/packages/coding-agent/src/extensibility/extensions/types.ts
 +++ b/packages/coding-agent/src/extensibility/extensions/types.ts
-@@ -2192,8 +2192,11 @@
+@@ -2198,8 +2198,11 @@
  	/** Get available slash commands in the current session. */
  	getCommands(): SlashCommandInfo[];
  
@@ -148,7 +148,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packa
  
  	/** Get current thinking level. */
  	getThinkingLevel(): ThinkingLevel | undefined;
-@@ -2424,7 +2427,7 @@
+@@ -2450,7 +2453,7 @@
  
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
  

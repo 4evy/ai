@@ -2,10 +2,10 @@ import { code } from "@oh-my-pi/pi-tui/native/describe";
 import { plainToolCard, renderStatusLine } from "@oh-my-pi/pi-tui/render";
 import { formatExpandHint } from "@oh-my-pi/pi-tui/render/render-utils";
 import type { ToolRenderer } from "@oh-my-pi/pi-tui/tools/renderer";
-import type { XdevQueuedArgs } from "@oh-my-pi/pi-tui/tools/xdev";
+import type { QueuedToolCommandArgs } from "@oh-my-pi/pi-tui/tools/tool-commands";
 
 /** Keep queued scripts about the operation until their arguments are expanded */
-function operation({ label, args }: XdevQueuedArgs) {
+function operation({ label, args }: QueuedToolCommandArgs) {
   if (typeof args.script !== "string" && !Array.isArray(args.steps)) return undefined;
   const title =
     typeof args.name === "string" && args.name.trim() ? args.name.trim() : label;
@@ -62,4 +62,4 @@ export const queuedScriptRenderer = {
       preview: "children",
     };
   },
-} satisfies ToolRenderer<XdevQueuedArgs>;
+} satisfies ToolRenderer<QueuedToolCommandArgs>;

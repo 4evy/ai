@@ -68,7 +68,7 @@ export const compactShellPresentation: ShellRendererPolicy = {
     if (service.pid !== undefined) parts.push(`PID: ${service.pid}`);
     return parts;
   },
-  presentState(state, title, options, theme, showHeader) {
+  presentState(state, title, options, theme, showHeader, intent) {
     const label = shellStateLabels[state];
     const running = state === "running" || state === "background";
     const failed = state === "failed" || state === "cancelled";
@@ -100,6 +100,7 @@ export const compactShellPresentation: ShellRendererPolicy = {
         icon,
         title: `${label}${theme.sep.dot}${title}`,
       };
+      if (intent !== undefined) status.description = intent;
       if (options.spinnerFrame !== undefined)
         status.spinnerFrame = options.spinnerFrame;
       presentation.header = renderStatusLine(status, theme);

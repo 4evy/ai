@@ -187,6 +187,7 @@ const targetPatch = Effect.fnUntraced(function* (
       continue;
     }
     // Preserve published inference when the source-only build emits weaker types
+    // Anchor insertions so earlier inference differences cannot displace them
     const delta = structuredPatch(
       file,
       file,
@@ -194,7 +195,7 @@ const targetPatch = Effect.fnUntraced(function* (
       next.toString("utf8"),
       undefined,
       undefined,
-      { context: 0 },
+      { context: 3 },
     );
     const updated = applyPatch(publishedTypes.toString("utf8"), delta, {
       fuzzFactor: 0,
