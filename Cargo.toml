@@ -14,20 +14,20 @@ resolver = "3"
 [workspace.package]
 version = "1.0.0"
 edition = "2024"
-rust-version = "1.99.1"
+rust-version = "1.100.0"
 license = "MIT"
 
 [workspace.dependencies]
 # Refresh exact requirements with cargo upgrade --pinned --incompatible
 # Update transitive pins with cargo update
-ashpd = { version = "=0.14.1", default-features = false }
+ashpd = { version = "=0.14.3", default-features = false }
 async-io = "=2.6.0"
 async-trait = "=0.1.92"
 axuielement = "=0.10.2"
 backon = { version = "=1.6.0", default-features = false }
 base64 = "=0.23.1"
 bytes = "=1.12.2"
-clap = { version = "=4.6.8", default-features = false }
+clap = { version = "=4.6.9", default-features = false }
 command-fds = "=0.3.3"
 core-foundation = "=0.10.1"
 core-graphics = "=0.25.0"
@@ -56,6 +56,7 @@ rmcp = { version = "=3.11.0", default-features = false }
 rustix = "=1.1.6"
 schemars = "=1.2.3"
 scopeguard = { version = "=1.2.0", default-features = false }
+# Keep one Apple CF bridge until AXUIElement and Apple Metal support 0.12
 screencapturekit = "=11.1.2"
 serde = "=1.0.229"
 serde_json = "=1.0.154"
@@ -67,13 +68,13 @@ uuid = "=1.29.3"
 wayland-client = "=0.31.15"
 wayland-protocols-misc = "=0.3.12"
 wayland-protocols-wlr = "=0.3.12"
-win-custody = "=0.1.5"
+win-custody = "=0.1.6"
 windows = "=0.62.2"
 windows-service = "=0.8.1"
 wl-clipboard-rs = "=0.9.5"
 wl-proxy = { version = "=0.1.5", default-features = false }
 xkbcommon = "=0.9.0"
-zbus = { version = "=6.3.0", default-features = false }
+zbus = { version = "=6.5.0", default-features = false }
 zbus_systemd = "=0.26201.0"
 
 [workspace.lints.rust]
