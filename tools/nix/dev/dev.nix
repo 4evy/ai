@@ -4,27 +4,31 @@
   bun2nix,
   farstep,
   ai-javascript,
+  rustToolchain,
   nativeOnly ? false,
 }:
 let
   inherit (pkgs) lib;
   linux = pkgs.stdenv.hostPlatform.isLinux;
+  cargoBin = lib.getExe' rustToolchain "cargo";
   cargo =
     if linux then
-      pkgs.cargo
+      cargoBin
     else
       let
         vendor = farstep.desktop.cargoVendorDir;
       in
-      pkgs.writeShellScriptBin "cargo" ''
-        configuration=(--config "${vendor}/config.toml")
-        # Clippy forwards subcommand arguments to its nested Cargo invocation
-        if [[ "''${1-}" == clippy ]]; then
-          shift
-          exec ${lib.meta.getExe pkgs.cargo} clippy "''${configuration[@]}" "$@"
-        fi
-        exec ${lib.meta.getExe pkgs.cargo} "''${configuration[@]}" "$@"
-      '';
+      lib.getExe (
+        pkgs.writeShellScriptBin "cargo" ''
+          configuration=(--config "${vendor}/config.toml")
+          # Clippy forwards subcommand arguments to its nested Cargo invocation
+          if [[ "''${1-}" == clippy ]]; then
+            shift
+            exec ${cargoBin} clippy "''${configuration[@]}" "$@"
+          fi
+          exec ${cargoBin} "''${configuration[@]}" "$@"
+        ''
+      );
 in
 pkgs.mkShell {
   inputsFrom =
@@ -38,11 +42,8 @@ pkgs.mkShell {
       ];
   packages = lib.attrsets.attrValues (
     {
-      inherit bun bun2nix cargo;
+      inherit bun bun2nix rustToolchain;
       inherit (pkgs)
-        rustc
-        rustfmt
-        clippy
         rust-analyzer
         just
         actionlint
@@ -71,8 +72,9 @@ pkgs.mkShell {
     }
   );
   env = {
-    RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
-    CARGO = lib.meta.getExe cargo;
+    RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
+    CARGO = cargo;
+    RUSTC = lib.getExe' rustToolchain "rustc";
   }
   // lib.attrsets.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
     # inputsFrom inherits compiler inputs, but not the package's linker flags
@@ -82,6 +84,6 @@ pkgs.mkShell {
     FARSTEP_SKY_RUNTIME = toString farstep.skyRuntime;
   };
   shellHook = ''
-    export PATH="$PWD/node_modules/.bin:$PATH"
+    export PATH="$PWD/node_modules/.bin:${dirOf cargo}:${rustToolchain}/bin:$PATH"
   '';
 }

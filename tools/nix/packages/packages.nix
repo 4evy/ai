@@ -1,4 +1,8 @@
-{ bun2nix, crane }:
+{
+  bun2nix,
+  crane,
+  rustFor,
+}:
 pkgs:
 let
   ghidraNative = pkgs.lib.trivial.importJSON ../../../apps/ghidra/native/source.json;
@@ -21,7 +25,7 @@ let
   scope = pkgs.lib.makeScope pkgs.newScope (
     self:
     {
-      craneLib = crane.mkLib pkgs;
+      craneLib = (crane.mkLib pkgs).overrideToolchain (p: (rustFor p).minimal);
       farstep-cargo = self.callPackage ../../../farstep/nix/cargo-deps.nix { };
       aiUpdateScript = self.callPackage ../update/update.nix { };
       bun = self.callPackage ../javascript/runtime/runtime.nix {

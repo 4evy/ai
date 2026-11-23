@@ -1,4 +1,7 @@
-{ ... }:
+{ config, ... }:
+let
+  inherit (config.flake.lib) rustFor;
+in
 {
   perSystem =
     {
@@ -8,6 +11,13 @@
     }:
     {
       devShells.default = pkgs.callPackage ../dev/dev.nix {
+        rustToolchain = (rustFor pkgs).minimal.override {
+          extensions = [
+            "clippy"
+            "rust-src"
+            "rustfmt"
+          ];
+        };
         inherit (config.packages)
           bun
           bun2nix
