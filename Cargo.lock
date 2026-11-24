@@ -538,7 +538,7 @@ checksum = "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099"
 [[package]]
 name = "enigo"
 version = "0.6.1"
-source = "git+https://github.com/enigo-rs/enigo?rev=64ccb967a791bed54c7bed3cbe1586f32bfa99c1#64ccb967a791bed54c7bed3cbe1586f32bfa99c1"
+source = "git+https://github.com/enigo-rs/enigo?rev=47fe169946beb64f017e2ec0d513484c97e818e3#47fe169946beb64f017e2ec0d513484c97e818e3"
 dependencies = [
  "core-foundation",
  "core-graphics",
@@ -546,7 +546,6 @@ dependencies = [
  "foreign-types-shared",
  "libc",
  "log",
- "nom",
  "objc2",
  "objc2-app-kit",
  "objc2-core-foundation",

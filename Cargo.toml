@@ -38,7 +38,7 @@ dlopen2 = { version = "=0.9.0", default-features = false, features = [
   "wrapper",
 ] }
 # First upstream revision with windows 0.62, not yet on crates.io
-enigo = { git = "https://github.com/enigo-rs/enigo", rev = "64ccb967a791bed54c7bed3cbe1586f32bfa99c1", default-features = false }
+enigo = { git = "https://github.com/enigo-rs/enigo", rev = "47fe169946beb64f017e2ec0d513484c97e818e3", default-features = false }
 futures-util = "=0.3.34"
 gstreamer = "=0.25.4"
 gstreamer-app = "=0.25.2"
