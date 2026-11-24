@@ -26,7 +26,7 @@ diff --git a/packages/coding-agent/src/slash-commands/builtin-commit.ts b/packag
 diff --git a/packages/coding-agent/src/tools/settings.ts b/packages/coding-agent/src/tools/settings.ts
 --- a/packages/coding-agent/src/tools/settings.ts
 +++ b/packages/coding-agent/src/tools/settings.ts
-@@ -735,7 +735,7 @@
+@@ -751,7 +751,7 @@
  		group: "Available Tools",
  		label: "Selective commit",
  		description:

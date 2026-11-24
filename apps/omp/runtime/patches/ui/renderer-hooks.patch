@@ -1125,7 +1125,7 @@ diff --git a/packages/coding-agent/src/tools/tool-commands.ts b/packages/coding-
  	/**
  	 * Approval tier of the wrapped tool for {@link args} (`read` = no workspace
  	 * mutation). Absent for `help` dispatches and calls whose tier could not be
-@@ -408,6 +410,7 @@
+@@ -427,6 +429,7 @@
  	signal?: AbortSignal,
  	onUpdate?: AgentToolUpdateCallback<ToolCommandDispatch>,
  	context?: AgentToolContext,
@@ -1133,7 +1133,7 @@ diff --git a/packages/coding-agent/src/tools/tool-commands.ts b/packages/coding-
  ): Promise<{ result: AgentToolResult<unknown>; dispatch: ToolCommandDispatch }> {
  	let dispatch: ToolCommandDispatch = { tool: name, mode: "execute", exitCode: 1 };
  	try {
-@@ -452,6 +455,7 @@
+@@ -471,6 +474,7 @@
  					},
  				}
  			: undefined;
@@ -1144,7 +1144,7 @@ diff --git a/packages/coding-agent/src/tools/tool-commands.ts b/packages/coding-
 diff --git a/packages/coding-agent/src/tools/bash.ts b/packages/coding-agent/src/tools/bash.ts
 --- a/packages/coding-agent/src/tools/bash.ts
 +++ b/packages/coding-agent/src/tools/bash.ts
-@@ -772,7 +772,7 @@
+@@ -773,7 +773,7 @@
  	progress(dispatch: ToolCommandDispatch, index: number): void {
  		if (this.#finished.has(index)) return;
  		const current = this.#records[index];
@@ -1153,7 +1153,7 @@ diff --git a/packages/coding-agent/src/tools/bash.ts b/packages/coding-agent/src
  	}
  
  	/** Records so far, in invocation order. */
-@@ -1075,6 +1075,10 @@
+@@ -1088,6 +1088,10 @@
  	): ShellCommands | undefined {
  		if (names.length === 0) return undefined;
  		const { recorder, onChange } = options;
@@ -1164,7 +1164,7 @@ diff --git a/packages/coding-agent/src/tools/bash.ts b/packages/coding-agent/src
  		return {
  			names: [...names],
  			handler: createToolCommandHandler({
-@@ -1086,10 +1090,8 @@
+@@ -1099,10 +1103,8 @@
  					recorder.finish(dispatch, index);
  					onChange?.();
  				},

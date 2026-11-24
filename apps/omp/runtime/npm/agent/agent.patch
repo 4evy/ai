@@ -47,7 +47,7 @@ diff --git a/dist/types/extensibility/extensions/compact-handler.d.ts b/dist/typ
 diff --git a/dist/types/extensibility/extensions/runner.d.ts b/dist/types/extensibility/extensions/runner.d.ts
 --- a/dist/types/extensibility/extensions/runner.d.ts
 +++ b/dist/types/extensibility/extensions/runner.d.ts
-@@ -90,6 +90,7 @@
+@@ -91,6 +91,7 @@
      private readonly localProtocolOptions?;
      /** Identity of the agent this runner's session runs; defaults to the top-level agent. */
      private readonly agent;
@@ -66,7 +66,7 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
  import type { CustomEditor } from "@oh-my-pi/pi-tui/prompt/custom-editor";
  import type { Theme } from "@oh-my-pi/pi-tui/theme";
  import type { NativeToolView } from "@oh-my-pi/pi-tui/tools/renderer";
-@@ -594,6 +595,8 @@
+@@ -595,6 +596,8 @@
      sessionManager: ReadonlySessionManager;
      /** Model registry for API key resolution */
      modelRegistry: ModelRegistry;
@@ -75,7 +75,7 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
      /** Calling session's `local://` root mapping for external tool bridges. */
      localProtocolOptions?: LocalProtocolOptions;
      /** Current model (may be undefined) */
-@@ -1651,8 +1654,13 @@
+@@ -1685,8 +1688,13 @@
      setActiveTools(toolNames: string[]): Promise<void>;
      /** Get available slash commands in the current session. */
      getCommands(): SlashCommandInfo[];
@@ -91,7 +91,7 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
      /** Get current thinking level. */
      getThinkingLevel(): ThinkingLevel | undefined;
      /** Set thinking level for the current session. */
-@@ -1863,7 +1871,7 @@
+@@ -1897,7 +1905,7 @@
  export type GetAllToolsHandler = () => ToolInfo[];
  export type GetCommandsHandler = () => SlashCommandInfo[];
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
@@ -283,7 +283,7 @@ diff --git a/dist/types/modes/components/extensions/mcp-runtime.d.ts b/dist/type
 diff --git a/dist/types/session/agent-session-types.d.ts b/dist/types/session/agent-session-types.d.ts
 --- a/dist/types/session/agent-session-types.d.ts
 +++ b/dist/types/session/agent-session-types.d.ts
-@@ -405,6 +405,8 @@
+@@ -410,6 +410,8 @@
      advisorConfigWarnings?: string[];
      /** Disconnect the MCP manager owned by this session during disposal. */
      disconnectOwnedMcpManager?: () => Promise<void>;
@@ -428,7 +428,7 @@ diff --git a/dist/types/tools/tool-commands.d.ts b/dist/types/tools/tool-command
      /**
       * Approval tier of the wrapped tool for {@link args} (`read` = no workspace
       * mutation). Absent for `help` dispatches and calls whose tier could not be
-@@ -148,7 +150,7 @@
+@@ -158,7 +160,7 @@
  /** Help sections for selected mounted tools under the configured prompt-doc policy. */
  export declare function toolCommandDocsFor(state: ToolCommandState, names: Iterable<string>, mode: ToolCommandDocsMode, inlinePatterns?: readonly string[]): string;
  /** Validate and execute one enabled tool with already-parsed arguments. */
@@ -620,7 +620,7 @@ diff --git a/src/extensibility/extensions/compact-handler.ts b/src/extensibility
 diff --git a/src/extensibility/extensions/loader.ts b/src/extensibility/extensions/loader.ts
 --- a/src/extensibility/extensions/loader.ts
 +++ b/src/extensibility/extensions/loader.ts
-@@ -404,8 +404,8 @@
+@@ -434,8 +434,8 @@
  		return this.runtime.getCommands();
  	}
  
@@ -634,7 +634,7 @@ diff --git a/src/extensibility/extensions/loader.ts b/src/extensibility/extensio
 diff --git a/src/extensibility/extensions/runner.ts b/src/extensibility/extensions/runner.ts
 --- a/src/extensibility/extensions/runner.ts
 +++ b/src/extensibility/extensions/runner.ts
-@@ -602,6 +602,7 @@
+@@ -612,6 +612,7 @@
  });
  
  export class ExtensionRunner {
@@ -642,7 +642,7 @@ diff --git a/src/extensibility/extensions/runner.ts b/src/extensibility/extensio
  	#uiContext: ExtensionUIContext;
  	#mode: ExtensionMode = "print";
  	#toolApprovalPreviewWaiter?: (toolCallId: string) => Promise<void>;
-@@ -1821,6 +1822,7 @@
+@@ -1976,6 +1977,7 @@
  			cwd: this.cwd,
  			sessionManager: this.sessionManager,
  			modelRegistry: this.modelRegistry,
@@ -661,7 +661,7 @@ diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extension
  import type { CustomEditor } from "@oh-my-pi/pi-tui/prompt/custom-editor";
  import type { Theme } from "@oh-my-pi/pi-tui/theme";
  import type { NativeToolView } from "@oh-my-pi/pi-tui/tools/renderer";
-@@ -815,6 +816,8 @@
+@@ -816,6 +817,8 @@
  	sessionManager: ReadonlySessionManager;
  	/** Model registry for API key resolution */
  	modelRegistry: ModelRegistry;
@@ -670,7 +670,7 @@ diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extension
  	/** Calling session's `local://` root mapping for external tool bridges. */
  	localProtocolOptions?: LocalProtocolOptions;
  	/** Current model (may be undefined) */
-@@ -2198,8 +2201,11 @@
+@@ -2234,8 +2237,11 @@
  	/** Get available slash commands in the current session. */
  	getCommands(): SlashCommandInfo[];
  
@@ -684,7 +684,7 @@ diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extension
  
  	/** Get current thinking level. */
  	getThinkingLevel(): ThinkingLevel | undefined;
-@@ -2450,7 +2456,7 @@
+@@ -2486,7 +2492,7 @@
  
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
  
@@ -912,7 +912,7 @@ diff --git a/src/mcp/link.ts b/src/mcp/link.ts
  	/** The server's configured request timeout in milliseconds; absent selects the default deadlines. */
  	timeout?: number;
  	/** Where the units live; the process-wide host by default. */
-@@ -112,6 +115,7 @@
+@@ -113,6 +116,7 @@
  	readonly #instance: string;
  	readonly #roots: () => MCPRoot[];
  	readonly #idleMs: number;
@@ -920,7 +920,7 @@ diff --git a/src/mcp/link.ts b/src/mcp/link.ts
  	readonly #timeout: number | undefined;
  	readonly #injectedAccess: McpHostAccess | undefined;
  	readonly #pending = new Map<string | number, PendingRequest>();
-@@ -140,6 +144,8 @@
+@@ -143,6 +147,8 @@
  	#lastId = 0;
  	#everAttached = false;
  	#closed = false;
@@ -929,7 +929,7 @@ diff --git a/src/mcp/link.ts b/src/mcp/link.ts
  
  	/** The link lost its attachment and could not take a new one. */
  	onClose?: () => void;
-@@ -167,6 +173,7 @@
+@@ -170,6 +176,7 @@
  		this.#instance = options.instance;
  		this.#roots = options.roots;
  		this.#idleMs = options.idleMs;
@@ -937,7 +937,7 @@ diff --git a/src/mcp/link.ts b/src/mcp/link.ts
  		this.#timeout = options.timeout;
  		this.#injectedAccess = options.access;
  	}
-@@ -198,7 +205,13 @@
+@@ -201,7 +208,13 @@
  	async connect(signal?: AbortSignal): Promise<void> {
  		signal?.throwIfAborted();
  		if (this.#attached) return;
@@ -952,7 +952,7 @@ diff --git a/src/mcp/link.ts b/src/mcp/link.ts
  	}
  
  	/**
-@@ -257,7 +270,7 @@
+@@ -260,7 +273,7 @@
  	 * link moves with {@link retarget}; a restart would reach the old host.
  	 */
  	async hostMoved(): Promise<boolean> {
@@ -961,7 +961,7 @@ diff --git a/src/mcp/link.ts b/src/mcp/link.ts
  		return (await mcpHostAccess()).shared !== this.#access.shared;
  	}
  
-@@ -273,17 +286,22 @@
+@@ -276,17 +289,22 @@
  	}
  
  	async close(): Promise<void> {
@@ -986,7 +986,7 @@ diff --git a/src/mcp/link.ts b/src/mcp/link.ts
  	}
  
  	get #kind(): MCPTransportKind {
-@@ -340,7 +358,9 @@
+@@ -348,7 +366,9 @@
  		this.#attached = undefined;
  		this.#failPending(this.#closedError("MCP server connection was replaced"));
  		previous?.host.tunnel.close();
@@ -994,19 +994,19 @@ diff --git a/src/mcp/link.ts b/src/mcp/link.ts
 +		const released = previous?.host.release();
 +		if (released) await released;
 +		this.#assertCurrent(generation);
- 		await this.#retake(generation, undefined, signal, replaced, recovery);
+ 		await this.#retake(generation, undefined, signal, replaced, recovery, era);
  	}
  
-@@ -350,7 +370,7 @@
- 	 * credentials must not.
- 	 */
- 	async #attach(generation: number, signal: AbortSignal | undefined, mayRefresh: boolean): Promise<void> {
+@@ -363,7 +383,7 @@
+ 		mayRefresh: boolean,
+ 		resolvedEra?: McpEra,
+ 	): Promise<void> {
 -		const access = this.#injectedAccess ?? (await mcpHostAccess());
 +		const access = this.#injectedAccess ?? (this.#sessionOwned ? localMcpHost() : await mcpHostAccess());
  		// Checked before the listener is registered: a link closed meanwhile would never remove it.
  		this.#assertCurrent(generation);
  		if (access !== this.#access) {
-@@ -362,12 +382,19 @@
+@@ -375,12 +395,19 @@
  		this.#assertCurrent(generation);
  		const spec = this.#spec;
  		const host = await access.attach(
@@ -1027,8 +1027,8 @@ diff --git a/src/mcp/link.ts b/src/mcp/link.ts
 +			await host.release();
  			this.#assertCurrent(generation);
  		}
- 		const attached: Attached = { host, backlog: [], draining: false };
-@@ -442,8 +469,10 @@
+ 		const attached: Attached = { host, era, backlog: [], draining: false };
+@@ -456,8 +483,10 @@
  				throw error;
  			} finally {
  				previous?.host.tunnel.close();
@@ -1737,7 +1737,7 @@ diff --git a/src/modes/runtime-init.ts b/src/modes/runtime-init.ts
 diff --git a/src/sdk.ts b/src/sdk.ts
 --- a/src/sdk.ts
 +++ b/src/sdk.ts
-@@ -3982,6 +3982,7 @@
+@@ -3992,6 +3992,7 @@
  			}),
  			createAnnotationsAPI,
  		);
@@ -1745,7 +1745,7 @@ diff --git a/src/sdk.ts b/src/sdk.ts
  		// A dialog waits for the user, not the agent: the session lets the display sleep while one is open.
  		const trackUserWait: UserWaitTracker = dialog => (hasSession ? session.waitForUser(dialog) : dialog());
  		extensionRunner.setUserWaitTracker(trackUserWait);
-@@ -5580,6 +5581,7 @@
+@@ -5589,6 +5590,7 @@
  				hostMcpServerInstructions = source;
  			},
  			disconnectOwnedMcpManager: ownedMcpManager ? () => ownedMcpManager.disconnectAll() : undefined,
@@ -1756,7 +1756,7 @@ diff --git a/src/sdk.ts b/src/sdk.ts
 diff --git a/src/session/agent-session-types.ts b/src/session/agent-session-types.ts
 --- a/src/session/agent-session-types.ts
 +++ b/src/session/agent-session-types.ts
-@@ -432,6 +432,8 @@
+@@ -437,6 +437,8 @@
  	advisorConfigWarnings?: string[];
  	/** Disconnect the MCP manager owned by this session during disposal. */
  	disconnectOwnedMcpManager?: () => Promise<void>;
@@ -1768,7 +1768,7 @@ diff --git a/src/session/agent-session-types.ts b/src/session/agent-session-type
 diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
 --- a/src/session/agent-session.ts
 +++ b/src/session/agent-session.ts
-@@ -1174,6 +1174,8 @@
+@@ -1179,6 +1179,8 @@
  	/** Settles when the open run ends or is abandoned; see {@link waitForRunEnd}. */
  	#runEnded: PromiseWithResolvers<void> | undefined;
  	#runCheckScheduled = false;
@@ -1777,7 +1777,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  	/** In-flight settle-callback flushes; the stranded-message drain after each may still start a loop. */
  	#settleCallbackFlushes = 0;
  	#commandMetadataChangedListeners: CommandMetadataChangedListener[] = [];
-@@ -1388,6 +1390,7 @@
+@@ -1393,6 +1395,7 @@
  	#sideStreamFn: StreamFn;
  	#convertToLlm: (messages: AgentMessage[]) => Message[] | Promise<Message[]>;
  	#disconnectOwnedMcpManager: (() => Promise<void>) | undefined;
@@ -1785,7 +1785,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  	#reloadOwnedMcpServers: (() => Promise<MCPLoadResult | undefined>) | undefined;
  	#projectScopeRefresher: (() => Promise<void>) | undefined;
  	#projectScopeRefresh: Promise<void> = Promise.resolve();
-@@ -1955,7 +1958,9 @@
+@@ -1961,7 +1964,9 @@
  		// advertise one yield schema while the runtime enforces the other, so join
  		// the transition before building the turn from a consistent contract.
  		void this.whenWorkPoolYieldSettled()
@@ -1796,16 +1796,16 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  				// Synchronous ownership check, atomic with the dispatch below:
  				// agent.prompt() claims streaming with no await in between, and the
  				// yield contract above mutates synchronously, so no install can
-@@ -2627,6 +2632,8 @@
- 			// settles, so a result from the outgoing session cannot start a turn in the target.
- 			isStreaming: () => this.isStreaming || this.isSessionTransitioning,
+@@ -2635,6 +2640,8 @@
+ 			// either settles, so an async result cannot inject a prompt ahead of it.
+ 			isStreaming: () => this.isStreaming || this.isSessionTransitioning || this.#pendingAgentContinueCount > 0,
  			injectIdle: async delivered => {
 +				if (this.#runFinalization) await this.#runFinalization;
 +				if (this.#isDisposed) return;
  				const first = delivered[0];
  				if (!first) return;
  				// A background job may have made a prelude's first call: its guide rides the job's delivery.
-@@ -2814,6 +2821,7 @@
+@@ -2823,6 +2830,7 @@
  			skillsReloadable: config.skillsReloadable,
  		});
  		this.#disconnectOwnedMcpManager = config.disconnectOwnedMcpManager;
@@ -1813,7 +1813,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  		this.#reloadOwnedMcpServers = config.reloadOwnedMcpServers;
  		const ttsrHost: TtsrCoordinatorHost = {
  			agent: this.agent,
-@@ -3999,6 +4007,7 @@
+@@ -4010,6 +4018,7 @@
  	async #admitSubmission<T>(work: () => Promise<T>): Promise<T> {
  		this.#admittedSubmissionCount++;
  		try {
@@ -1821,7 +1821,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  			if (this.hasPendingDeferredExtensions) await this.loadDeferredExtensions();
  			return await this.#inLogContext(work);
  		} finally {
-@@ -5755,6 +5764,7 @@
+@@ -5766,6 +5775,7 @@
  		onStart?: () => void,
  	): Promise<AgentContinueOutcome> {
  		try {
@@ -1829,7 +1829,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  			// During an automatic-retry saga the primary model's selector cooldown
  			// can expire while a chain-tail fallback is still mid-backoff. Restoring
  			// the primary then would reset the retry budget and re-enter a model
-@@ -6258,7 +6268,7 @@
+@@ -6291,7 +6301,7 @@
  	 * without writing) therefore ends it here.
  	 */
  	#checkRun(): void {
@@ -1838,7 +1838,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  		if (this.isStreaming || this.#postPromptTasks.size > 0 || this.#abortUnwinds.size > 0) return;
  		if (this.#admittedSubmissionCount > 0 || this.#settleCallbackFlushes > 0) return;
  		// Transitions and `/compact` detach the agent while they abort and rebuild; the
-@@ -6284,16 +6294,57 @@
+@@ -6317,16 +6327,57 @@
  			return;
  		}
  		const end = this.#loopEnd;
@@ -1903,7 +1903,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  	/** Whether the latest model turn ended on its own with an answer: no error, abort, or stop mid-tool-use. */
  	#lastTurnSettledCleanly(): boolean {
  		const last = this.getLastAssistantMessage();
-@@ -7022,7 +7073,7 @@
+@@ -7055,7 +7106,7 @@
  	beginDispose(): void {
  		this.#isDisposed = true;
  		for (const dispose of this.#disposers.splice(0)) dispose();
@@ -1912,7 +1912,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  		this.#modelDiscoveryAbortController.abort();
  		this.#queuedMessageDrainBlocked = false;
  		this.#usagePreflightReadyForNextModelCall = false;
-@@ -7167,7 +7218,7 @@
+@@ -7200,7 +7251,7 @@
  		try {
  			await withTimeout(
  				this.#disconnectOwnedMcpManager(),
@@ -1921,7 +1921,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  				"Timed out disconnecting owned MCP manager during dispose",
  			);
  		} catch (error) {
-@@ -7189,6 +7240,7 @@
+@@ -7222,6 +7273,7 @@
  
  	async #doDispose(options: AgentSessionDisposeOptions = {}): Promise<void> {
  		this.beginDispose();
@@ -1929,7 +1929,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  		// Stop cache warming before the drain windows below: an armed tick firing
  		// mid-dispose would issue a paid warm request and persist usage into the
  		// closing session writer.
-@@ -9954,6 +10006,10 @@
+@@ -9996,6 +10048,10 @@
  		const setupAbort = new AbortController();
  		this.#promptSetupAbortController = setupAbort;
  		try {
@@ -1940,7 +1940,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  			options?.onPromptAdmitted?.();
  			await this.#recovery.maybeRestoreRetryFallbackPrimary();
  			// Auto-prewalk: return from the previous task's handoff before the usage preflight checks the model,
-@@ -11228,6 +11284,8 @@
+@@ -11270,6 +11326,8 @@
  		const setupAbort = new AbortController();
  		this.#promptSetupAbortController = setupAbort;
  		try {
@@ -1949,7 +1949,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  			if (!(await this.#runUsageAwarePreflightForNextModelCall())) return false;
  			const acceptTerminalEmptyStop = options?.acceptTerminalEmptyStop === true;
  			if (acceptTerminalEmptyStop) {
-@@ -13185,7 +13243,7 @@
+@@ -13247,7 +13305,7 @@
  	async setModelTemporary(
  		model: Model,
  		thinkingLevel?: ConfiguredThinkingLevel,
@@ -1961,7 +1961,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
 diff --git a/src/session/model-controls.ts b/src/session/model-controls.ts
 --- a/src/session/model-controls.ts
 +++ b/src/session/model-controls.ts
-@@ -336,7 +336,8 @@
+@@ -341,7 +341,8 @@
  	async setModelTemporary(
  		model: Model,
  		thinkingLevel?: ConfiguredThinkingLevel,
@@ -1971,7 +1971,7 @@ diff --git a/src/session/model-controls.ts b/src/session/model-controls.ts
  		selection: "explicit" | "automatic" = "explicit",
  		isCurrent?: () => boolean,
  	): Promise<boolean> {
-@@ -363,7 +364,10 @@
+@@ -368,7 +369,10 @@
  						? EPHEMERAL_MODEL_CHANGE_ROLE
  						: TEMPORARY_MODEL_CHANGE_ROLE,
  			);
@@ -2382,7 +2382,7 @@ diff --git a/src/thread/services/mcp-remote.ts b/src/thread/services/mcp-remote.
 diff --git a/src/tools/bash.ts b/src/tools/bash.ts
 --- a/src/tools/bash.ts
 +++ b/src/tools/bash.ts
-@@ -772,7 +772,7 @@
+@@ -773,7 +773,7 @@
  	progress(dispatch: ToolCommandDispatch, index: number): void {
  		if (this.#finished.has(index)) return;
  		const current = this.#records[index];
@@ -2391,7 +2391,7 @@ diff --git a/src/tools/bash.ts b/src/tools/bash.ts
  	}
  
  	/** Records so far, in invocation order. */
-@@ -1075,6 +1075,10 @@
+@@ -1088,6 +1088,10 @@
  	): ShellCommands | undefined {
  		if (names.length === 0) return undefined;
  		const { recorder, onChange } = options;
@@ -2402,7 +2402,7 @@ diff --git a/src/tools/bash.ts b/src/tools/bash.ts
  		return {
  			names: [...names],
  			handler: createToolCommandHandler({
-@@ -1086,10 +1090,8 @@
+@@ -1099,10 +1103,8 @@
  					recorder.finish(dispatch, index);
  					onChange?.();
  				},
@@ -2609,7 +2609,7 @@ diff --git a/src/tools/tool-commands.ts b/src/tools/tool-commands.ts
  	/**
  	 * Approval tier of the wrapped tool for {@link args} (`read` = no workspace
  	 * mutation). Absent for `help` dispatches and calls whose tier could not be
-@@ -408,6 +410,7 @@
+@@ -427,6 +429,7 @@
  	signal?: AbortSignal,
  	onUpdate?: AgentToolUpdateCallback<ToolCommandDispatch>,
  	context?: AgentToolContext,
@@ -2617,7 +2617,7 @@ diff --git a/src/tools/tool-commands.ts b/src/tools/tool-commands.ts
  ): Promise<{ result: AgentToolResult<unknown>; dispatch: ToolCommandDispatch }> {
  	let dispatch: ToolCommandDispatch = { tool: name, mode: "execute", exitCode: 1 };
  	try {
-@@ -452,6 +455,7 @@
+@@ -471,6 +474,7 @@
  					},
  				}
  			: undefined;

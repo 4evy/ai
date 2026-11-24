@@ -39,27 +39,27 @@
     "os": ["win32"],
     "cpu": ["x64"]
   },
-  "@oh-my-pi/pi-natives-darwin-arm64@19.1.0": {
+  "@oh-my-pi/pi-natives-darwin-arm64@19.1.1": {
     "os": ["darwin"],
     "cpu": ["arm64"]
   },
-  "@oh-my-pi/pi-natives-darwin-x64@19.1.0": {
+  "@oh-my-pi/pi-natives-darwin-x64@19.1.1": {
     "os": ["darwin"],
     "cpu": ["x64"]
   },
-  "@oh-my-pi/pi-natives-linux-arm64@19.1.0": {
+  "@oh-my-pi/pi-natives-linux-arm64@19.1.1": {
     "os": ["linux"],
     "cpu": ["arm64"]
   },
-  "@oh-my-pi/pi-natives-linux-x64@19.1.0": {
+  "@oh-my-pi/pi-natives-linux-x64@19.1.1": {
     "os": ["linux"],
     "cpu": ["x64"]
   },
-  "@oh-my-pi/pi-natives-win32-arm64@19.1.0": {
+  "@oh-my-pi/pi-natives-win32-arm64@19.1.1": {
     "os": ["win32"],
     "cpu": ["arm64"]
   },
-  "@oh-my-pi/pi-natives-win32-x64@19.1.0": {
+  "@oh-my-pi/pi-natives-win32-x64@19.1.1": {
     "os": ["win32"],
     "cpu": ["x64"]
   },
