@@ -163,7 +163,7 @@ in
     "$schema" = "https://opencode.ai/v2/cli.json";
     theme.name = "catppuccin-custom";
     plugins = [
-      "@slkiser/opencode-quota@6.2.2"
+      "@slkiser/opencode-quota@6.3.0"
     ];
     keybinds = {
       leader = "ctrl+space";
