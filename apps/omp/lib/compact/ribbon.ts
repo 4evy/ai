@@ -1,5 +1,7 @@
+import { piComposerStyle } from "@oh-my-pi/pi-tui";
+import { theme } from "@oh-my-pi/pi-tui/theme";
 import { FG_RESET, fgAnsi, resolveVarRefs } from "@oh-my-pi/pi-tui/theme/color";
-import type { ThemeRulePolicy } from "@oh-my-pi/pi-tui/theme/rules";
+import { setThemeRulePolicy, type ThemeRulePolicy } from "@oh-my-pi/pi-tui/theme/rules";
 import type { ColorMode, ThemeJson } from "@oh-my-pi/pi-tui/theme/schema";
 
 const palettes = new WeakMap<
@@ -8,7 +10,7 @@ const palettes = new WeakMap<
 >();
 
 /** Paint foreground stripes without changing warning colors or backgrounds */
-export const compactRibbon: ThemeRulePolicy = (
+const compactRibbon: ThemeRulePolicy = (
   source,
   mode,
   glyph,
@@ -39,3 +41,14 @@ export const compactRibbon: ThemeRulePolicy = (
   }
   return result ? result + FG_RESET : "";
 };
+
+const renderPiTop = piComposerStyle.renderTop;
+const renderRibbonTop: typeof renderPiTop = (ctx) =>
+  theme?.renderRule(ctx.box.horizontal, ctx.width) ??
+  renderPiTop.call(piComposerStyle, ctx);
+
+export function installCompactRibbon(): void {
+  setThemeRulePolicy(compactRibbon);
+  // Use the same built-in shape for saved settings and all composer previews
+  piComposerStyle.renderTop = renderRibbonTop;
+}

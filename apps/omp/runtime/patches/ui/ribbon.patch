@@ -105,27 +105,6 @@ diff --git a/packages/tui/src/theme/loader.ts b/packages/tui/src/theme/loader.ts
  	);
  }
  
-diff --git a/packages/tui/src/components/composer/pi.ts b/packages/tui/src/components/composer/pi.ts
---- a/packages/tui/src/components/composer/pi.ts
-+++ b/packages/tui/src/components/composer/pi.ts
-@@ -4,6 +4,7 @@
-  * a plain standalone bottom bar with both segment groups.
-  */
- import { padding } from "../../utils";
-+import { theme } from "../../theme";
- import type { ComposerChromeContext, ComposerRowContext, ComposerStyle } from "./types";
- 
- export const piComposerStyle: ComposerStyle = {
-@@ -24,7 +25,8 @@
- 	},
- 
- 	renderTop(ctx: ComposerChromeContext): string {
--		return ctx.borderColor(ctx.box.horizontal.repeat(ctx.width));
-+		const decoration = typeof theme === "undefined" ? undefined : theme.renderRule(ctx.box.horizontal, ctx.width);
-+		return decoration ?? ctx.borderColor(ctx.box.horizontal.repeat(ctx.width));
- 	},
- 
- 	renderRow(ctx: ComposerRowContext): string[] {
 diff --git a/packages/tui/src/chrome/dynamic-border.ts b/packages/tui/src/chrome/dynamic-border.ts
 --- a/packages/tui/src/chrome/dynamic-border.ts
 +++ b/packages/tui/src/chrome/dynamic-border.ts

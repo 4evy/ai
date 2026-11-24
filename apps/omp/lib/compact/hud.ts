@@ -5,12 +5,9 @@ import type { NativeNode } from "@oh-my-pi/pi-tui/native/node";
 import { styledSpans } from "@oh-my-pi/pi-tui/native/spans";
 import type { ObservableSession } from "@oh-my-pi/pi-tui/overlays/session-observer-registry";
 import { theme } from "@oh-my-pi/pi-tui/theme";
-import {
-  todoChecklistPhases,
-  todoMatchesAnyDescription,
-} from "@oh-my-pi/pi-tui/tools/todo";
+import { todoMatchesAnyDescription } from "@oh-my-pi/pi-tui/tools/todo";
 import type { TspChecklistPhase } from "@oh-my-pi/pi-wire";
-import { summarizeTodos, type TodoSummary } from "../todo/summary";
+import { checklistWithNotes, summarizeTodos, type TodoSummary } from "../todo/summary";
 
 /** One responsive overview row, with details yielding space to counts and hints */
 export class CompactHudComponent extends Text {
@@ -184,7 +181,7 @@ export const compactLiveHudRenderer: LiveHudRenderer = {
         : undefined;
     return compactTodoHud(
       summarizeTodos(phases, isMatched),
-      todoChecklistPhases(phases, isMatched),
+      checklistWithNotes(phases, isMatched),
       agents,
       state.shortcuts.agentsHub,
     );

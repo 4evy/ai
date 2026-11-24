@@ -48,6 +48,20 @@ export interface LiveHudRenderer {
 let renderer: LiveHudRenderer | undefined;
 const listeners = new Set<() => void>();
 
+const emptyDescriptions: readonly string[] = [];
+let todoDescriptions: (() => readonly string[]) | undefined;
+
+export function bindLiveHudTodoDescriptions(read: () => readonly string[]): () => void {
+  todoDescriptions = read;
+  return () => {
+    if (todoDescriptions === read) todoDescriptions = undefined;
+  };
+}
+
+export function getLiveHudTodoDescriptions(): readonly string[] {
+  return todoDescriptions?.() ?? emptyDescriptions;
+}
+
 export function setLiveHudRenderer(next: LiveHudRenderer | undefined): void {
   if (renderer === next) return;
   renderer = next;

@@ -519,14 +519,12 @@ private browser types. Refresh both lockfiles and regenerate Nix dependencies
 after changing the shared version.
 
 The [compact extension](../apps/omp/extensions/compact/index.ts) installs footer
-segments, billing and effort labels, eval and shell presentation, JSON key
-contrast, live HUD summaries, ribbon painting, and queued-script rendering.
-Keep this policy in [`lib/compact`](../apps/omp/lib/compact/), with reusable
-renderer hooks in the shared SDK profile. Core patches retain native semantic
-content, visual clipping, transcript framing, and session-owned subscriptions.
-Compact preview bounds and error expansion are opt-in extension policies.
-Reuse upstream path-truncation bounds while keeping quota and context ahead
-of secondary footer segments.
+segments, billing and effort labels, tool previews, live HUD summaries, and
+ribbon painting. It uses OMP's checklist builder for todo cards and decorates
+the built-in Pi composer without changing its saved shape ID. Core patches
+retain native transcript framing, visual clipping, and session-owned observer
+hooks. Keep presentation policy in the extension and reuse upstream renderers
+and width bounds where they fit.
 
 Transparent tool backgrounds belong in managed themes: set `toolPendingBg`,
 `toolSuccessBg`, and `toolErrorBg` to empty strings. Other themes retain their

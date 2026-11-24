@@ -1,5 +1,10 @@
 import { flattenLine } from "@oh-my-pi/pi-tui/render";
-import { isClosedTodo, type TodoItem } from "@oh-my-pi/pi-tui/tools/todo";
+import { replaceTabs } from "@oh-my-pi/pi-tui/render/render-utils";
+import {
+  isClosedTodo,
+  type TodoItem,
+  todoChecklistPhases,
+} from "@oh-my-pi/pi-tui/tools/todo";
 import { sanitizeText } from "@oh-my-pi/pi-utils";
 
 export interface TodoSummary {
@@ -36,4 +41,20 @@ export function summarizeTodos(
     closed,
     current: current ? flattenLine(sanitizeText(current.content)) : undefined,
   };
+}
+
+/** Add the latest note to each item in OMP's native checklist */
+export function checklistWithNotes(
+  phases: Parameters<typeof todoChecklistPhases>[0],
+  isMatched?: Parameters<typeof todoChecklistPhases>[1],
+) {
+  const checklist = todoChecklistPhases(phases, isMatched);
+  for (const [p, phase] of checklist.entries()) {
+    for (const [t, item] of phase.items.entries()) {
+      // The native builder emits exactly one item per task in source order
+      const note = phases[p]?.tasks[t]?.notes?.at(-1);
+      if (note !== undefined) item.note = replaceTabs(sanitizeText(note));
+    }
+  }
+  return checklist;
 }

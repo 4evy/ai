@@ -2,7 +2,7 @@ diff --git a/dist/types/chrome/live-hud.d.ts b/dist/types/chrome/live-hud.d.ts
 new file mode 100644
 --- /dev/null
 +++ b/dist/types/chrome/live-hud.d.ts
-@@ -0,0 +1,44 @@
+@@ -0,0 +1,46 @@
 +import type { Component } from "@oh-my-pi/pi-tui";
 +import type { NativeNode } from "@oh-my-pi/pi-tui/native/node";
 +import type { ObservableSession } from "@oh-my-pi/pi-tui/overlays/session-observer-registry";
@@ -44,6 +44,8 @@ new file mode 100644
 +    renderTodo?(state: LiveHudState): LiveTodoHud | undefined;
 +    renderSubagents?(state: LiveHudState): LiveSubagentHud | undefined;
 +}
++export declare function bindLiveHudTodoDescriptions(read: () => readonly string[]): () => void;
++export declare function getLiveHudTodoDescriptions(): readonly string[];
 +export declare function setLiveHudRenderer(next: LiveHudRenderer | undefined): void;
 +export declare function getLiveHudRenderer(): LiveHudRenderer | undefined;
 +export declare function onLiveHudRendererChange(listener: () => void): () => void;
@@ -263,18 +265,6 @@ diff --git a/dist/types/tools/json-tree.d.ts b/dist/types/tools/json-tree.d.ts
  /** Sanitization, string summary, and budgeting policy for inline JSON. */
  export interface InlineFormatOptions {
      sanitizeText?: (text: string) => string;
-diff --git a/dist/types/tools/todo.d.ts b/dist/types/tools/todo.d.ts
---- a/dist/types/tools/todo.d.ts
-+++ b/dist/types/tools/todo.d.ts
-@@ -114,6 +114,8 @@
- export declare const TODO_STRIKE_TOTAL_FRAMES: number;
- /** Wire the live-subagent description source for {@link todoToolRenderer}. */
- export declare function setActiveTodoDescriptionsProvider(provider: () => readonly string[]): void;
-+/** Read the host-owned live descriptions without replacing their provider */
-+export declare function getActiveTodoDescriptions(): readonly string[];
- /**
-  * Checklist phases for native terminals: plain phase titles (no roman
-  * numerals — the terminal numbers nothing), completed phases folded.
 diff --git a/dist/types/tools/tool-commands.d.ts b/dist/types/tools/tool-commands.d.ts
 --- a/dist/types/tools/tool-commands.d.ts
 +++ b/dist/types/tools/tool-commands.d.ts
@@ -353,7 +343,7 @@ diff --git a/src/chrome/live-hud.ts b/src/chrome/live-hud.ts
 new file mode 100644
 --- /dev/null
 +++ b/src/chrome/live-hud.ts
-@@ -0,0 +1,64 @@
+@@ -0,0 +1,78 @@
 +import type { Component } from "@oh-my-pi/pi-tui";
 +import type { NativeNode } from "@oh-my-pi/pi-tui/native/node";
 +import type { ObservableSession } from "@oh-my-pi/pi-tui/overlays/session-observer-registry";
@@ -404,6 +394,20 @@ new file mode 100644
 +let renderer: LiveHudRenderer | undefined;
 +const listeners = new Set<() => void>();
 +
++const emptyDescriptions: readonly string[] = [];
++let todoDescriptions: (() => readonly string[]) | undefined;
++
++export function bindLiveHudTodoDescriptions(read: () => readonly string[]): () => void {
++  todoDescriptions = read;
++  return () => {
++    if (todoDescriptions === read) todoDescriptions = undefined;
++  };
++}
++
++export function getLiveHudTodoDescriptions(): readonly string[] {
++  return todoDescriptions?.() ?? emptyDescriptions;
++}
++
 +export function setLiveHudRenderer(next: LiveHudRenderer | undefined): void {
 +  if (renderer === next) return;
 +  renderer = next;
@@ -418,27 +422,6 @@ new file mode 100644
 +  listeners.add(listener);
 +  return () => listeners.delete(listener);
 +}
-diff --git a/src/components/composer/pi.ts b/src/components/composer/pi.ts
---- a/src/components/composer/pi.ts
-+++ b/src/components/composer/pi.ts
-@@ -4,6 +4,7 @@
-  * a plain standalone bottom bar with both segment groups.
-  */
- import { padding } from "../../utils";
-+import { theme } from "../../theme";
- import type { ComposerChromeContext, ComposerRowContext, ComposerStyle } from "./types";
- 
- export const piComposerStyle: ComposerStyle = {
-@@ -24,7 +25,8 @@
- 	},
- 
- 	renderTop(ctx: ComposerChromeContext): string {
--		return ctx.borderColor(ctx.box.horizontal.repeat(ctx.width));
-+		const decoration = typeof theme === "undefined" ? undefined : theme.renderRule(ctx.box.horizontal, ctx.width);
-+		return decoration ?? ctx.borderColor(ctx.box.horizontal.repeat(ctx.width));
- 	},
- 
- 	renderRow(ctx: ComposerRowContext): string[] {
 diff --git a/src/render/output-block.ts b/src/render/output-block.ts
 --- a/src/render/output-block.ts
 +++ b/src/render/output-block.ts
@@ -1708,33 +1691,6 @@ diff --git a/src/tools/json-tree.ts b/src/tools/json-tree.ts
  		const prefix = keySpans.length > 0 ? [...keySpans, span(": ", "muted")] : [];
  		const inline = inlineJson(entry, plainText);
  		if (inline) return { id, label: [...prefix, ...inline.map(([text, color]) => span(text, color))] };
-diff --git a/src/tools/todo.ts b/src/tools/todo.ts
---- a/src/tools/todo.ts
-+++ b/src/tools/todo.ts
-@@ -529,6 +529,11 @@
- 	activeTodoDescriptionsProvider = provider;
- }
- 
-+/** Read the host-owned live descriptions without replacing their provider */
-+export function getActiveTodoDescriptions(): readonly string[] {
-+	return activeTodoDescriptionsProvider();
-+}
-+
- /** omp todo status → checklist item status (§7.5). */
- const CHECKLIST_STATUS: Record<TodoStatus, TspChecklistItem["status"]> = {
- 	pending: "pending",
-@@ -540,7 +545,10 @@
- /** Checklist item for one todo; a pending todo an in-flight subagent executes reads as active. */
- function checklistItem(task: TodoItem, id: string, matched = false): TspChecklistItem {
- 	const status = task.status === "pending" && matched ? "active" : CHECKLIST_STATUS[task.status];
--	return { id, text: forDisplay(task.content), status };
-+	const note = task.notes?.at(-1);
-+	return note === undefined
-+		? { id, text: forDisplay(task.content), status }
-+		: { id, text: forDisplay(task.content), status, note: forDisplay(note) };
- }
- 
- /**
 diff --git a/src/tools/tool-commands.ts b/src/tools/tool-commands.ts
 --- a/src/tools/tool-commands.ts
 +++ b/src/tools/tool-commands.ts

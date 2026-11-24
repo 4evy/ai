@@ -6,7 +6,6 @@
       "workspace/workspace.patch",
       "compression/compression.patch",
       "mcp/mcp.patch",
-      "ui/todo.patch",
       "quota/quota.patch",
       "schema/schema.patch",
       "ui/hud.patch",
@@ -22,7 +21,6 @@
       "ssh/ssh.patch",
       "compression/compression.patch",
       "mcp/mcp.patch",
-      "ui/todo.patch",
       "ui/session-model.patch",
       "ui/ribbon.patch",
       "ui/renderer-hooks.patch"
