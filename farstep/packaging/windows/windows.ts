@@ -35,7 +35,7 @@ export async function packageWindows(output: string, release = "1") {
       : undefined);
   if (!compiler)
     throw new Error(
-      "Install WiX 7 (dotnet tool install --global wix --version 7.0.0 --allow-roll-forward) or set FARSTEP_WIX",
+      "Install WiX 7 (dotnet tool install --global wix --version 7.0.1 --allow-roll-forward) or set FARSTEP_WIX",
     );
   if (!(await Bun.file(compiler).exists()))
     throw new Error("Cannot find the WiX compiler, check FARSTEP_WIX");
