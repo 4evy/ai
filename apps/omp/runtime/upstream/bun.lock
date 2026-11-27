@@ -11,7 +11,7 @@
         "@oh-my-pi/pi-utils": "19.2.1",
         "ipaddr.js": "2.5.0",
         "katex": "0.19.1",
-        "lucide-react": "1.81.0",
+        "lucide-react": "1.82.0",
         "react": "19.3.1",
         "react-dom": "19.3.1",
       },
@@ -127,11 +127,11 @@
 
     "katex": ["katex@0.19.1", "", { "dependencies": { "commander": "^15.0.0" }, "bin": { "katex": "cli.js" } }, "sha512-jG8uKntjSEcm2EpQOh0XturpPuuC9r3Sq5HLHdsFdWZT27E672SF19QEi+of0/YeOy15lDgRhKvr5614uRrEfA=="],
 
-    "lucide-react": ["lucide-react@1.81.0", "", { "peerDependencies": { "@types/react": "*", "react": "^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0" }, "optionalPeers": ["@types/react"] }, "sha512-U+CisvFQ84m+xUJAKKA4q+mykGB1LAmu196hOblQbuNYJgD43iHwpmfYuqcFYHXJu2oqRih5JoH3f5LxwsUegg=="],
+    "lucide-react": ["lucide-react@1.82.0", "", { "peerDependencies": { "@types/react": "*", "react": "^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0" }, "optionalPeers": ["@types/react"] }, "sha512-6jSApJxVZnyOGO5q7ygxiaVmzt87OtkfzpU5aD14ph32W78hBtmwEkVj2ehGyhfEynSM6TEEnFhPq24QhSOz6g=="],
 
     "mitt": ["mitt@3.0.1", "", {}, "sha512-vKivATfr97l2/QBCYAkXYDbrIWPM2IIKEl7YPhjCvKlG3kE2gm+uBo6nEXK3M5/Ffh/FLpKExzOQ3JJoJGFKBw=="],
 
-    "modern-tar": ["modern-tar@0.8.6", "", {}, "sha512-LYSks0tNVqbtez/9OB0YFP6qLRSqkdAxJWOQpVaR67lNTbj2zNLyYpowkRMia5lXLCZKzxwoxkxH2MbbBR2aEg=="],
+    "modern-tar": ["modern-tar@0.8.7", "", {}, "sha512-q17gyzLiCw2wf/Rcl5c3EA5ynB2hOHb5+qMpbaILOQBaTiBx9bumfXC5sMk0wQrVoLtlBhW77dJTnLArlczsGg=="],
 
     "puppeteer-core": ["puppeteer-core@25.19.0", "", { "dependencies": { "@puppeteer/browsers": "3.3.0", "chromium-bidi": "157.0.8090-0", "devtools-protocol": "0.0.1724436", "typed-query-selector": "^2.12.3", "webdriver-bidi-protocol": "1.0.2", "ws": "^8.23.0" } }, "sha512-F4pw8kpSczJS3TCHBw7/qskDxv4cMj09oOv7BwhHGYOerxLF1Sk2t4tpWlLvy6Vx/mM6TuqkDj4j0j3PRN1FiA=="],
 

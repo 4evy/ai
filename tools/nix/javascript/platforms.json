@@ -214,94 +214,94 @@
     "os": ["win32"],
     "cpu": ["x64"]
   },
-  "@rolldown/binding-android-arm-eabi@1.2.19": {
+  "@rolldown/binding-android-arm-eabi@1.3.4": {
     "os": ["android"],
     "cpu": ["arm"]
   },
-  "@rolldown/binding-android-arm64@1.2.19": {
+  "@rolldown/binding-android-arm64@1.3.4": {
     "os": ["android"],
     "cpu": ["arm64"]
   },
-  "@rolldown/binding-darwin-arm64@1.2.19": {
+  "@rolldown/binding-darwin-arm64@1.3.4": {
     "os": ["darwin"],
     "cpu": ["arm64"]
   },
-  "@rolldown/binding-darwin-x64@1.2.19": {
+  "@rolldown/binding-darwin-x64@1.3.4": {
     "os": ["darwin"],
     "cpu": ["x64"]
   },
-  "@rolldown/binding-freebsd-x64@1.2.19": {
+  "@rolldown/binding-freebsd-x64@1.3.4": {
     "os": ["freebsd"],
     "cpu": ["x64"]
   },
-  "@rolldown/binding-linux-arm-gnueabihf@1.2.19": {
+  "@rolldown/binding-linux-arm-gnueabihf@1.3.4": {
     "os": ["linux"],
     "cpu": ["arm"]
   },
-  "@rolldown/binding-linux-arm64-gnu@1.2.19": {
+  "@rolldown/binding-linux-arm64-gnu@1.3.4": {
     "os": ["linux"],
     "cpu": ["arm64"]
   },
-  "@rolldown/binding-linux-arm64-musl@1.2.19": {
+  "@rolldown/binding-linux-arm64-musl@1.3.4": {
     "os": ["linux"],
     "cpu": ["arm64"]
   },
-  "@rolldown/binding-linux-ppc64-gnu@1.2.19": {
+  "@rolldown/binding-linux-ppc64-gnu@1.3.4": {
     "os": ["linux"],
     "cpu": ["ppc64"]
   },
-  "@rolldown/binding-linux-s390x-gnu@1.2.19": {
+  "@rolldown/binding-linux-s390x-gnu@1.3.4": {
     "os": ["linux"],
     "cpu": ["s390x"]
   },
-  "@rolldown/binding-linux-x64-gnu@1.2.19": {
+  "@rolldown/binding-linux-x64-gnu@1.3.4": {
     "os": ["linux"],
     "cpu": ["x64"]
   },
-  "@rolldown/binding-linux-x64-musl@1.2.19": {
+  "@rolldown/binding-linux-x64-musl@1.3.4": {
     "os": ["linux"],
     "cpu": ["x64"]
   },
-  "@rolldown/binding-openharmony-arm64@1.2.19": {
+  "@rolldown/binding-openharmony-arm64@1.3.4": {
     "os": ["none"],
     "cpu": ["arm64"]
   },
-  "@rolldown/binding-wasm32-wasi@1.2.19": {
+  "@rolldown/binding-wasm32-wasi@1.3.4": {
     "cpu": ["none"]
   },
-  "@rolldown/binding-win32-arm64-msvc@1.2.19": {
+  "@rolldown/binding-win32-arm64-msvc@1.3.4": {
     "os": ["win32"],
     "cpu": ["arm64"]
   },
-  "@rolldown/binding-win32-x64-msvc@1.2.19": {
+  "@rolldown/binding-win32-x64-msvc@1.3.4": {
     "os": ["win32"],
     "cpu": ["x64"]
   },
-  "@typescript/typescript-darwin-arm64@7.1.0-dev.20261125.1": {
+  "@typescript/typescript-darwin-arm64@7.1.0-dev.20261127.1": {
     "os": ["darwin"],
     "cpu": ["arm64"]
   },
-  "@typescript/typescript-darwin-x64@7.1.0-dev.20261125.1": {
+  "@typescript/typescript-darwin-x64@7.1.0-dev.20261127.1": {
     "os": ["darwin"],
     "cpu": ["x64"]
   },
-  "@typescript/typescript-linux-arm@7.1.0-dev.20261125.1": {
+  "@typescript/typescript-linux-arm@7.1.0-dev.20261127.1": {
     "os": ["linux"],
     "cpu": ["arm"]
   },
-  "@typescript/typescript-linux-arm64@7.1.0-dev.20261125.1": {
+  "@typescript/typescript-linux-arm64@7.1.0-dev.20261127.1": {
     "os": ["linux"],
     "cpu": ["arm64"]
   },
-  "@typescript/typescript-linux-x64@7.1.0-dev.20261125.1": {
+  "@typescript/typescript-linux-x64@7.1.0-dev.20261127.1": {
     "os": ["linux"],
     "cpu": ["x64"]
   },
-  "@typescript/typescript-win32-arm64@7.1.0-dev.20261125.1": {
+  "@typescript/typescript-win32-arm64@7.1.0-dev.20261127.1": {
     "os": ["win32"],
     "cpu": ["arm64"]
   },
-  "@typescript/typescript-win32-x64@7.1.0-dev.20261125.1": {
+  "@typescript/typescript-win32-x64@7.1.0-dev.20261127.1": {
     "os": ["win32"],
     "cpu": ["x64"]
   },
@@ -351,5 +351,9 @@
   "lightningcss-win32-x64-msvc@1.33.0": {
     "os": ["win32"],
     "cpu": ["x64"]
+  },
+  "napi-windows-process-start-time@0.1.0": {
+    "os": ["win32"],
+    "cpu": ["x64", "arm64"]
   }
 }

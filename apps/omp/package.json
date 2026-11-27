@@ -15,7 +15,7 @@
     "@optique/core": "1.4.0",
     "@tailnet/tailscaled": "0.1.2",
     "valibot": "1.5.0",
-    "effect": "4.1.6",
+    "effect": "4.1.7",
     "@ai/values": "workspace:*",
     "@ai/runtime": "workspace:*",
     "@ai/toolkit": "workspace:*",

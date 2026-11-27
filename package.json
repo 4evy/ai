@@ -5,8 +5,8 @@
     "@nodelib/fs.walk": "3.0.1",
     "@optique/valibot": "1.4.0",
     "valibot": "1.5.0",
-    "vscode-jsonrpc": "10.0.1",
-    "effect": "4.1.6",
+    "vscode-jsonrpc": "10.0.2",
+    "effect": "4.1.7",
     "@ai/values": "workspace:*",
     "@ai/runtime": "workspace:*",
     "@ai/toolkit": "workspace:*",
@@ -45,8 +45,8 @@
     ],
     "catalog": {
       "@types/bun": "1.4.5",
-      "typescript": "7.1.0-dev.20261125.1",
-      "vite": "8.3.8"
+      "typescript": "7.1.0-dev.20261127.1",
+      "vite": "8.4.0"
     }
   },
   "scripts": {
