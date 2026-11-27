@@ -27,7 +27,7 @@ axuielement = "=0.10.2"
 backon = { version = "=1.6.0", default-features = false }
 base64 = "=0.23.1"
 bytes = "=1.12.2"
-clap = { version = "=4.6.9", default-features = false }
+clap = { version = "=4.6.10", default-features = false }
 command-fds = "=0.3.3"
 core-foundation = "=0.10.1"
 core-graphics = "=0.25.0"
@@ -37,8 +37,8 @@ dlopen2 = { version = "=0.9.0", default-features = false, features = [
   "derive",
   "wrapper",
 ] }
-# First upstream revision with windows 0.62, not yet on crates.io
-enigo = { git = "https://github.com/enigo-rs/enigo", rev = "64ccb967a791bed54c7bed3cbe1586f32bfa99c1", default-features = false }
+# Stay on git until the crates.io release uses windows 0.62
+enigo = { git = "https://github.com/enigo-rs/enigo", rev = "061570f04309ab5c1b68f1945d8c1ec168173e6e", default-features = false }
 futures-util = "=0.3.34"
 gstreamer = "=0.25.4"
 gstreamer-app = "=0.25.2"
@@ -50,7 +50,7 @@ objc2-core-graphics = { version = "=0.3.2", default-features = false }
 objc2-foundation = { version = "=0.3.2", default-features = false }
 png = "=0.18.1"
 procfs = { version = "=0.18.0", default-features = false }
-process-wrap = { version = "=10.0.1", default-features = false }
+process-wrap = { version = "=11.0.0", default-features = false }
 reis = "=0.7.1"
 rmcp = { version = "=3.11.0", default-features = false }
 rustix = "=1.1.6"
