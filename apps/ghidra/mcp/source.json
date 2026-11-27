@@ -1,7 +1,7 @@
 {
-  "rev": "8dbbb1f677166fe483d605f925d60da080e448f2",
-  "version": "7.1.0-unstable-2026-11-20",
-  "hash": "sha256-4xWLBpdkktFCf2yI4bHDqpE+jXqZ8k8QdPM9Nh0Yf1w=",
+  "rev": "85427debeaa54c27a29d7c423357c29053cb040d",
+  "version": "7.1.0-unstable-2026-11-27",
+  "hash": "sha256-SWOfkhLMbXm9Cd5cbtP8KHSzeeMwS1kGXtIpRHxavso=",
   "upstreamVersion": "7.1.0",
   "patches": [
     "explicit-backend.patch",
