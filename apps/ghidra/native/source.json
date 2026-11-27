@@ -9,7 +9,7 @@
     "url": "https://downloads.gradle.org/distributions/gradle-9.9.2-bin.zip",
     "sha256": "971fcd7150ca4ba04852c0b2ca0d2d0ab9468e14b03473eab19528809914c76b"
   },
-  "uvVersion": "0.13.9",
+  "uvVersion": "0.13.10",
   "platforms": {
     "win32-x64": {
       "jdk": {
@@ -18,8 +18,8 @@
         "sha256": "849d380ab0a64d9098e7d3a2de28beb73841c3b255c8284f019ccd8748c5eb5b"
       },
       "uv": {
-        "url": "https://github.com/astral-sh/uv/releases/download/0.13.9/uv-x86_64-pc-windows-msvc.zip",
-        "sha256": "edd61f7f5728a56cc62455386661860bdfc7bab65872f39b0c25bdcc1d8e1beb"
+        "url": "https://github.com/astral-sh/uv/releases/download/0.13.10/uv-x86_64-pc-windows-msvc.zip",
+        "sha256": "297b3881fe1adfb922becc2c1613202abb41dc83ea5ff43d472aa087ca1f8683"
       }
     }
   }

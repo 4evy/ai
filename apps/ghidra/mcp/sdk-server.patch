@@ -1,4 +1,4 @@
-Migrate the Ghidra MCP 7.0.0 bridge to MCP Python SDK 2.3
+Migrate the Ghidra MCP bridge to MCP Python SDK 2.3
 
 Preserve legacy resource subscriptions, write invalidation, and tool changes
 while supporting modern subscription streams and request-scoped SDK sessions
@@ -24,7 +24,7 @@ diff --git a/pyproject.toml b/pyproject.toml
 diff --git a/python/bridge_mcp_ghidra/server.py b/python/bridge_mcp_ghidra/server.py
 --- a/python/bridge_mcp_ghidra/server.py
 +++ b/python/bridge_mcp_ghidra/server.py
-@@ -1,123 +1,83 @@
+@@ -1,125 +1,84 @@
 -"""The FastMCP server singleton and its initialization-options patch."""
 +"""The MCPServer singleton, capability policy, and optional tool pagination"""
  
@@ -38,10 +38,13 @@ diff --git a/python/bridge_mcp_ghidra/server.py b/python/bridge_mcp_ghidra/serve
  
 -# `state` imports only from `config`, so this cannot cycle back through here.
  from . import state as _state
+-from .protocol_safety import install_protocol_guards
++from .protocol_safety import limit_response
  
 -# The MCP server singleton. All static and dynamically registered tools attach
 -# to this object.
 -mcp = FastMCP("ghidra-mcp")
+-install_protocol_guards(mcp._mcp_server)
 +# All static and dynamically registered tools attach to this server
 +mcp = MCPServer("ghidra-mcp", subscriptions=_state.tools_changed_bus)
 +_tool_page_size: int | None = None
@@ -213,7 +216,7 @@ diff --git a/python/bridge_mcp_ghidra/server.py b/python/bridge_mcp_ghidra/serve
 -
 -mcp.list_tools = _list_tools_capturing_session
 -mcp._mcp_server.list_tools()(_list_tools_capturing_session)
-+mcp.middleware.append(_bridge_middleware)
++mcp.middleware.extend([limit_response, _bridge_middleware])
 diff --git a/python/bridge_mcp_ghidra/registry.py b/python/bridge_mcp_ghidra/registry.py
 --- a/python/bridge_mcp_ghidra/registry.py
 +++ b/python/bridge_mcp_ghidra/registry.py
@@ -960,3 +963,101 @@ diff --git a/python/bridge_mcp_ghidra/subscriptions.py b/python/bridge_mcp_ghidr
 +        loops = list(state._tools_changed_subscription_loops)
 +    for loop in loops:
 +        state.schedule_on_session_loop(loop, state.tools_changed_bus.publish(event))
+diff --git a/python/bridge_mcp_ghidra/protocol_safety.py b/python/bridge_mcp_ghidra/protocol_safety.py
+--- a/python/bridge_mcp_ghidra/protocol_safety.py
++++ b/python/bridge_mcp_ghidra/protocol_safety.py
+@@ -1,9 +1,8 @@
+ """Bridge-local guards around the SDK's server transport boundary."""
+ 
+-from types import MethodType
+-
+ from mcp import types
++from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
++from mcp.shared.exceptions import MCPError
+ from mcp.shared.message import SessionMessage
+-from mcp.shared.session import RequestResponder
+ 
+ from .config import logger
+@@ -26,7 +25,7 @@
+     size = len(wire.encode("utf-8")) + 1
+     if size <= limit:
+         return message
+-    root = message.message.root
++    root = message.message
+     logger.warning("Blocked oversized MCP %s (%d bytes; limit %d)", type(root).__name__, size, limit)
+     if isinstance(root, types.JSONRPCResponse):
+         if "content" in root.result:
+@@ -58,44 +57,31 @@
+-    return SessionMessage(types.JSONRPCMessage(replacement), metadata=message.metadata)
++    return SessionMessage(replacement, metadata=message.metadata)
+ 
+ 
+-class GuardedWriteStream:
+-    def __init__(self, stream):
+-        self.stream = stream
+-
+-    async def send(self, message):
+-        guarded = guard_message(message)
+-        if guarded is not None:
+-            await self.stream.send(guarded)
+-
+-    async def __aenter__(self):
+-        await self.stream.__aenter__()
+-        return self
+-
+-    async def __aexit__(self, *args):
+-        return await self.stream.__aexit__(*args)
+-
+-
+-async def _cancel_without_response(responder):
+-    # SDK 1.28.1 replies after cancellation, contrary to the protocol's SHOULD
+-    # NOT. Keep its completion bookkeeping but do not write that late reply.
+-    # This is installed on bridge server responders only, never SDK clients.
+-    if responder._completed:
+-        return
+-    responder._cancel_scope.cancel()
+-    responder._completed = True
+-
+-
+-def install_protocol_guards(server):
+-    original_run = server.run
+-    original_handle = server._handle_message
+-
+-    async def run(read_stream, write_stream, *args, **kwargs):
+-        return await original_run(read_stream, GuardedWriteStream(write_stream), *args, **kwargs)
+-
+-    async def handle(message, *args, **kwargs):
+-        if isinstance(message, RequestResponder):
+-            message.cancel = MethodType(_cancel_without_response, message)
+-        return await original_handle(message, *args, **kwargs)
+-
+-    server.run = run
+-    server._handle_message = handle
++async def limit_response(ctx: ServerRequestContext, call_next: CallNext) -> HandlerResult:
++    # SDK 2 owns cancellation. Check final wire results in its middleware,
++    # which runs for both HTTP eras, SSE and stdio
++    if ctx.request_id is None:
++        return await call_next(ctx)
++    try:
++        result = await call_next(ctx)
++    except MCPError as exc:
++        error = types.JSONRPCError(jsonrpc="2.0", id=ctx.request_id, error=exc.error)
++        message = SessionMessage(error)
++        if guard_message(message) is not message:
++            raise MCPError(types.INTERNAL_ERROR, OVERSIZED_RESULT_MESSAGE) from None
++        raise
++    if not isinstance(result, dict):
++        return result
++    response = types.JSONRPCResponse(jsonrpc="2.0", id=ctx.request_id, result=result)
++    message = SessionMessage(response)
++    guarded = guard_message(message)
++    if guarded is message:
++        return result
++    assert guarded is not None
++    replacement = guarded.message
++    if isinstance(replacement, types.JSONRPCError):
++        raise MCPError.from_jsonrpc_error(replacement)
++    assert isinstance(replacement, types.JSONRPCResponse)
++    if "resultType" in result:
++        replacement.result["resultType"] = "complete"
++    return replacement.result
