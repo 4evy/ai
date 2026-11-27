@@ -13,16 +13,20 @@ import { runJobs } from "./jobs/jobs";
 import { runWorkflow } from "./jobs/workflow/worker";
 import { platform } from "./platform/platform";
 import { runSky } from "./sky/sky";
-import { exists, PROTOCOL_MAJOR, paths, VERSION } from "./state";
+import { exists, loadIdentity, PROTOCOL_MAJOR, paths, VERSION } from "./state";
 import { disableSystem, enableSystem, systemExec, systemStatus } from "./system/system";
 import { runSystem } from "./system/tools";
 
-async function assertActivated(allowSystem = false): Promise<void> {
+async function assertActivated(mode: "desktop" | "jobs"): Promise<void> {
   const state = paths().state;
+  const record =
+    mode === "desktop" && process.platform !== "win32"
+      ? "installation.json"
+      : "installer.json";
   if (
     (await exists(join(state, "maintenance.lock"))) ||
-    (!(allowSystem && (await darwinSystemPackage())) &&
-      !(await exists(join(state, "installer.json"))))
+    (!(mode === "jobs" && (await darwinSystemPackage())) &&
+      !(await exists(join(state, record))))
   )
     throw new Error("Helper is not activated or is undergoing maintenance");
 }
@@ -88,16 +92,21 @@ function executeCommand(options: Command, native: Native): Promise<void> {
       "system-disable": () => writeResult(disableSystem()),
       "system-connect": () => runSystem(),
       sky: (request) => runSky(request.cwd ?? process.cwd()),
+      "desktop-init": async () => {
+        if (process.platform !== "linux" && process.platform !== "darwin")
+          throw new Error("Declarative desktop activation requires Linux or macOS");
+        await loadIdentity();
+      },
       desktop: async (request) => {
         if (!native.desktopEndpoint)
           throw new Error(
             "Farstep desktop has no native backend for this platform; use Skylight on macOS",
           );
-        await assertActivated();
+        await assertActivated("desktop");
         await relayDesktop(request.wireCodec === "zstd");
       },
       jobs: async (request) => {
-        await assertActivated(true);
+        await assertActivated("jobs");
         await runJobs(request.scope, request.owner);
       },
       status: () => writeResult(management.status()),

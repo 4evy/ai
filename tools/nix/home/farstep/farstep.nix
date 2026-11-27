@@ -63,6 +63,21 @@ in
             }) servers
           );
     };
+    home.activation.farstepDesktopIdentity = lib.modules.mkIf cfg.desktop.enable (
+      lib.hm.dag.entryBetween
+        [
+          "reloadSystemd"
+          "setupLaunchAgents"
+        ]
+        [ "writeBoundary" ]
+        ''
+          run ${lib.meta.getExe' pkgs.coreutils "env"} -- ${
+            lib.strings.escapeShellArgs (
+              lib.attrsets.mapAttrsToList (name: value: "${name}=${value}") cfg.desktop.environment
+            )
+          } ${lib.meta.getExe cfg.package} desktop init
+        ''
+    );
     systemd.user.services.farstep-desktop =
       lib.modules.mkIf (cfg.desktop.enable && pkgs.stdenv.hostPlatform.isLinux)
         {

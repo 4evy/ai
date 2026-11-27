@@ -118,14 +118,17 @@ const parser = or(
   ),
   command(
     "desktop",
-    command(
-      "connect",
-      object({
-        action: constant("desktop"),
-        wireCodec: optional(
-          option("--wire-codec", valibot(v.literal("zstd"), { placeholder: "zstd" })),
-        ),
-      }),
+    or(
+      command("init", constant({ action: "desktop-init" } as const), { hidden: true }),
+      command(
+        "connect",
+        object({
+          action: constant("desktop"),
+          wireCodec: optional(
+            option("--wire-codec", valibot(v.literal("zstd"), { placeholder: "zstd" })),
+          ),
+        }),
+      ),
     ),
   ),
   command(
