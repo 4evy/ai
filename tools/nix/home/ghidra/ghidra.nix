@@ -2,13 +2,11 @@
   config,
   lib,
   pkgs,
-  aiContext,
   ...
 }:
 let
-  inherit (aiContext) packages;
   cfg = config.programs.ai.ghidra;
-  command = lib.meta.getExe packages.ai-tools;
+  command = lib.meta.getExe config.programs.ai.package;
   environment = cfg.server.environment // {
     GHIDRA_MCP_PACKAGE = toString cfg.package;
     GHIDRA_MCP_PORT = toString cfg.server.port;
@@ -16,10 +14,7 @@ let
 in
 {
   config = lib.modules.mkIf cfg.enable {
-    home.packages = [
-      cfg.package
-      packages.ai-tools
-    ];
+    home.packages = [ cfg.package ];
     programs.mcp = {
       enable = lib.modules.mkDefault true;
       servers.ghidra = {

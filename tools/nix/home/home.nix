@@ -6,6 +6,7 @@
   config,
   lib,
   pkgs,
+  aiBundleEnabled,
   ...
 }:
 let
@@ -19,7 +20,7 @@ let
       "${config.home.homeDirectory}/.codex";
   resources = cfg.host.chatgptResources or "";
   repl = pkgs.writeShellScript "ai-node-repl" ''
-    exec ${lib.meta.getExe packages.bun} ${packages.ai-tools}/lib/ai-tools/apps/chatgpt/repl/repl.js \
+    exec ${lib.meta.getExe packages.bun} ${cfg.package}/lib/ai-tools/apps/chatgpt/repl/repl.js \
       ${lib.strings.escapeShellArg resources} ${lib.strings.escapeShellArg codexHome} "$@"
   '';
   settings = mkSettings {
@@ -29,7 +30,7 @@ let
       inherit codexHome;
       # Farstep is supplied through upstream shared MCP integration
       farstep = "";
-      ghidraBridge = lib.meta.getExe packages.ai-tools;
+      ghidraBridge = lib.meta.getExe cfg.package;
       ghidraArgs = [
         "ghidra"
         "mcp"
@@ -74,20 +75,13 @@ in
     ./chatgpt/chatgpt.nix
   ];
 
-  config = lib.modules.mkMerge [
-    {
-      # Runtime arguments stay out of imports so option-dependent values are lazy
-      _module.args.aiContext = {
-        inherit packages settings;
-        # Defaults apply to leaves so a user can override one setting independently
-        inherit defaults;
-      };
-    }
-    (lib.modules.mkIf
-      (cfg.enable || cfg.codex.enable || cfg.claude.enable || cfg.opencode.enable || cfg.omp.enable)
-      {
-        home.packages = [ packages.ai-tools ];
-      }
-    )
-  ];
+  config = {
+    # Runtime arguments stay out of imports so option-dependent values are lazy
+    _module.args.aiContext = {
+      inherit settings;
+      # Defaults apply to leaves so a user can override one setting independently
+      inherit defaults;
+    };
+    home.packages = lib.modules.mkIf aiBundleEnabled [ cfg.package ];
+  };
 }

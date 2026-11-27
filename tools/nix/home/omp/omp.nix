@@ -6,8 +6,9 @@
   ...
 }:
 let
-  inherit (aiContext) packages settings defaults;
+  inherit (aiContext) settings defaults;
   cfg = config.programs.ai.omp;
+  ompRoot = "${config.programs.ai.package}/lib/ai-tools/apps/omp";
   yaml = pkgs.formats.yaml { };
   json = pkgs.formats.json { };
   files = {
@@ -54,11 +55,9 @@ in
           _: entry: lib.modules.mkIf (!cfg.mutableSettings) { inherit (entry) source; }
         ) files
         // {
-          ".omp/agent/lib".source = "${packages.ai-tools}/lib/ai-tools/apps/omp/lib";
-          ".omp/agent/commands/commit.md".source =
-            "${packages.ai-tools}/lib/ai-tools/apps/omp/commands/commit.md";
-          ".omp/agent/commands/rebase.md".source =
-            "${packages.ai-tools}/lib/ai-tools/apps/omp/commands/rebase.md";
+          ".omp/agent/lib".source = "${ompRoot}/lib";
+          ".omp/agent/commands/commit.md".source = "${ompRoot}/commands/commit.md";
+          ".omp/agent/commands/rebase.md".source = "${ompRoot}/commands/rebase.md";
         }
         // lib.attrsets.mapAttrs' (
           name: source:

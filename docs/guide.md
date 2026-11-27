@@ -408,6 +408,10 @@ Farstep desktop are enabled separately. On nix-darwin, enable
 settings. See [options](../tools/nix/common/common.nix) and the
 [Darwin adapter](../tools/nix/darwin/darwin.nix).
 
+Set `programs.ai.package` to replace the launcher bundle and its bundled data
+without changing the separately configurable Farstep, Ghidra, or ChatGPT
+packages.
+
 Activation preserves undeclared writable settings. `just config generate` and
 `just config export` stage settings for inspection, not activation.
 

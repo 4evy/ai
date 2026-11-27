@@ -2,12 +2,11 @@
 {
   config,
   lib,
-  pkgs,
+  aiBundleEnabled,
   ...
 }:
 let
   cfg = config.programs.ai;
-  packages = pkgs.aiTools or (packagesFor pkgs);
   # Match option-default priority so an explicit package list still replaces it
   selectedPackage =
     enable: package: lib.modules.mkIf enable (lib.modules.mkOptionDefault [ package ]);
@@ -23,18 +22,13 @@ in
       '';
       description = ''
         AI packages installed for all users
-        On nix-darwin, enable programs.ai.user.enable for native user settings
-        On NixOS, import the Home Manager module for each user's settings
+        Import the Home Manager module for each user's settings
       '';
     };
   };
   config = {
     programs.ai.packages = lib.modules.mkMerge (
-      [
-        (selectedPackage (
-          cfg.enable || cfg.codex.enable || cfg.claude.enable || cfg.opencode.enable || cfg.omp.enable
-        ) packages.ai-tools)
-      ]
+      [ (selectedPackage aiBundleEnabled cfg.package) ]
       ++ map (name: selectedPackage cfg.${name}.enable cfg.${name}.package) [
         "farstep"
         "ghidra"

@@ -14,6 +14,13 @@ in
 {
   options.programs.ai = {
     enable = lib.options.mkEnableOption "the shared AI tools and settings";
+    package = lib.options.mkPackageOption packages "ai-tools" {
+      pkgsText = "ai.packages.<system>";
+      extraDescription = ''
+        A replacement must provide the launcher binaries and the data under
+        `lib/ai-tools` used by the enabled integrations.
+      '';
+    };
     host = lib.options.mkOption {
       type = lib.types.attrsOf lib.types.anything;
       default = { };
@@ -93,15 +100,15 @@ in
       };
       extensions = lib.options.mkOption {
         type = lib.types.attrsOf lib.types.path;
-        default = {
-          compact = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/compact";
-          improve = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/improve";
-          mcp = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/mcp";
-          quick = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/quick";
-          remote = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/remote";
-          skylight = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/skylight";
-          thinking = "${packages.ai-tools}/lib/ai-tools/apps/omp/extensions/thinking";
-        };
+        default = lib.genAttrs [
+          "compact"
+          "improve"
+          "mcp"
+          "quick"
+          "remote"
+          "skylight"
+          "thinking"
+        ] (name: "${cfg.package}/lib/ai-tools/apps/omp/extensions/${name}");
         description = "Extension directories installed into the OMP agent home";
       };
     };
@@ -179,8 +186,17 @@ in
       };
     };
   };
-  config = lib.modules.mkIf cfg.enable {
-    programs.ai = {
+  config = {
+    _module.args.aiBundleEnabled =
+      cfg.enable
+      || cfg.codex.enable
+      || cfg.claude.enable
+      || cfg.opencode.enable
+      || cfg.omp.enable
+      || cfg.ghidra.enable
+      || cfg.chatgpt.enable;
+
+    programs.ai = lib.modules.mkIf cfg.enable {
       claude.enable = lib.modules.mkDefault true;
       codex.enable = lib.modules.mkDefault true;
       opencode.enable = lib.modules.mkDefault true;

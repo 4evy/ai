@@ -6,9 +6,11 @@
   ...
 }:
 let
-  inherit (aiContext) packages settings;
-  cfg = config.programs.ai.chatgpt;
-  codexCli = config.programs.ai.host.codexCli or (lib.meta.getExe' packages.ai-tools "codex");
+  inherit (aiContext) settings;
+  ai = config.programs.ai;
+  cfg = ai.chatgpt;
+  codexLauncher = lib.meta.getExe' ai.package "codex";
+  codexCli = ai.host.codexCli or codexLauncher;
   nodeRepl = settings.".codex/config.toml".settings.mcp_servers.node_repl.command;
   codexHome = settings.".codex/config.toml".settings.mcp_servers.node_repl.env.CODEX_HOME;
   environment = pkgs.writeShellScript "ai-chatgpt-environment" ''
@@ -26,7 +28,7 @@ in
         message = "programs.ai.chatgpt.patchComputerUse requires macOS";
       }
     ];
-    home.packages = [ packages.ai-tools ] ++ lib.lists.optional (cfg.package != null) cfg.package;
+    home.packages = lib.modules.mkIf (cfg.package != null) [ cfg.package ];
     home.sessionVariables = lib.modules.mkIf pkgs.stdenv.hostPlatform.isDarwin {
       CHATGPT_RESOURCES = cfg.resources;
       CODEX_HOME = codexHome;
@@ -36,7 +38,7 @@ in
     programs.ai.host = lib.modules.mkIf pkgs.stdenv.hostPlatform.isDarwin {
       chatgptResources = lib.modules.mkDefault cfg.resources;
       nodeRepl = lib.modules.mkDefault "${cfg.resources}/cua_node/bin/node_repl";
-      codexCli = lib.modules.mkDefault (lib.meta.getExe' packages.ai-tools "codex");
+      codexCli = lib.modules.mkDefault codexLauncher;
     };
     # Dock-launched apps inherit launchd's environment rather than shell exports
     launchd.agents.ai-chatgpt-environment = lib.modules.mkIf pkgs.stdenv.hostPlatform.isDarwin {
@@ -53,7 +55,7 @@ in
           enable = true;
           config = {
             ProgramArguments = [
-              "${packages.ai-tools}/bin/ai"
+              (lib.meta.getExe ai.package)
               "chatgpt"
               "policy"
               "patch"
