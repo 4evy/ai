@@ -1,11 +1,10 @@
-import type { ToolDefinition } from "@oh-my-pi/pi-coding-agent";
-import { type Component, Text } from "@oh-my-pi/pi-tui";
-import type { OutputMeta } from "@oh-my-pi/pi-tui/tools/output-meta";
+import type { OutputMeta } from "@oh-my-pi/pi-coding-agent/tools/output-meta-format";
 import type {
-  RenderResultContextOptions,
-  ToolRenderer,
-  ToolRenderResult,
-} from "@oh-my-pi/pi-tui/tools/renderer";
+  ToolPresenter,
+  ToolResult,
+  ToolView,
+  ToolViewState,
+} from "@oh-my-pi/pi-coding-agent/ui/tools/contract";
 import { isRecord } from "@oh-my-pi/pi-utils";
 
 export interface FileDetails {
@@ -23,7 +22,14 @@ export interface FileDetails {
   truncated?: boolean;
 }
 
-function remoteArgs(input: unknown, details?: FileDetails) {
+interface RemoteFileArgs {
+  content: unknown;
+  path: string | undefined;
+  oldText: unknown;
+  newText: unknown;
+}
+
+function remoteArgs(input: unknown, details?: FileDetails): RemoteFileArgs {
   const args = isRecord(input) ? input : {};
   const path = details?.path ?? args.path;
   const connection = details?.connectionId ?? args.connection;
@@ -33,60 +39,50 @@ function remoteArgs(input: unknown, details?: FileDetails) {
       ? `${typeof connection === "string" ? connection : "SSH"}:${path}`
       : undefined;
   return {
-    ...args,
+    content: args.content,
     path:
       display === undefined
         ? undefined
         : `${display}${typeof args.selector === "string" ? `:${args.selector}` : ""}`,
     oldText: args.old_string,
     newText: args.new_string,
-    // Remote offsets count directory entries, not native file line numbers
-    offset: undefined,
-    limit: undefined,
   };
 }
 
-// Native file renderers generate local OSC links even for qualified paths
-// biome-ignore lint/suspicious/noControlCharactersInRegex: OSC 8 hyperlink wrappers
-const hyperlink = /\x1b\]8;[^\x07\x1b]*(?:\x07|\x1b\\)/gu;
-
-function remoteComponent(component: Component | undefined): Component {
-  const content = component ?? new Text("", 0, 0);
-  let previous: readonly string[] | undefined;
-  let rows: readonly string[] = [];
+// A qualified remote path is a display label, never a local file link
+function withoutLocalLinks(view: ToolView | undefined): ToolView | undefined {
+  if (!view) return undefined;
+  const { head, term } = view;
+  const edit = term?.edit;
+  const { href: _href, ...localFreeHead } = head ?? {};
   return {
-    render(width) {
-      const rendered = content.render(width);
-      if (rendered !== previous) {
-        previous = rendered;
-        rows = rendered.map((line) => line.replace(hyperlink, ""));
-      }
-      return rows;
-    },
-    invalidate: () => {
-      previous = undefined;
-      rows = [];
-      content.invalidate?.();
-    },
-    releaseRenderCaches: () => {
-      previous = undefined;
-      rows = [];
-      content.releaseRenderCaches?.();
-    },
+    ...view,
+    ...(head ? { head: localFreeHead } : {}),
+    ...(term
+      ? {
+          term: {
+            ...term,
+            link: undefined,
+            ...(isRecord(edit) && Array.isArray(edit.cards)
+              ? {
+                  edit: {
+                    ...edit,
+                    cards: edit.cards.map((card) =>
+                      isRecord(card) ? { ...card, link: undefined } : card,
+                    ),
+                  },
+                }
+              : {}),
+          },
+        }
+      : {}),
   };
 }
 
 export function remoteFilePresentation<D extends FileDetails>(
-  renderer: ToolRenderer<Record<string, unknown>, D>,
-): Pick<
-  ToolDefinition<Record<string, unknown>, D>,
-  "renderCall" | "renderResult" | "describeCall" | "describeResult"
-> {
-  const optionsFor = (options: RenderResultContextOptions) => ({
-    ...options,
-    renderContext: { ...options.renderContext, editMode: "replace" },
-  });
-  const viewResult = (result: ToolRenderResult<D>, args: unknown) => {
+  presenter: ToolPresenter<RemoteFileArgs, D>,
+): { presenter: ToolPresenter<unknown, D> } {
+  const viewResult = (result: ToolResult<D>, args: unknown) => {
     const { details: original, ...rest } = result;
     if (!original) return rest;
     const path = remoteArgs(args, original).path;
@@ -94,7 +90,6 @@ export function remoteFilePresentation<D extends FileDetails>(
     delete details.resolvedPath;
     if (path !== undefined) {
       details.path = path;
-      details.displayTarget = path;
     }
     if (details.meta) {
       details.meta = { ...details.meta };
@@ -105,27 +100,27 @@ export function remoteFilePresentation<D extends FileDetails>(
       details,
     };
   };
+  const optionsFor = (state: ToolViewState): ToolViewState => ({
+    ...state,
+    renderContext: { ...state.renderContext, editMode: "replace" },
+  });
   return {
-    renderCall: (args, options, theme) =>
-      remoteComponent(
-        renderer.renderCall(remoteArgs(args), optionsFor(options), theme),
-      ),
-    renderResult: (result, options, theme, args) =>
-      remoteComponent(
-        renderer.renderResult(
-          viewResult(result, args),
-          optionsFor(options),
-          theme,
-          remoteArgs(args, result.details),
+    presenter: {
+      ...(presenter.merge === undefined ? {} : { merge: presenter.merge }),
+      ...(presenter.inline === undefined ? {} : { inline: presenter.inline }),
+      ...(presenter.streamsBody === undefined
+        ? {}
+        : { streamsBody: presenter.streamsBody }),
+      call: (args, state) =>
+        withoutLocalLinks(presenter.call?.(remoteArgs(args), optionsFor(state))),
+      result: (result, state, args) =>
+        withoutLocalLinks(
+          presenter.result?.(
+            viewResult(result, args),
+            optionsFor(state),
+            remoteArgs(args, result.details),
+          ),
         ),
-      ),
-    describeCall: (args, options) =>
-      renderer.describeCall?.(remoteArgs(args), optionsFor(options)),
-    describeResult: (result, options, args) =>
-      renderer.describeResult?.(
-        viewResult(result, args),
-        optionsFor(options),
-        remoteArgs(args, result.details),
-      ),
+    },
   };
 }

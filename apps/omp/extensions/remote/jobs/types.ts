@@ -1,5 +1,5 @@
 import type { AgentToolResult, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
-import type { BashToolDetails } from "@oh-my-pi/pi-tui/tools/bash";
+import type { BashToolDetails } from "@oh-my-pi/pi-coding-agent/tools/details/bash";
 import type { Deferred } from "effect";
 import type {
   JobLogs,

@@ -1,14 +1,14 @@
 diff --git a/packages/coding-agent/src/tools/browser/launch.ts b/packages/coding-agent/src/tools/browser/launch.ts
 --- a/packages/coding-agent/src/tools/browser/launch.ts
 +++ b/packages/coding-agent/src/tools/browser/launch.ts
-@@ -41,6 +41,7 @@
- import stealthPluginsScript from "../puppeteer/10_stealth_plugins.txt" with { type: "text" };
- import stealthHardwareScript from "../puppeteer/11_stealth_hardware.txt" with { type: "text" };
- import stealthCodecsScript from "../puppeteer/12_stealth_codecs.txt" with { type: "text" };
-+import { adaptBrowserLaunch, launchBrowser } from "./launch-adapter";
- import stealthWorkerScript from "../puppeteer/13_stealth_worker.txt" with { type: "text" };
- import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+@@ -46,6 +46,7 @@
  import { withDownload } from "../../downloads/activity";
+ import { TOOL_TIMEOUTS } from "../tool-timeouts";
+ import { findUserDataDirInArgs, gracefulKillTreeOnce, killTreeOnce, probeCdpResponse } from "./attach";
++import { adaptBrowserLaunch, launchBrowser } from "./launch-adapter";
+ 
+ export const DEFAULT_VIEWPORT = { width: 1365, height: 768, deviceScaleFactor: 1.25 };
+ 
 @@ -733,7 +734,7 @@
  		const staleActivePort = pipe ? await readActivePort(activePortFile) : undefined;
  		if (userDataDir) await seedOwnedProfilePreferences(userDataDir);

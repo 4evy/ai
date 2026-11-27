@@ -1,7 +1,8 @@
 import type { AgentToolResult, ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import type { WriteToolDetails } from "@oh-my-pi/pi-coding-agent/tools/details/write";
 import { outputMeta } from "@oh-my-pi/pi-coding-agent/tools/output-meta";
 import { WriteTool } from "@oh-my-pi/pi-coding-agent/tools/write";
-import { type WriteToolDetails, writeToolRenderer } from "@oh-my-pi/pi-tui/tools/write";
+import { writePresenter } from "@oh-my-pi/pi-coding-agent/ui/tools/write";
 import { hash } from "farstep/client/files/files";
 import { remoteDefinitions } from "farstep/remote/remote";
 import { compileTool, registerCompiledTool } from "#apps/omp/lib/schema/tool";
@@ -54,6 +55,6 @@ export function registerWriteTool(api: ExtensionAPI, { selected }: Connections) 
         });
       },
     }),
-    remoteFilePresentation(writeToolRenderer),
+    remoteFilePresentation(writePresenter),
   );
 }

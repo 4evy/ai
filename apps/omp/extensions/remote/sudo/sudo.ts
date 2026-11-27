@@ -3,13 +3,13 @@ import type {
   AgentToolUpdateCallback,
   ExtensionContext,
 } from "@oh-my-pi/pi-coding-agent";
-import { toolResult } from "@oh-my-pi/pi-coding-agent/tools/tool-result";
-import type { BashToolDetails } from "@oh-my-pi/pi-tui/tools/bash";
+import type { BashToolDetails } from "@oh-my-pi/pi-coding-agent/tools/details/bash";
 import {
   OutputSink,
   streamTailUpdates,
   TailBuffer,
-} from "@oh-my-pi/pi-tui/tools/streaming-output";
+} from "@oh-my-pi/pi-coding-agent/tools/streaming-output";
+import { toolResult } from "@oh-my-pi/pi-coding-agent/tools/tool-result";
 import type { SudoInput } from "farstep/remote/sudo/script";
 import { executeSudo, validateSudoInput } from "farstep/remote/sudo/sudo";
 import type { Connection } from "../connections/types";

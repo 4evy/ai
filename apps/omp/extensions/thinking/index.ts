@@ -1,6 +1,6 @@
 import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
-import { toReasoningEffort } from "@oh-my-pi/pi-tui/thinking";
+import { toReasoningEffort } from "@oh-my-pi/pi-coding-agent/thinking/levels";
 
 const EFFORT_SHORTCUTS = [
   {

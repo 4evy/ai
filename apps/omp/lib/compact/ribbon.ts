@@ -1,18 +1,17 @@
-import { piComposerStyle } from "@oh-my-pi/pi-tui";
-import { theme } from "@oh-my-pi/pi-tui/theme";
-import { FG_RESET, fgAnsi, resolveVarRefs } from "@oh-my-pi/pi-tui/theme/color";
+import { type ColorDepth, FG_DEFAULT, fgSgr } from "@oh-my-pi/pi-tui/theme/color";
 import { setThemeRulePolicy, type ThemeRulePolicy } from "@oh-my-pi/pi-tui/theme/rules";
-import type { ColorMode, ThemeJson } from "@oh-my-pi/pi-tui/theme/schema";
+import type { ThemeJson } from "@oh-my-pi/pi-tui/theme/schema";
+import { resolveColorValue } from "@oh-my-pi/pi-tui/theme/theme";
 
 const palettes = new WeakMap<
   Readonly<ThemeJson>,
-  { mode: ColorMode; colors: readonly string[] }
+  { depth: ColorDepth; colors: readonly string[] }
 >();
 
 /** Paint foreground stripes without changing warning colors or backgrounds */
 const compactRibbon: ThemeRulePolicy = (
   source,
-  mode,
+  depth,
   glyph,
   width,
   offset,
@@ -20,11 +19,11 @@ const compactRibbon: ThemeRulePolicy = (
 ) => {
   if (!source.ribbon) return undefined;
   let cached = palettes.get(source);
-  if (!cached || cached.mode !== mode) {
+  if (!cached || cached.depth !== depth) {
     cached = {
-      mode,
+      depth,
       colors: source.ribbon.map((color) =>
-        fgAnsi(resolveVarRefs(color, source.vars ?? {}), mode),
+        fgSgr(resolveColorValue(color, source.vars ?? {}), depth),
       ),
     };
     palettes.set(source, cached);
@@ -39,16 +38,9 @@ const compactRibbon: ThemeRulePolicy = (
     );
     if (end > start) result += colors[index] + glyph.repeat(end - start);
   }
-  return result ? result + FG_RESET : "";
+  return result ? result + FG_DEFAULT : "";
 };
-
-const renderPiTop = piComposerStyle.renderTop;
-const renderRibbonTop: typeof renderPiTop = (ctx) =>
-  theme?.renderRule(ctx.box.horizontal, ctx.width) ??
-  renderPiTop.call(piComposerStyle, ctx);
 
 export function installCompactRibbon(): void {
   setThemeRulePolicy(compactRibbon);
-  // Use the same built-in shape for saved settings and all composer previews
-  piComposerStyle.renderTop = renderRibbonTop;
 }

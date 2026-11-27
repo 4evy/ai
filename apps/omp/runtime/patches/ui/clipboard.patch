@@ -1,19 +1,18 @@
 diff --git a/packages/coding-agent/src/modes/controllers/input-controller.ts b/packages/coding-agent/src/modes/controllers/input-controller.ts
 --- a/packages/coding-agent/src/modes/controllers/input-controller.ts
 +++ b/packages/coding-agent/src/modes/controllers/input-controller.ts
-@@ -438,6 +438,11 @@
- 					this.ctx.toggleThinkingBlockVisibility();
- 					return { consume: true };
- 				}
-+				if (this.ctx.keybindings.matches(data, "app.clipboard.copyResponse")) {
-+					if (this.ctx.ui.hasOverlay() || this.ctx.ui.getFocused() instanceof TreeSelectorComponent) return undefined;
-+					void this.#copyAgentResponse();
-+					return { consume: true };
-+				}
- 				if (this.ctx.keybindings.matches(data, "app.history.search")) {
- 					if (this.ctx.ui.hasOverlay() || this.ctx.ui.getFocused() instanceof HistorySearchComponent) {
- 						return undefined;
-@@ -3147,6 +3152,25 @@
+@@ -643,6 +643,10 @@
+ 			this.toggleThinkingBlockVisibility();
+ 			return true;
+ 		}
++		if (km.matches(key, "app.clipboard.copyResponse")) {
++			void this.#copyAgentResponse();
++			return true;
++		}
+ 		if (km.matches(key, "app.history.search")) {
+ 			this.ctx.showHistorySearch();
+ 			return true;
+@@ -3141,6 +3145,25 @@
  		}
  	}
  
@@ -38,11 +37,11 @@ diff --git a/packages/coding-agent/src/modes/controllers/input-controller.ts b/p
 +
  	/** Copy current prompt text to system clipboard. */
  	handleCopyPrompt(): void {
- 		const text = this.ctx.editor.getText();
-diff --git a/packages/tui/src/app-keybindings.ts b/packages/tui/src/app-keybindings.ts
---- a/packages/tui/src/app-keybindings.ts
-+++ b/packages/tui/src/app-keybindings.ts
-@@ -50,6 +50,7 @@
+ 		const text = this.ctx.composer.text();
+diff --git a/packages/coding-agent/src/config/keybindings/app-keybindings.ts b/packages/coding-agent/src/config/keybindings/app-keybindings.ts
+--- a/packages/coding-agent/src/config/keybindings/app-keybindings.ts
++++ b/packages/coding-agent/src/config/keybindings/app-keybindings.ts
+@@ -32,6 +32,7 @@
  	"app.clipboard.pasteTextRaw": true;
  	"app.clipboard.copyLine": true;
  	"app.clipboard.copyPrompt": true;
@@ -50,7 +49,7 @@ diff --git a/packages/tui/src/app-keybindings.ts b/packages/tui/src/app-keybindi
  	"app.agents.hub": true;
  	"app.session.new": true;
  	"app.session.tree": true;
-@@ -209,6 +210,10 @@
+@@ -187,6 +188,10 @@
  		defaultKeys: "alt+shift+c",
  		description: "Copy prompt",
  	},
@@ -61,11 +60,11 @@ diff --git a/packages/tui/src/app-keybindings.ts b/packages/tui/src/app-keybindi
  	"app.session.new": {
  		defaultKeys: [],
  		description: "Create new session",
-diff --git a/packages/tui/src/hotkeys-markdown.ts b/packages/tui/src/hotkeys-markdown.ts
---- a/packages/tui/src/hotkeys-markdown.ts
-+++ b/packages/tui/src/hotkeys-markdown.ts
-@@ -115,6 +115,7 @@
- 				{ keys: [hints(["ctrl+k"])], action: "Delete to end of line" },
+diff --git a/packages/coding-agent/src/ui/keys/hotkeys.ts b/packages/coding-agent/src/ui/keys/hotkeys.ts
+--- a/packages/coding-agent/src/ui/keys/hotkeys.ts
++++ b/packages/coding-agent/src/ui/keys/hotkeys.ts
+@@ -76,6 +76,7 @@
+ 				{ keys: [keys("ctrl+k")], action: "Delete to end of line" },
  				{ keys: [act("app.clipboard.copyLine")], action: "Copy current line" },
  				{ keys: [act("app.clipboard.copyPrompt")], action: "Copy whole prompt" },
 +				{ keys: [act("app.clipboard.copyResponse")], action: "Copy latest visible agent response" },

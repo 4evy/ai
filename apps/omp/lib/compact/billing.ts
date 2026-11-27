@@ -1,9 +1,10 @@
 import type {
   BillingSummaryPresentation,
   StatusLinePresentation,
-} from "@oh-my-pi/pi-tui/status-line/presentation";
-import type { Theme } from "@oh-my-pi/pi-tui/theme";
+} from "@oh-my-pi/pi-coding-agent/ui/status/presentation";
+import type { SymbolSet } from "@oh-my-pi/pi-tui/theme/contract";
 import { formatNumber, normalizePremiumRequests } from "@oh-my-pi/pi-utils";
+import { compactFooterSegments } from "./footer";
 
 function thinkingLevelLabel(level: string): string {
   switch (level) {
@@ -25,7 +26,8 @@ function thinkingLevelLabel(level: string): string {
 /** Keep billing facts intact while choosing units and secondary detail */
 function billingSummary(
   options: BillingSummaryPresentation,
-  theme: Theme,
+  symbols: SymbolSet,
+  availableWidth = 0,
 ): string | undefined {
   const premium = normalizePremiumRequests(options.premiumRequests);
   const advisor = options.advisor?.cost ?? 0;
@@ -43,19 +45,18 @@ function billingSummary(
   const parts: string[] = [];
   let shownSubscription: boolean | undefined;
   if (options.cost || options.pricingPeriod || tree || options.usingSubscription) {
-    parts.push(`$${options.cost.toFixed(options.fractionDigits)}`);
+    parts.push(`$${options.cost.toFixed(options.digits)}`);
     shownSubscription = options.usingSubscription;
   }
-  const width = options.availableWidth ?? 0;
-  if (tree && !(width > 0 && width < 100))
-    parts.push(`(+${tree.toFixed(options.fractionDigits)})`);
+  if (tree && !(availableWidth > 0 && availableWidth < 100))
+    parts.push(`(+${tree.toFixed(options.digits)})`);
   if (options.pricingPeriod) parts.push(options.pricingPeriod === "peak" ? "↑" : "↓");
   if (premium) parts.push(`★ ${formatNumber(premium)}`);
   if (advisor && options.advisor) {
-    const amount = advisor.toFixed(options.fractionDigits);
+    const amount = advisor.toFixed(options.digits);
     const spend =
       shownSubscription === options.advisor.usingSubscription ? amount : `$${amount}`;
-    const icon = theme.icon.advisor;
+    const icon = symbols.icon("advisor");
     parts.push(
       `${parts.length > 0 ? "+ " : ""}${icon && icon !== "(adv)" ? `${icon} ${spend}` : `${spend} (adv)`}`,
     );
@@ -66,4 +67,5 @@ function billingSummary(
 export const compactStatusLine: StatusLinePresentation = {
   thinkingLevelLabel,
   billingSummary,
+  ...compactFooterSegments,
 };

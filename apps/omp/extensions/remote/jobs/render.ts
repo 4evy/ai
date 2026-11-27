@@ -1,23 +1,35 @@
-import { ansi, code, node, text } from "@oh-my-pi/pi-tui/native/describe";
-import { plainText } from "@oh-my-pi/pi-tui/native/spans";
 import {
-  framedToolCard,
-  OutputPane,
-  type ToolCardPhase,
-} from "@oh-my-pi/pi-tui/render";
-import { formatDuration } from "@oh-my-pi/pi-tui/render/render-utils";
-import { highlightCode } from "@oh-my-pi/pi-tui/theme";
+  outputLine,
+  sourcePreview,
+} from "@oh-my-pi/pi-coding-agent/ui/styles/tools/code-cell";
 import {
-  createShellRenderer,
-  type ShellRendererConfig,
-} from "@oh-my-pi/pi-tui/tools/bash";
-import { resultText } from "@oh-my-pi/pi-tui/tools/native-view";
+  frameInner,
+  frameRows,
+  statusIcon,
+  statusLine,
+  tailRows,
+} from "@oh-my-pi/pi-coding-agent/ui/styles/tools/frame";
+import {
+  defineToolLook,
+  isExpanded,
+  toolProps,
+} from "@oh-my-pi/pi-coding-agent/ui/styles/tools/look";
+import {
+  type ShellConfig,
+  shellPresenter,
+} from "@oh-my-pi/pi-coding-agent/ui/tools/bash";
 import type {
-  NativeToolView,
-  RenderResultContextOptions,
-  ToolRenderer,
-  ToolRenderResult,
-} from "@oh-my-pi/pi-tui/tools/renderer";
+  ToolPresenter,
+  ToolResult,
+  ToolView,
+  ToolViewState,
+} from "@oh-my-pi/pi-coding-agent/ui/tools/contract";
+import { resultText } from "@oh-my-pi/pi-coding-agent/ui/tools/default";
+import { type JSXNode, jsx, type UiNode } from "@oh-my-pi/pi-tui";
+import type { Block, PaintContext } from "@oh-my-pi/pi-tui/term/paint";
+import { ansiLines } from "@oh-my-pi/pi-tui/term/painters/ansi";
+import { highlightCode } from "@oh-my-pi/pi-tui/text/highlight";
+import { formatDuration, sanitizeText } from "@oh-my-pi/pi-utils";
 import type {
   WorkflowOutput,
   WorkflowStepResult,
@@ -36,7 +48,7 @@ interface JobView {
   title: string;
   target: string;
   state: string;
-  phase: ToolCardPhase;
+  phase: "error" | "warning" | "running" | "success";
   meta: string[];
   sections: Section[];
 }
@@ -107,8 +119,8 @@ function stepSummary(step: WorkflowStepResult): string {
 }
 
 function jobView(
-  result: ToolRenderResult<RemoteJobDetails>,
-  options: RenderResultContextOptions,
+  result: ToolResult<RemoteJobDetails>,
+  options: ToolViewState,
   title: string,
 ): JobView {
   const details = result.details ?? {};
@@ -133,7 +145,7 @@ function jobView(
                 ? "running"
                 : "in background"
               : (workflow?.state ?? details.state ?? "completed");
-  const phase: ToolCardPhase = failed
+  const phase: JobView["phase"] = failed
     ? "error"
     : unknown || state === "timed out" || state === "cancelled"
       ? "warning"
@@ -231,116 +243,119 @@ function jobView(
   return { title, target: details.job ?? "", state, phase, meta, sections };
 }
 
-export function createJobRenderer(config: ShellRendererConfig<unknown>) {
-  const shell = createShellRenderer(config);
-  const fallback = farstepPresentation("Job");
+interface JobTerm extends JobView {
+  readonly look: "remote-job";
+  readonly elapsedMs?: number;
+}
+
+function sectionLimit(section: Section): number {
+  return section.label === "Steps" ? 8 : 10;
+}
+
+function paintJob(node: UiNode, cx: PaintContext): Block {
+  const props = toolProps(node);
+  const job = props.term as unknown as JobTerm;
+  const theme = cx.theme;
+  const expanded = isExpanded(props);
+  const width = frameInner(cx.width);
+  const sections = job.sections.map((section) => {
+    const limit = sectionLimit(section);
+    const lines = section.language
+      ? highlightCode(sanitizeText(section.output), section.language, theme)
+      : ansiLines(section.output).map((line) => outputLine(theme, line));
+    return {
+      label: theme.fg("toolTitle", section.label),
+      lines: expanded
+        ? lines
+        : section.tail
+          ? tailRows(theme, lines, limit, width)
+          : sourcePreview(theme, lines, limit, width, false),
+    };
+  });
+  return {
+    rows: frameRows(theme, cx.width, {
+      head: statusLine(theme, {
+        glyph: statusIcon(cx, job.phase),
+        title: job.title,
+        description: job.state,
+        meta: job.meta,
+      }),
+      sections,
+      border:
+        job.phase === "success"
+          ? "dim"
+          : job.phase === "running"
+            ? "accent"
+            : job.phase,
+      ...(job.elapsedMs === undefined
+        ? {}
+        : { foot: theme.fg("dim", `elapsed ${formatDuration(job.elapsedMs)}`) }),
+    }),
+  };
+}
+
+defineToolLook("remote-job", { paint: paintJob, margin: true, animated: true });
+
+function sectionNode(section: Section, index: number): JSXNode {
+  const preview = { lines: sectionLimit(section) };
+  const child =
+    section.language || section.label === "Steps"
+      ? jsx("code", {
+          text: sanitizeText(section.output),
+          lang: section.language,
+          preview,
+          wrap: true,
+        })
+      : section.tail
+        ? jsx("ansi", { text: section.output, follow: true, preview })
+        : jsx("text", { spans: [{ t: sanitizeText(section.output) }], wrap: "word" });
+  return jsx(
+    "section",
+    { head: sanitizeText(section.label), children: child },
+    String(index),
+  );
+}
+
+export function createJobPresenter(
+  config: ShellConfig<unknown>,
+): ToolPresenter<unknown, RemoteJobDetails> {
+  const shell = shellPresenter(config);
+  const { presenter: fallback } = farstepPresentation("Job");
   return {
     ...shell,
-    renderResult(result, options, theme, args) {
-      if (!result.details?.job)
-        return fallback.renderResult(result, options, theme, args);
-      const view = jobView(result, options, config.resolveTitle(args, options));
-      const command = config.resolveCommand?.(args);
+    result(result, state, args): ToolView | undefined {
+      if (!result.details?.job) return fallback.result?.(result, state, args);
+      const view = jobView(result, state, config.title(args));
+      const command = config.command(args);
       if (command)
         view.sections.unshift({
           label: "Script",
           output: command,
           language: "typescript",
         });
-      view.sections.unshift({ label: "Job", output: view.target });
-      const sections = view.sections.map((section) => ({
-        label: theme.fg("toolTitle", section.label),
-        content: new OutputPane(
-          theme,
-          {
-            expanded: options.expanded,
-            collapsedMaxLines: section.label === "Steps" ? 8 : 10,
-            edge: section.tail ? "tail" : "head",
-            visual: true,
-            styleLine: (line) => theme.fg("toolOutput", line),
-          },
-          section.language
-            ? highlightCode(section.output, section.language).join("\n")
-            : section.output,
-        ),
-      }));
-      return framedToolCard(theme, () => ({
-        status: {
-          icon:
-            view.phase === "running"
-              ? "running"
-              : view.phase === "error"
-                ? "error"
-                : view.phase === "warning"
-                  ? "warning"
-                  : "success",
-          ...(options.spinnerFrame === undefined
-            ? {}
-            : { spinnerFrame: options.spinnerFrame }),
-          title: view.title,
-          description: view.state,
-        },
-        phase: view.phase,
-        headerMeta: view.meta.join(" · "),
-        ...(options.isPartial && options.elapsedMs !== undefined
-          ? { footerMeta: `elapsed ${formatDuration(options.elapsedMs)}` }
+      const exit = result.details.exitCode;
+      const term: JobTerm = {
+        ...view,
+        look: "remote-job",
+        sections: [{ label: "Job", output: view.target }, ...view.sections],
+        ...(state.isPartial && state.elapsedMs !== undefined
+          ? { elapsedMs: state.elapsedMs }
           : {}),
-        sections,
-      }));
-    },
-    describeResult(result, options, args): NativeToolView | undefined {
-      if (!result.details?.job) return fallback.describeResult(result, options, args);
-      const view = jobView(result, options, config.resolveTitle(args, options));
-      const command = config.resolveCommand?.(args);
-      if (command)
-        view.sections.unshift({
-          label: "Script",
-          output: command,
-          language: "typescript",
-        });
+      };
       return {
-        tool: {
+        head: {
           title: view.title,
           target: view.target,
           meta: view.meta,
           note: view.state,
           ...(command ? { command } : {}),
-          ...(result.details.exitCode !== undefined && result.details.exitCode !== 0
-            ? { exit: result.details.exitCode }
-            : {}),
+          ...(exit ? { exit } : {}),
         },
-        tone:
-          view.phase === "error"
-            ? "error"
-            : view.phase === "warning"
-              ? "warning"
-              : view.phase === "running"
-                ? "pending"
-                : "success",
-        body: view.sections.map((section, index) =>
-          node(
-            "section",
-            { head: plainText(section.label) },
-            [
-              section.language || section.label === "Steps"
-                ? code(plainText(section.output), {
-                    ...(section.language ? { lang: section.language } : {}),
-                    ...(options.expanded
-                      ? {}
-                      : { preview: { lines: section.label === "Steps" ? 8 : 10 } }),
-                  })
-                : section.tail
-                  ? ansi(section.output, {
-                      follow: true,
-                      ...(options.expanded ? {} : { preview: { lines: 10 } }),
-                    })
-                  : text(plainText(section.output), { wrap: "word" }),
-            ],
-            String(index),
-          ),
-        ),
+        tone: view.phase === "running" ? "pending" : view.phase,
+        body: view.sections.map(sectionNode),
         preview: "children",
+        term: { ...term },
       };
     },
-  } satisfies ToolRenderer<unknown, RemoteJobDetails>;
+  };
 }

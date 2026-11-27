@@ -1,8 +1,9 @@
 import type { AgentToolResult, ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import type { ReadToolDetails } from "@oh-my-pi/pi-coding-agent/tools/details/read";
 import { outputMeta } from "@oh-my-pi/pi-coding-agent/tools/output-meta";
 import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
 import { parseSel } from "@oh-my-pi/pi-coding-agent/tools/read-selector";
-import { type ReadToolDetails, readToolRenderer } from "@oh-my-pi/pi-tui/tools/read";
+import { readPresenter } from "@oh-my-pi/pi-coding-agent/ui/tools/read";
 import { hash } from "farstep/client/files/files";
 import { remoteDefinitions } from "farstep/remote/remote";
 import { compileTool, registerCompiledTool } from "#apps/omp/lib/schema/tool";
@@ -108,6 +109,6 @@ export function registerReadTool(api: ExtensionAPI, { selected }: Connections) {
         });
       },
     }),
-    remoteFilePresentation(readToolRenderer),
+    remoteFilePresentation(readPresenter),
   );
 }

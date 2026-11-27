@@ -1,11 +1,11 @@
-import { flattenLine } from "@oh-my-pi/pi-tui/render";
-import { replaceTabs } from "@oh-my-pi/pi-tui/render/render-utils";
 import {
   isClosedTodo,
   type TodoItem,
-  todoChecklistPhases,
-} from "@oh-my-pi/pi-tui/tools/todo";
+} from "@oh-my-pi/pi-coding-agent/tools/details/todo";
+import { flattenLine } from "@oh-my-pi/pi-tui/text/sanitize";
+import { replaceTabs } from "@oh-my-pi/pi-tui/text/width";
 import { sanitizeText } from "@oh-my-pi/pi-utils";
+import type { TspChecklistItem, TspChecklistPhase } from "@oh-my-pi/pi-wire";
 
 export interface TodoSummary {
   total: number;
@@ -13,15 +13,17 @@ export interface TodoSummary {
   current: string | undefined;
 }
 
+type SummarizedTodo = Pick<TodoItem, "content" | "status">;
+
 /** Counts and current work shared by the compact HUD and transcript result */
 export function summarizeTodos(
-  phases: readonly { readonly tasks: readonly TodoItem[] }[],
-  isMatched: (task: TodoItem) => boolean = () => false,
+  phases: readonly { readonly tasks: readonly SummarizedTodo[] }[],
+  isMatched: (task: SummarizedTodo) => boolean = () => false,
 ): TodoSummary {
   let total = 0;
   let closed = 0;
-  let active: TodoItem | undefined;
-  let pending: TodoItem | undefined;
+  let active: SummarizedTodo | undefined;
+  let pending: SummarizedTodo | undefined;
   for (const phase of phases) {
     for (const task of phase.tasks) {
       total++;
@@ -43,18 +45,33 @@ export function summarizeTodos(
   };
 }
 
-/** Add the latest note to each item in OMP's native checklist */
+const CHECKLIST_STATUS: Record<TodoItem["status"], TspChecklistItem["status"]> = {
+  pending: "pending",
+  in_progress: "active",
+  completed: "done",
+  abandoned: "dropped",
+};
+
+/** Include the latest note in each checklist item and fold closed phases */
 export function checklistWithNotes(
-  phases: Parameters<typeof todoChecklistPhases>[0],
-  isMatched?: Parameters<typeof todoChecklistPhases>[1],
-) {
-  const checklist = todoChecklistPhases(phases, isMatched);
-  for (const [p, phase] of checklist.entries()) {
-    for (const [t, item] of phase.items.entries()) {
-      // The native builder emits exactly one item per task in source order
-      const note = phases[p]?.tasks[t]?.notes?.at(-1);
-      if (note !== undefined) item.note = replaceTabs(sanitizeText(note));
-    }
-  }
-  return checklist;
+  phases: readonly { readonly name: string; readonly tasks: readonly TodoItem[] }[],
+  isMatched: (task: TodoItem) => boolean = () => false,
+): TspChecklistPhase[] {
+  return phases.map((phase, p) => ({
+    id: `p${p}`,
+    title: replaceTabs(sanitizeText(phase.name)),
+    items: phase.tasks.map((task, t) => {
+      const note = task.notes?.at(-1);
+      return {
+        id: `p${p}.${t}`,
+        text: replaceTabs(sanitizeText(task.content)),
+        status:
+          task.status === "pending" && isMatched(task)
+            ? "active"
+            : CHECKLIST_STATUS[task.status],
+        ...(note !== undefined && { note: replaceTabs(sanitizeText(note)) }),
+      };
+    }),
+    collapsed: phase.tasks.length > 0 && phase.tasks.every(isClosedTodo),
+  }));
 }

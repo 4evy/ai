@@ -1,4 +1,4 @@
-import { truncateTail } from "@oh-my-pi/pi-tui/tools/streaming-output";
+import { truncateTail } from "@oh-my-pi/pi-coding-agent/tools/streaming-output";
 import { sanitizeText } from "@oh-my-pi/pi-utils";
 import type { JobSnapshot } from "farstep/protocol/jobs/protocol";
 import { JOB_OUTPUT_MAX_BYTES } from "farstep/protocol/jobs/protocol";

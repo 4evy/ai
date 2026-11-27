@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-import { createShellRenderer } from "@oh-my-pi/pi-tui/tools/bash";
+import { shellPresenter } from "@oh-my-pi/pi-coding-agent/ui/tools/bash";
 import { isRecord } from "@oh-my-pi/pi-utils/type-guards";
 import { remoteDefinitions } from "farstep/remote/remote";
 import { shellArguments } from "farstep/remote/tools/shell";
@@ -21,10 +21,14 @@ export function registerSudoTool(
         return jobs.sudo(selected(args.connection), args, ctx, signal, onUpdate);
       },
     }),
-    createShellRenderer<unknown>({
-      ...shellArguments,
-      resolveTitle: (args) =>
-        `Remote sudo · ${isRecord(args) && typeof args.connection === "string" ? args.connection : "SSH"}`,
-    }),
+    {
+      presenter: shellPresenter<unknown>({
+        header: true,
+        command: shellArguments.resolveCommand,
+        cwd: shellArguments.resolveCwd,
+        title: (args) =>
+          `Remote sudo · ${isRecord(args) && typeof args.connection === "string" ? args.connection : "SSH"}`,
+      }),
+    },
   );
 }

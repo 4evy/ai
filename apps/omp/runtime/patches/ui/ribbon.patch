@@ -1,190 +1,198 @@
 diff --git a/packages/tui/src/theme/schema.ts b/packages/tui/src/theme/schema.ts
 --- a/packages/tui/src/theme/schema.ts
 +++ b/packages/tui/src/theme/schema.ts
-@@ -53,6 +53,8 @@
+@@ -136,6 +136,8 @@
  	$schema?: string;
  	name: string;
  	vars?: Record<string, ColorValue>;
 +	/** Five foreground stripes for decorative rules, never background fills */
 +	ribbon?: [ColorValue, ColorValue, ColorValue, ColorValue, ColorValue];
- 	colors: Omit<Record<ThemeColor | ThemeBg, ColorValue>, "thinkingMax" | keyof typeof OPTIONAL_THEME_COLOR_RECORD> &
- 		Partial<Record<keyof typeof OPTIONAL_THEME_COLOR_RECORD, ColorValue>> & { thinkingMax?: ColorValue };
- 	export?: {
-diff --git a/packages/tui/src/theme/schema-validation.ts b/packages/tui/src/theme/schema-validation.ts
---- a/packages/tui/src/theme/schema-validation.ts
-+++ b/packages/tui/src/theme/schema-validation.ts
-@@ -107,6 +107,7 @@
- 	"$schema?": "string",
- 	name: "string",
- 	"vars?": { "[string]": "string | number" },
-+	"ribbon?": "(string | number)[] == 5",
- 	colors: themeColorsSchema,
- 	"export?": {
- 		"pageBg?": "string | number",
-diff --git a/packages/tui/src/theme/theme-schema.json b/packages/tui/src/theme/theme-schema.json
---- a/packages/tui/src/theme/theme-schema.json
-+++ b/packages/tui/src/theme/theme-schema.json
-@@ -31,6 +31,13 @@
- 				]
- 			}
- 		},
-+		"ribbon": {
-+			"type": "array",
-+			"description": "Five foreground stripes for decorative rules, preserving terminal backgrounds",
-+			"minItems": 5,
-+			"maxItems": 5,
-+			"items": { "type": ["string", "integer"] }
-+		},
- 		"colors": {
- 			"type": "object",
- 			"description": "Theme color definitions (all required except thinkingMax, assistantMessageText, mdExtensionLink and subagent1-subagent6)",
-diff --git a/packages/tui/src/theme/theme-class.ts b/packages/tui/src/theme/theme-class.ts
---- a/packages/tui/src/theme/theme-class.ts
-+++ b/packages/tui/src/theme/theme-class.ts
-@@ -12,6 +12,7 @@
- 	type ThemeColor,
- } from "./schema";
- import type { SessionAccentTheme } from "./session-color";
-+import type { ThemeRuleRenderer } from "./rules";
+ 	colors: Partial<Record<ForegroundKey | BackgroundKey, ColorValue>>;
+ 	export?: { pageBg?: ColorValue; cardBg?: ColorValue; infoBg?: ColorValue };
+ 	/** The terminal the theme was made for; `ansi` (16 entries) is the palette colorful markdown paints from. */
+@@ -223,6 +225,10 @@
+ 	if (typeof value.name !== "string") errors.push("name must be a string");
+ 	if (value.$schema !== undefined && typeof value.$schema !== "string") errors.push("$schema must be a string");
+ 	checkColorRecord(value.vars, "vars", errors);
++	const ribbon = value.ribbon;
++	if (ribbon !== undefined && (!Array.isArray(ribbon) || ribbon.length !== 5 || !ribbon.every(isColor))) {
++		errors.push("ribbon must hold exactly 5 colors");
++	}
+ 	const colors = value.colors;
+ 	if (!isObject(colors)) errors.push("colors must be an object");
+ 	else {
+diff --git a/packages/tui/src/theme/theme.ts b/packages/tui/src/theme/theme.ts
+--- a/packages/tui/src/theme/theme.ts
++++ b/packages/tui/src/theme/theme.ts
+@@ -5,6 +5,7 @@
+ import { adjustHsv, mixHex } from "@oh-my-pi/pi-utils/color";
+ import { BG_DEFAULT, type ColorDepth, colorHex, FG_DEFAULT, fgSgr, bgSgr, isLightColor, normalizeHex } from "./color";
+ import type { Theme } from "./contract";
++import { renderThemeRule } from "./rules";
  import {
- 	type SlashCommandIconName,
- 	SPINNER_FRAMES,
-@@ -197,6 +198,7 @@
- 	#sessionAccentInputs: SessionAccentTheme | undefined;
- 	#symbols: SymbolMap;
- 	#spinnerFramesOverrides: Partial<Record<SpinnerType, string[]>>;
-+	readonly #ruleRenderer: ThemeRuleRenderer | undefined;
- 	/**
- 	 * Perceptual luma (0..1) of the status-line background — used to classify the
- 	 * theme light/dark. Undefined when it can't be resolved. Classified against the
-@@ -216,9 +218,11 @@
- 		spinnerFramesOverrides: Partial<Record<SpinnerType, string[]>> = {},
- 		ansiPalette: ReadonlyArray<string | number> = [],
- 		terminalBackground?: string | number,
-+		ruleRenderer?: ThemeRuleRenderer,
- 	) {
--		this.statusLineLuminance = colorLuma(bgColors.statusLineBg);
--		this.#statusLineContrastLuminance = relativeLuminance(bgColors.statusLineBg);
-+		const statusBackground = bgColors.statusLineBg === "" ? (terminalBackground ?? "") : bgColors.statusLineBg;
-+		this.statusLineLuminance = colorLuma(statusBackground);
-+		this.#statusLineContrastLuminance = relativeLuminance(statusBackground);
- 		const slIsLight = isLightLuma(this.statusLineLuminance);
- 
- 		this.#fgColors = {} as Record<ThemeColor, string>;
-@@ -266,8 +270,14 @@
- 		// `status.done` aliases `status.success` unless a theme overrides it explicitly.
- 		if (!("status.done" in symbolOverrides)) this.#symbols["status.done"] = this.#symbols["status.success"];
- 		this.#spinnerFramesOverrides = spinnerFramesOverrides;
-+		this.#ruleRenderer = ruleRenderer;
- 	}
- 
-+	/** Optional rule decoration; semantic warning and error colors stay with callers */
-+	renderRule(glyph: string, width: number, offset = 0, totalWidth = width): string | undefined {
-+		return this.#ruleRenderer?.(glyph, width, offset, totalWidth);
-+	}
-+
- 	/** True when the active theme has a light status-line background. */
- 	get isLight(): boolean {
- 		return isLightLuma(this.statusLineLuminance);
-diff --git a/packages/tui/src/theme/loader.ts b/packages/tui/src/theme/loader.ts
---- a/packages/tui/src/theme/loader.ts
-+++ b/packages/tui/src/theme/loader.ts
-@@ -10,6 +10,7 @@
- import type { ColorMode, ThemeBg, ThemeColor, ThemeJson } from "./schema";
- import { normalizeSpinnerFramesOverride, type SymbolPreset } from "./symbols";
- import { Theme } from "./theme-class";
-+import { createThemeRuleRenderer } from "./rules";
- 
- // ============================================================================
- // Theme Loading
-@@ -223,6 +224,7 @@
- 		spinnerFramesOverrides,
- 		ansiPalette,
- 		terminalBackground,
-+		createThemeRuleRenderer(themeJson, colorMode),
- 	);
+ 	BACKGROUND_KEYS,
+ 	type ColorValue,
+@@ -21,6 +22,8 @@
+ 	readonly depth?: ColorDepth;
+ 	/** Symbol preset chosen in settings; wins over the theme file's `symbols.preset`. */
+ 	readonly symbolPreset?: SymbolPreset;
++	/** Fallback appearance for a theme that uses the terminal's own background. */
++	readonly terminalDark?: boolean;
+ 	/** Shift `toolDiffAdded` from green toward blue (red–green color blindness). */
+ 	readonly colorBlindMode?: boolean;
  }
- 
-diff --git a/packages/tui/src/chrome/dynamic-border.ts b/packages/tui/src/chrome/dynamic-border.ts
---- a/packages/tui/src/chrome/dynamic-border.ts
-+++ b/packages/tui/src/chrome/dynamic-border.ts
-@@ -14,13 +14,15 @@
-  */
- export class DynamicBorder implements Component {
- 	#color: (str: string) => string;
-+	readonly #decorate: boolean;
- 	#label: string | (() => string) | undefined;
- 	#cachedWidth = -1;
- 	#cachedLabel: string | undefined;
- 	#cachedLines: string[] | undefined;
- 
--	constructor(color: (str: string) => string = str => fgOrPlain("border", str)) {
--		this.#color = color;
-+	constructor(color?: (str: string) => string) {
-+		this.#decorate = color === undefined;
-+		this.#color = color ?? (str => fgOrPlain("border", str));
- 	}
- 
- 	invalidate(): void {
-@@ -58,12 +60,19 @@
- 	}
- 
- 	#rule(horizontal: string, width: number, label: string | undefined): string {
--		const lead = horizontal.repeat(3);
-+		const leadWidth = visibleWidth(horizontal) * 3;
- 		// The label sits between single spaces and leaves at least one rule cell after it.
--		const labelRoom = width - visibleWidth(lead) - 3;
--		if (!label || labelRoom < 1) return this.#color(horizontal.repeat(width));
-+		const labelRoom = width - leadWidth - 3;
-+		if (!label || labelRoom < 1) return this.#ruleSegment(horizontal, width, 0, width);
- 		const fitted = ` ${truncateToWidth(label, labelRoom)} `;
--		const rest = width - visibleWidth(lead) - visibleWidth(fitted);
--		return `${this.#color(lead)}${fitted}${this.#color(horizontal.repeat(rest))}`;
-+		const offset = leadWidth + visibleWidth(fitted);
-+		const rest = width - offset;
-+		return `${this.#ruleSegment(horizontal, 3, 0, width)}${fitted}${this.#ruleSegment(horizontal, rest, offset, width)}`;
- 	}
-+
-+	#ruleSegment(horizontal: string, width: number, offset: number, totalWidth: number): string {
-+		const decoration =
-+			this.#decorate && typeof theme !== "undefined" ? theme.renderRule(horizontal, width, offset, totalWidth) : undefined;
-+		return decoration ?? this.#color(horizontal.repeat(width));
-+	}
- }
-diff --git a/packages/tui/src/render/output-block.ts b/packages/tui/src/render/output-block.ts
---- a/packages/tui/src/render/output-block.ts
-+++ b/packages/tui/src/render/output-block.ts
-@@ -182,6 +182,14 @@
- 
- 	const H = rows.length;
- 
-+	const fillRule = (count: number, offset: number): string => {
-+		if (state !== "error" && state !== "warning" && options.borderColor === undefined) {
-+			const decoration = theme.renderRule(h, count, offset, lineWidth);
-+			if (decoration !== undefined) return decoration;
-+		}
-+		return border(h.repeat(count));
-+	};
-+
- 	const renderBar = (row: { leftChar: string; rightChar: string; label?: string; meta?: string }): string => {
- 		const leftGlyphs = `${row.leftChar}${cap}`;
- 		const rightGlyph = row.rightChar;
-@@ -190,7 +198,7 @@
- 		if (!labelText) {
- 			// No header: draw a clean, continuous top/separator bar (no 1-col gap).
- 			const fillCount = Math.max(0, lineWidth - visibleWidth(leftGlyphs) - visibleWidth(rightGlyph));
--			return `${border(leftGlyphs)}${border(h.repeat(fillCount))}${border(rightGlyph)}`;
-+			return `${border(leftGlyphs)}${fillRule(fillCount, visibleWidth(leftGlyphs))}${border(rightGlyph)}`;
+@@ -151,7 +154,11 @@
+ 			const value = declared[key as keyof typeof declared];
+ 			if (value !== undefined) colors[key] = resolveColorValue(value, vars);
  		}
- 		const rawLabel = ` ${labelText} `;
- 		const leftWidth = visibleWidth(leftGlyphs);
-@@ -199,8 +207,7 @@
- 		const trimmedLabel = truncateToWidth(rawLabel, maxLabelWidth);
- 		const labelWidth = visibleWidth(trimmedLabel);
- 		const fillCount = Math.max(0, lineWidth - leftWidth - labelWidth - rightWidth);
--		const fillGlyphs = h.repeat(fillCount);
--		return `${border(leftGlyphs)}${trimmedLabel}${border(fillGlyphs)}${border(rightGlyph)}`;
-+		return `${border(leftGlyphs)}${trimmedLabel}${fillRule(fillCount, leftWidth + labelWidth)}${border(rightGlyph)}`;
- 	};
+-		const light = isLightColor(colors.statusLineBg);
++		const background = json.terminal?.background;
++		const status = colors.statusLineBg === "" && background !== undefined
++			? resolveColorValue(background, vars)
++			: colors.statusLineBg;
++		const light = status === "" && options.terminalDark !== undefined ? !options.terminalDark : isLightColor(status);
+ 		const ansi = json.terminal?.ansi?.map(value => resolveColorValue(value, vars));
+ 		if (options.colorBlindMode) {
+ 			const added = colors.toolDiffAdded;
+@@ -197,6 +204,10 @@
+ 		});
+ 	}
  
- 	const renderContent = (inner: string): string =>
++	renderRule(glyph: string, width: number, offset = 0, totalWidth = width): string | undefined {
++		return renderThemeRule(this.json, this.depth, glyph, width, offset, totalWidth);
++	}
++
+ 	/** Foreground SGR of a color key; throws for unknown keys. */
+ 	fgSgr(color: string): string {
+ 		const sgr = this.#fg[color];
+diff --git a/packages/tui/src/theme/contract.ts b/packages/tui/src/theme/contract.ts
+--- a/packages/tui/src/theme/contract.ts
++++ b/packages/tui/src/theme/contract.ts
+@@ -69,5 +69,7 @@
+ 	fgSgr(color: string): string;
+ 	/** Hex a color key stands for (gradients, accent blends); throws for unknown keys. */
+ 	hex(color: string): string;
++	/** Optional decorative foreground for a span of a rule; not used for semantic borders. */
++	renderRule?(glyph: string, width: number, offset?: number, totalWidth?: number): string | undefined;
+ 	readonly symbols: SymbolSet;
+ }
+diff --git a/packages/tui/src/term/painters/layout.ts b/packages/tui/src/term/painters/layout.ts
+--- a/packages/tui/src/term/painters/layout.ts
++++ b/packages/tui/src/term/painters/layout.ts
+@@ -176,13 +176,14 @@
+ 	const theme = cx.theme;
+ 	const line = theme.symbols.box.horizontal;
+ 	const text = styledText(theme, label);
+-	if (!text) return { rows: [theme.fg("border", line.repeat(cx.width))] };
+-	const lead = line.repeat(3);
+-	const room = cx.width - 5;
+-	if (room < 1) return { rows: [theme.fg("border", line.repeat(cx.width))] };
++	const width = cx.width;
++	const rule = (count: number, offset = 0): string =>
++		theme.renderRule?.(line, count, offset, width) ?? theme.fg("border", line.repeat(count));
++	const room = width - 5;
++	if (!text || room < 1) return { rows: [rule(width)] };
+ 	const fitted = ` ${truncate(text, room)} `;
+-	const rest = Math.max(0, cx.width - 3 - visibleWidth(fitted));
+-	return { rows: [`${theme.fg("border", lead)}${fitted}${theme.fg("border", line.repeat(rest))}`] };
++	const offset = 3 + visibleWidth(fitted);
++	return { rows: [`${rule(3)}${fitted}${rule(Math.max(0, width - offset), offset)}`] };
+ }
+ 
+ interface TextProps {
+diff --git a/packages/coding-agent/src/ui/styles/composer/shapes.ts b/packages/coding-agent/src/ui/styles/composer/shapes.ts
+--- a/packages/coding-agent/src/ui/styles/composer/shapes.ts
++++ b/packages/coding-agent/src/ui/styles/composer/shapes.ts
+@@ -262,7 +262,7 @@
+ 	sideBorders: false,
+ 	paddingX: 1,
+ 	sideWidth: paddingX => paddingX,
+-	top: fullRule,
++	top: cx => cx.theme.renderRule?.(cx.box.horizontal, cx.width) ?? fullRule(cx),
+ 	row: cx => [" ".repeat(cx.paddingX) + cx.gutter + cx.text + cx.pad],
+ 	bottom: fullRule,
+ };
+diff --git a/packages/coding-agent/src/ui/styles/tools/frame.ts b/packages/coding-agent/src/ui/styles/tools/frame.ts
+--- a/packages/coding-agent/src/ui/styles/tools/frame.ts
++++ b/packages/coding-agent/src/ui/styles/tools/frame.ts
+@@ -54,17 +54,21 @@
+ 	right: string,
+ 	text: string | undefined,
+ 	border = "dim",
++	decorate = true,
+ ): string {
+ 	const line = theme.symbols.box.horizontal;
+-	const lead = `${left}${line.repeat(LEAD)}`;
+-	const leadWidth = visibleWidth(lead);
++	const leftWidth = visibleWidth(left);
+ 	const rightWidth = visibleWidth(right);
+-	if (!text) {
+-		return `${theme.fg(border, lead)}${theme.fg(border, line.repeat(Math.max(0, width - leadWidth - rightWidth)))}${theme.fg(border, right)}`;
+-	}
+-	const label = truncate(` ${text} `, Math.max(0, width - leadWidth - rightWidth));
+-	const fill = Math.max(0, width - leadWidth - visibleWidth(label) - rightWidth);
+-	return `${theme.fg(border, lead)}${label}${theme.fg(border, line.repeat(fill))}${theme.fg(border, right)}`;
++	const ribbon = decorate && (border === "dim" || border === "borderMuted" || border === "border");
++	const rule = (count: number, offset: number) =>
++		(ribbon ? theme.renderRule?.(line, count, offset, width) : undefined) ?? theme.fg(border, line.repeat(count));
++	const room = Math.max(0, width - leftWidth - rightWidth);
++	const start = theme.fg(border, left);
++	const end = theme.fg(border, right);
++	if (!text || room <= LEAD) return `${start}${rule(room, leftWidth)}${end}`;
++	const label = truncate(` ${text} `, room - LEAD);
++	const offset = leftWidth + LEAD + visibleWidth(label);
++	return `${start}${rule(LEAD, leftWidth)}${label}${rule(Math.max(0, width - offset - rightWidth), offset)}${end}`;
+ }
+ 
+ /** A content row: `│ ` + row padded to the inner width + ` │`. */
+@@ -115,7 +119,7 @@
+ 		visibleWidth(` ${foot} `) <= width - visibleWidth(`${box.bottomLeft}${box.horizontal.repeat(LEAD)}`) - 1;
+ 	if (foot !== undefined && !footFits)
+ 		for (const wrapped of wrap(foot, Math.max(1, inner))) push(frameRow(theme, width, wrapped, border));
+-	push(edgeRow(theme, width, box.bottomLeft, box.bottomRight, footFits ? foot : undefined, border));
++	push(edgeRow(theme, width, box.bottomLeft, box.bottomRight, footFits ? foot : undefined, border, false));
+ 	if (rowTags) rowTags.push(...tags);
+ 	return rows.map((row, index) =>
+ 		fillRow(
+diff --git a/packages/coding-agent/src/ui/styles/messages/divider.ts b/packages/coding-agent/src/ui/styles/messages/divider.ts
+--- a/packages/coding-agent/src/ui/styles/messages/divider.ts
++++ b/packages/coding-agent/src/ui/styles/messages/divider.ts
+@@ -31,7 +31,9 @@
+ 	const rule = Math.min(term.ruleWidth ?? 10, cx.width - visibleWidth(label) - 1);
+ 	// A label that runs past the width is cut there either way: rows never exceed it.
+ 	if (rule < 1) return truncate(painted, cx.width);
+-	return `${theme.fg(term.ruleColor ?? "dim", theme.symbols.box.horizontal.repeat(rule))} ${painted}`;
++	const line = theme.symbols.box.horizontal;
++	const decoration = term.ruleColor === undefined ? theme.renderRule?.(line, rule) : undefined;
++	return `${decoration ?? theme.fg(term.ruleColor ?? "dim", line.repeat(rule))} ${painted}`;
+ }
+ 
+ function paintDivider(node: UiNode, cx: PaintContext): Block {
+diff --git a/packages/tui/src/theme/runtime.ts b/packages/tui/src/theme/runtime.ts
+--- a/packages/tui/src/theme/runtime.ts
++++ b/packages/tui/src/theme/runtime.ts
+@@ -109,7 +109,12 @@
+ 	}
+ 
+ 	get options(): ThemeOptions {
+-		return { depth: this.#depth, symbolPreset: this.#symbolPreset, colorBlindMode: this.#colorBlindMode };
++		return {
++			depth: this.#depth,
++			symbolPreset: this.#symbolPreset,
++			colorBlindMode: this.#colorBlindMode,
++			terminalDark: this.#appearance === "dark",
++		};
+ 	}
+ 
+ 	#autoName(): string {
+@@ -140,7 +145,9 @@
+ 	#absorb(capabilities: Pick<TerminalCapabilities, "truecolor" | "colors" | "dark">): boolean {
+ 		const depth = depthOf(capabilities);
+ 		const appearance = capabilities.dark ? "dark" : "light";
+-		const changed = depth !== this.#depth || (this.#auto && appearance !== this.#appearance);
++		const background = currentTheme().json;
++		const transparent = background.colors.statusLineBg === "" && !background.terminal?.background;
++		const changed = depth !== this.#depth || ((this.#auto || transparent) && appearance !== this.#appearance);
+ 		this.#depth = depth;
+ 		this.#appearance = appearance;
+ 		return changed;

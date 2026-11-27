@@ -1,7 +1,7 @@
 diff --git a/packages/coding-agent/src/modes/rpc/rpc-goal.ts b/packages/coding-agent/src/modes/rpc/rpc-goal.ts
 --- a/packages/coding-agent/src/modes/rpc/rpc-goal.ts
 +++ b/packages/coding-agent/src/modes/rpc/rpc-goal.ts
-@@ -228,6 +228,82 @@
+@@ -229,6 +229,82 @@
  		}
  	}
  
@@ -87,7 +87,7 @@ diff --git a/packages/coding-agent/src/modes/rpc/rpc-goal.ts b/packages/coding-a
 diff --git a/packages/coding-agent/src/modes/rpc/rpc-mode.ts b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
 --- a/packages/coding-agent/src/modes/rpc/rpc-mode.ts
 +++ b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
-@@ -2149,6 +2149,7 @@
+@@ -2140,6 +2140,7 @@
  					settings: session.settings,
  					cwd: session.sessionManager.getCwd(),
  					output: commandOutput => output({ type: "command_output", text: commandOutput }),
@@ -98,7 +98,7 @@ diff --git a/packages/coding-agent/src/modes/rpc/rpc-mode.ts b/packages/coding-a
 diff --git a/packages/coding-agent/src/slash-commands/builtin-modes.ts b/packages/coding-agent/src/slash-commands/builtin-modes.ts
 --- a/packages/coding-agent/src/slash-commands/builtin-modes.ts
 +++ b/packages/coding-agent/src/slash-commands/builtin-modes.ts
-@@ -335,6 +335,8 @@
+@@ -340,6 +340,8 @@
  		name: "goal",
  		icon: "goal",
  		description: "Toggle goal mode (persistent autonomous objective for this session)",
@@ -107,7 +107,7 @@ diff --git a/packages/coding-agent/src/slash-commands/builtin-modes.ts b/package
  		subcommands: [
  			{ name: "set", description: "Set or replace the goal", usage: "<objective>" },
  			{ name: "show", description: "Show current goal details" },
-@@ -351,6 +353,10 @@
+@@ -356,6 +358,10 @@
  			const state = runtime.ctx.session.getGoalModeState();
  			return state ? `Goal: ${state.goal.status} (${shortDetail(state.goal.objective)})` : "Goal: off";
  		},

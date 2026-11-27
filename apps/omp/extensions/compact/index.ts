@@ -1,23 +1,15 @@
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import { todoMatchesAnyDescription } from "@oh-my-pi/pi-coding-agent/tools/details/todo";
 import {
   getLiveHudTodoDescriptions,
   setLiveHudRenderer,
-} from "@oh-my-pi/pi-tui/chrome/live-hud";
-import { TruncatedText } from "@oh-my-pi/pi-tui/components/truncated-text";
-import { node } from "@oh-my-pi/pi-tui/native/describe";
-import { OwnerMemo } from "@oh-my-pi/pi-tui/native/memo";
-import { renderStatusLine } from "@oh-my-pi/pi-tui/render";
-import { setStatusLinePresentation } from "@oh-my-pi/pi-tui/status-line/presentation";
-import { toolRenderers } from "@oh-my-pi/pi-tui/tools";
-import { createEvalRenderer } from "@oh-my-pi/pi-tui/tools/eval";
-import type { NativeToolView } from "@oh-my-pi/pi-tui/tools/renderer";
-import {
-  todoMatchesAnyDescription,
-  todoToolRenderer,
-} from "@oh-my-pi/pi-tui/tools/todo";
+} from "@oh-my-pi/pi-coding-agent/ui/dock/live-hud";
+import { setStatusLinePresentation } from "@oh-my-pi/pi-coding-agent/ui/status/presentation";
+import { createEvalRenderer } from "@oh-my-pi/pi-coding-agent/ui/tools/eval";
+import { registerToolPresenter } from "@oh-my-pi/pi-coding-agent/ui/tools/registry";
+import { todoPresenter } from "@oh-my-pi/pi-coding-agent/ui/tools/todo";
 import { compactStatusLine } from "../../lib/compact/billing";
 import { compactEvalHistory } from "../../lib/compact/eval-history";
-import { installCompactFooterSegments } from "../../lib/compact/footer";
 import { compactLiveHudRenderer } from "../../lib/compact/hud";
 import { queuedScriptRenderer } from "../../lib/compact/queued-script";
 import {
@@ -25,67 +17,30 @@ import {
   installCompactRendererPolicies,
 } from "../../lib/compact/renderers";
 import { installCompactRibbon } from "../../lib/compact/ribbon";
-import { checklistWithNotes, summarizeTodos } from "../../lib/todo/summary";
+import { summarizeTodos } from "../../lib/todo/summary";
 
-const nativeTodo = new OwnerMemo<NativeToolView | undefined>();
-
-const compactTodoRenderer = {
-  ...todoToolRenderer,
-  renderResult(result, options, theme, args) {
-    const phases = result.details?.phases ?? [];
-    if (
-      result.isError ||
-      options.expanded ||
-      !phases.some((phase) => phase.tasks.length)
-    )
-      return todoToolRenderer.renderResult(result, options, theme, args);
+const compactTodoPresenter: typeof todoPresenter = {
+  ...todoPresenter,
+  result(result, state, args) {
+    const stock = todoPresenter.result?.(result, state, args);
+    if (state.expanded || result.isError) return stock;
+    const phases = result.details?.phases;
+    if (!phases?.some((phase) => phase.tasks.length > 0)) return stock;
     const descriptions = getLiveHudTodoDescriptions();
     const summary = summarizeTodos(phases, (task) =>
       todoMatchesAnyDescription(task.content, descriptions),
     );
-    const meta = [`${summary.closed}/${summary.total} done`];
-    if (summary.current) meta.push(summary.current);
-    return new TruncatedText(
-      renderStatusLine(
-        {
-          iconOverride: theme.styledSymbol("tool.todo", "accent"),
-          title: "Todo",
-          meta,
-        },
-        theme,
-      ),
-    );
+    const progress = `${summary.closed}/${summary.total}`;
+    return {
+      ...stock,
+      open: false,
+      term: {
+        compactSummary: `${progress} done${summary.current ? ` · ${summary.current}` : ""}`,
+        margin: false,
+      },
+    };
   },
-  describeResult(result, options) {
-    return nativeTodo.get(result, [options.expanded], () => {
-      if (result.isError) return todoToolRenderer.describeResult(result, options);
-      const phases = (result.details?.phases ?? []).filter(
-        (phase) => phase.tasks.length > 0,
-      );
-      if (phases.length === 0) return todoToolRenderer.describeResult(result, options);
-      const { closed, total } = summarizeTodos(phases);
-      const tool = {
-        title: "Todo",
-        target: `${closed}/${total}`,
-        targetKind: "text",
-      } as const;
-      if (!options.expanded) return { tool, preview: "none", open: false };
-      return {
-        tool,
-        body: [
-          node(
-            "checklist",
-            { mode: "full", phases: checklistWithNotes(phases) },
-            [],
-            "checklist",
-          ),
-        ],
-        preview: "none",
-        open: true,
-      };
-    });
-  },
-} satisfies typeof todoToolRenderer;
+};
 
 const compactEvalRenderer = createEvalRenderer(
   compactEvalHistory,
@@ -94,13 +49,11 @@ const compactEvalRenderer = createEvalRenderer(
 
 export default function compact(_api: ExtensionAPI) {
   // Host registries are process-wide, just like the replaced policy
-  // Rebinding a child installs the same objects, never another wrapper
-  installCompactFooterSegments();
   setStatusLinePresentation(compactStatusLine);
   setLiveHudRenderer(compactLiveHudRenderer);
   installCompactRibbon();
   installCompactRendererPolicies();
-  toolRenderers.todo = compactTodoRenderer;
-  toolRenderers.eval = compactEvalRenderer;
-  toolRenderers["tool-command:queued"] = queuedScriptRenderer;
+  registerToolPresenter("todo", compactTodoPresenter);
+  registerToolPresenter("eval", compactEvalRenderer);
+  registerToolPresenter("tool-command:queued", queuedScriptRenderer);
 }

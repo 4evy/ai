@@ -1,7 +1,7 @@
 diff --git a/packages/coding-agent/src/modes/controllers/todo-command-controller.ts b/packages/coding-agent/src/modes/controllers/todo-command-controller.ts
 --- a/packages/coding-agent/src/modes/controllers/todo-command-controller.ts
 +++ b/packages/coding-agent/src/modes/controllers/todo-command-controller.ts
-@@ -17,7 +17,7 @@
+@@ -24,7 +24,7 @@
  	"  /todo edit                         Open todos in $EDITOR",
  	"  /todo copy                         Copy todos as Markdown to clipboard",
  	"  /todo expand                       Show every phase and task in the HUD",
@@ -10,184 +10,10 @@ diff --git a/packages/coding-agent/src/modes/controllers/todo-command-controller
  	"  /todo export [<path>]              Write todos to file (default: TODO.md)",
  	"  /todo import [<path>]              Replace todos from file (default: TODO.md)",
  	"  /todo append [<phase>] <task...>   Append a task; phase fuzzy-matched or auto-created",
-diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/coding-agent/src/modes/interactive-mode.ts
---- a/packages/coding-agent/src/modes/interactive-mode.ts
-+++ b/packages/coding-agent/src/modes/interactive-mode.ts
-@@ -242,6 +242,13 @@
- 	setActiveTodoDescriptionsProvider,
- 	todoMatchesAnyDescription,
- } from "@oh-my-pi/pi-tui/tools/todo";
-+import {
-+	bindLiveHudTodoDescriptions,
-+	getLiveHudTodoDescriptions,
-+	getLiveHudRenderer,
-+	onLiveHudRendererChange,
-+	type LiveHudState,
-+} from "@oh-my-pi/pi-tui/chrome/live-hud";
- import { vocalizer } from "../tts/vocalizer";
- import { applyFileLinkSetting, applyHyperlinkSetting, fileHyperlink } from "@oh-my-pi/pi-tui/render/hyperlink";
- import {
-@@ -1199,7 +1206,7 @@
-  * rows and hit-testing can never disagree.
-  */
- export function layoutPinnedHud(runningTotal: number, expanded: boolean): PinnedHudLayout {
--	if (runningTotal <= SUBAGENT_HUD_COLLAPSED_LIMIT) {
-+	if (runningTotal <= SUBAGENT_HUD_COLLAPSED_LIMIT && !expanded) {
- 		return { itemRows: runningTotal, toggle: undefined, toggleRow: undefined };
- 	}
- 	if (!expanded) {
-@@ -1593,6 +1600,7 @@
- 	/** Band composer: the status band hides `session_name`, so the title docks
- 	 * onto the working row instead — right-aligned, dim, italic. */
- 	#workingTitleTrailer(): string | undefined {
-+		if (getLiveHudRenderer()?.showWorkingTitle === false) return undefined;
- 		if (cfgComposerShape.get(settings) !== "band") return undefined;
- 		const name = this.sessionManager.getSessionName();
- 		if (!name) return undefined;
-@@ -2165,12 +2173,12 @@
- 		return this.composer.viewportClickCandidates(index);
- 	}
- 
--	/** Flip the pinned jump list between its collapsed few and the full list, overriding the setting. */
-+	/** Toggle the full pinned jump list, overriding its configured density */
- 	togglePinnedHudExpanded(): void {
- 		const mode = cfgDisplayPinnedAgents.get(settings);
- 		const expanded = this.#pinnedHudOverride ?? mode === "full";
- 		this.#pinnedHudOverride = !expanded;
--		this.#renderSubagentList();
-+		this.#renderTodoList();
- 		this.ui.requestRender();
- 	}
- 
-@@ -2179,7 +2187,7 @@
- 		// An explicit settings change wins over click state: without the reset,
- 		// reselecting the current value would keep showing the old override.
- 		this.#pinnedHudOverride = undefined;
--		this.#renderSubagentList();
-+		this.#renderTodoList();
- 		this.ui.requestRender();
- 	}
- 
-@@ -2457,6 +2465,13 @@
- 		this.statusContainer = new StatusHudContainer(this);
- 		this.todoContainer = new TodoHudContainer(this);
- 		this.subagentContainer = new AnchoredLiveContainer();
-+		this.#eventBusUnsubscribers.push(
-+			onLiveHudRendererChange(() => {
-+				this.#subagentHudKey = "";
-+				this.#renderTodoList();
-+				this.ui.requestRender();
-+			}),
-+		);
- 		this.btwContainer = new AnchoredLiveContainer();
- 		this.omfgContainer = new AnchoredLiveContainer();
- 		this.cleanseContainer = new AnchoredLiveContainer();
-@@ -2901,7 +2916,8 @@
- 		);
- 		// Let the transient todo tool result light up pending todos executed by a
- 		// live subagent, matching the sticky HUD's active set (#5873).
--		setActiveTodoDescriptionsProvider(() => this.#getActiveSubagentDescriptions());
-+		this.#eventBusUnsubscribers.push(bindLiveHudTodoDescriptions(() => this.#getActiveSubagentDescriptions()));
-+		setActiveTodoDescriptionsProvider(getLiveHudTodoDescriptions);
- 
- 		// Load initial todos
- 		await logger.time("InteractiveMode.init:todos", () => this.#loadTodoList());
-@@ -5468,14 +5484,43 @@
- 		this.#cancelSubagentPreviewTick();
- 	}
- 
-+	#liveHudState(): LiveHudState {
-+		const mode = cfgDisplayPinnedAgents.get(settings);
-+		return {
-+			phases: this.todoPhases,
-+			activeDescriptions: this.#getActiveSubagentDescriptions(),
-+			sessions: this.#observerRegistry.getSessions(),
-+			todoHidden: this.#todoHudHidden,
-+			todoExpanded: this.todoExpanded,
-+			agentsMode: mode,
-+			agentsExpanded: this.#pinnedHudOverride ?? mode === "full",
-+			shortcuts: {
-+				agentsHub: appKey(this.keybindings, "app.agents.hub") || appKey(this.keybindings, "app.session.observe"),
-+			},
-+		};
-+	}
-+
- 	#renderTodoList(): void {
- 		this.todoContainer.clear();
- 		this.#todoHudNative = undefined;
- 		const activeDescs = this.#getActiveSubagentDescriptions();
- 		this.#todoHudSubagentKey = activeDescs.join("\n");
--		if (this.#todoHudHidden) return;
-+		if (this.#todoHudHidden) {
-+			this.#renderSubagentList(true);
-+			return;
-+		}
- 		const phases = this.todoPhases.filter(phase => phase.tasks.length > 0);
--		if (phases.length === 0) return;
-+		if (phases.length === 0) {
-+			this.#renderSubagentList(true);
-+			return;
-+		}
-+		const hud = getLiveHudRenderer()?.renderTodo?.(this.#liveHudState());
-+		if (hud) {
-+			this.todoContainer.addChild(hud.component);
-+			this.#todoHudNative = hud.native;
-+			this.#renderSubagentList(true);
-+			return;
-+		}
- 		const expanded = this.todoExpanded;
- 		const multiPhase = phases.length > 1;
- 		const activeIdx = phases.indexOf(this.#getActivePhase(phases) ?? phases[0]);
-@@ -5703,9 +5748,11 @@
- 			),
- 			fallback,
- 		};
-+		this.#renderSubagentList(true);
- 	}
- 
- 	isCompactTodoMode(): boolean {
-+		if (getLiveHudRenderer()?.compactTodoInStatus === false) return false;
- 		const rows = this.ui?.terminal?.rows ?? process.stdout.rows ?? 24;
- 		return rows < TODO_COMPACT_TERMINAL_ROWS_THRESHOLD;
- 	}
-@@ -5818,8 +5865,20 @@
- 	 * appear and advance, so a repaint is armed for when the marker first shows
- 	 * and then once a second while a listed agent stays mid-call.
- 	 */
--	#renderSubagentList(): boolean {
-+	#renderSubagentList(todoRendered = false): boolean {
- 		this.#cancelSubagentPreviewTick();
-+		const presentation = getLiveHudRenderer()?.renderSubagents?.(this.#liveHudState());
-+		if (presentation) {
-+			if (presentation.key === this.#subagentHudKey) return false;
-+			this.#subagentHudKey = presentation.key;
-+			if (presentation.mergedWithTodo && !todoRendered) {
-+				this.#renderTodoList();
-+				return true;
-+			}
-+			this.subagentContainer.clear();
-+			if (!presentation.mergedWithTodo && presentation.component) this.subagentContainer.addChild(presentation.component);
-+			return true;
-+		}
- 		const view = this.#buildSubagentHudView();
- 		if (!view) {
- 			const changed = this.subagentContainer.children.length > 0;
-@@ -5833,7 +5892,10 @@
- 		this.#subagentHudKey = key;
- 		const hud = this.subagentContainer.children[0];
- 		if (hud instanceof SubagentHudComponent) hud.update(view.lines, view.order, view.toggleRow);
--		else this.subagentContainer.addChild(new SubagentHudComponent(view.lines, view.order, view.toggleRow));
-+		else {
-+			this.subagentContainer.clear();
-+			this.subagentContainer.addChild(new SubagentHudComponent(view.lines, view.order, view.toggleRow));
-+		}
- 		return true;
- 	}
- 
 diff --git a/packages/coding-agent/src/modes/settings.ts b/packages/coding-agent/src/modes/settings.ts
 --- a/packages/coding-agent/src/modes/settings.ts
 +++ b/packages/coding-agent/src/modes/settings.ts
-@@ -735,10 +735,10 @@
+@@ -729,10 +729,10 @@
  		group: "Display",
  		label: "Pinned Agents",
  		description:
@@ -200,3 +26,265 @@ diff --git a/packages/coding-agent/src/modes/settings.ts b/packages/coding-agent
  			{ value: "full", label: "Full", description: "Always list every live agent" },
  		],
  	},
+diff --git a/packages/coding-agent/src/modes/interactive-mode.ts b/packages/coding-agent/src/modes/interactive-mode.ts
+--- a/packages/coding-agent/src/modes/interactive-mode.ts
++++ b/packages/coding-agent/src/modes/interactive-mode.ts
+@@ -407,6 +407,7 @@
+ import type { DialogVim } from "../ui/composer/vim-editor";
+ import { enabledMagicKeywords } from "../ui/composer/magic-keywords";
+ import { deferredMaxRows, subagentEntries, TODO_COMPACT_ROWS, type WorkingSpec } from "../ui/dock";
++import { getLiveHudRenderer } from "../ui/dock/live-hud";
+ import { CodexResetFireworks, FIREWORKS_SHEET } from "../ui/overlays/panels/codex-reset-fireworks";
+ import { ErrorBanner } from "../ui/overlays/panels/error-banner";
+ import { PlanReview, planReviewSheet } from "../ui/overlays/panels/plan-review";
+@@ -840,6 +841,7 @@
+ 	 * instead: faint and italic, behind an accent pin.
+ 	 */
+ 	#workingTitleTrailer(): string | undefined {
++		if (getLiveHudRenderer()?.showWorkingTitle === false) return undefined;
+ 		if (cfgComposerShape.get(settings) !== "band") return undefined;
+ 		const name = this.sessionManager.getSessionName();
+ 		if (!name) return undefined;
+@@ -4237,15 +4239,21 @@
+ 	#renderSubagentList(): void {
+ 		const hud = this.hud.subagents;
+ 		const mode = cfgDisplayPinnedAgents.get(settings);
+-		const entries =
+-			mode === "off"
+-				? []
+-				: subagentEntries(this.#observerRegistry.getSessions(), cfgTaskShowResolvedModelBadge.get(settings));
++		const sessions = this.#observerRegistry.getSessions();
++		const expanded = this.#pinnedHudOverride ?? mode === "full";
++		const hubKey = actionKey("app.agents.hub", this.keybindings);
++		const entries = mode === "off" ? [] : subagentEntries(sessions, cfgTaskShowResolvedModelBadge.get(settings));
+ 		batch(() => {
+ 			hud.entries.set(entries);
+-			hud.expanded.set(this.#pinnedHudOverride ?? mode === "full");
++			hud.expanded.set(expanded);
+ 			hud.livePreview.set(cfgDisplaySubagentLivePreview.get(settings) && !agentPauseGate.paused);
+-			hud.hubKey.set(actionKey("app.agents.hub", this.keybindings) || undefined);
++			hud.hubKey.set(hubKey || undefined);
++			this.hud.todo.liveAgents.set({
++				sessions,
++				agentsMode: mode,
++				agentsExpanded: expanded,
++				agentsHubKey: hubKey || actionKey("app.session.observe", this.keybindings),
++			});
+ 		});
+ 	}
+ 
+diff --git a/packages/coding-agent/src/modes/interactive/frame.tsx b/packages/coding-agent/src/modes/interactive/frame.tsx
+--- a/packages/coding-agent/src/modes/interactive/frame.tsx
++++ b/packages/coding-agent/src/modes/interactive/frame.tsx
+@@ -404,7 +404,10 @@
+ 		dock.slot("pendingShell").set(() => <PendingShellRuns runs={this.pendingShellRuns} />);
+ 		dock.slot("pendingMessages").set(() => <QueuedMessages model={hud.queue} />);
+ 		dock.slot("todo").set(() => <TodoHud model={hud.todo} />);
+-		dock.slot("subagents").set(() => <SubagentHud model={hud.subagents} />);
++		dock.slot("subagents").set(() => {
++			const custom = hud.todo.presentation()?.subagents;
++			return custom === undefined ? <SubagentHud model={hud.subagents} /> : custom;
++		});
+ 		dock.slot("modelCycle").set(() => <ModelCycleTrack model={hud.modelCycle} />);
+ 		dock.slot("deferredCommand").set(() => <DeferredCommand model={hud.deferred} />);
+ 		dock.slot("progress").set(() => <ProgressHud model={hud.progress} />);
+diff --git a/packages/coding-agent/src/ui/dock/todo.tsx b/packages/coding-agent/src/ui/dock/todo.tsx
+--- a/packages/coding-agent/src/ui/dock/todo.tsx
++++ b/packages/coding-agent/src/ui/dock/todo.tsx
+@@ -28,6 +28,7 @@
+ } from "../../tools/details/todo";
+ import { formatMoreItems } from "../../utils/render-utils";
+ import "../styles/dock";
++import { getLiveHudRenderer, type LiveHudAgents } from "./live-hud";
+ 
+ /** Stages shown after the active one while collapsed. */
+ const FOLLOWING_STAGES = 4;
+@@ -48,6 +49,22 @@
+ 	readonly compact = signal(false);
+ 	/** Descriptions of the running subagents: a pending task they match lights up. */
+ 	readonly descriptions = signal<readonly string[]>([]);
++	readonly liveAgents = signal<LiveHudAgents | undefined>(undefined);
++
++	readonly foldIntoStatus = computed(() => this.compact() && getLiveHudRenderer()?.compactTodoInStatus !== false);
++
++	readonly presentation = computed(() => {
++		const renderer = getLiveHudRenderer();
++		const agents = this.liveAgents();
++		if (!renderer || !agents) return undefined;
++		return renderer.render({
++			...agents,
++			phases: this.phases(),
++			activeDescriptions: this.descriptions(),
++			todoHidden: this.hidden(),
++			todoExpanded: this.expanded(),
++		});
++	});
+ 
+ 	/** The window to show, or undefined while hidden or empty (reactive). */
+ 	readonly window: Accessor<TodoWindow | undefined> = computed(() =>
+@@ -233,6 +250,8 @@
+ export function TodoHud(props: { readonly model: TodoHudModel }): JSXNode {
+ 	const model = props.model;
+ 	return () => {
++		const custom = model.presentation()?.todo;
++		if (custom !== undefined) return custom;
+ 		const view = model.window();
+ 		if (!view) return undefined;
+ 		return (
+@@ -251,6 +270,8 @@
+ export function TodoChecklist(props: { readonly model: TodoHudModel }): JSXNode {
+ 	const model = props.model;
+ 	return () => {
++		const custom = model.presentation()?.checklist;
++		if (custom !== undefined) return custom;
+ 		const view = model.window();
+ 		if (!view) return undefined;
+ 		return <checklist key="todo" phases={todoChecklistPhases(view)} mode="hud" role="omp.hud.todo" />;
+diff --git a/packages/coding-agent/src/ui/dock/subagents.tsx b/packages/coding-agent/src/ui/dock/subagents.tsx
+--- a/packages/coding-agent/src/ui/dock/subagents.tsx
++++ b/packages/coding-agent/src/ui/dock/subagents.tsx
+@@ -88,7 +88,7 @@
+ 	readonly items: number;
+ 	readonly toggle: "expand" | "collapse" | undefined;
+ } {
+-	if (running <= SUBAGENT_HUD_COLLAPSED) return { items: running, toggle: undefined };
++	if (running <= SUBAGENT_HUD_COLLAPSED && !expanded) return { items: running, toggle: undefined };
+ 	return expanded ? { items: running, toggle: "collapse" } : { items: SUBAGENT_HUD_COLLAPSED, toggle: "expand" };
+ }
+ 
+diff --git a/packages/coding-agent/src/ui/tools/todo.tsx b/packages/coding-agent/src/ui/tools/todo.tsx
+--- a/packages/coding-agent/src/ui/tools/todo.tsx
++++ b/packages/coding-agent/src/ui/tools/todo.tsx
+@@ -12,9 +12,9 @@
+  * While collapsed, a pending task a running subagent's description matches reads as active
+  * ({@link setActiveTodoDescriptions}), as the dock's todo HUD lights it.
+  */
+-import { signal } from "@oh-my-pi/pi-tui";
+ import type { TspChecklistItem, TspChecklistPhase } from "@oh-my-pi/pi-wire";
+ import { todoMatchesAnyDescription } from "../../tools/details/todo";
++import { getLiveHudTodoDescriptions } from "../dock/live-hud";
+ import type { ToolPresenter, ToolView } from "./contract";
+ import { cleanText, countText, ErrorText, NoteText } from "./agent-common";
+ import { resultText } from "./default";
+@@ -25,6 +25,7 @@
+ export interface TodoItem {
+ 	readonly content: string;
+ 	readonly status: TodoStatus;
++	readonly notes?: readonly string[];
+ }
+ 
+ export interface TodoPhase {
+@@ -145,15 +146,7 @@
+ 	return phases.flatMap((phase, index) => (touched.has(phase.name) ? [`p${index}`] : []));
+ }
+ 
+-/** Descriptions of the running subagents (the interactive mode feeds them; none elsewhere). */
+-const activeTodoDescriptions = signal<readonly string[]>([]);
+-
+-/** Feed the running subagents' descriptions: collapsed todo cards light the pending tasks they match. */
+-export function setActiveTodoDescriptions(descriptions: readonly string[]): void {
+-	const current = activeTodoDescriptions.peek();
+-	if (current.length === descriptions.length && current.every((text, i) => text === descriptions[i])) return;
+-	activeTodoDescriptions.set(descriptions);
+-}
++export { setLiveHudTodoDescriptions as setActiveTodoDescriptions } from "../dock/live-hud";
+ 
+ function checklistPhases(phases: readonly TodoPhase[], descriptions: readonly string[]): TspChecklistPhase[] {
+ 	const matched = (task: TodoItem): boolean =>
+@@ -161,11 +154,15 @@
+ 	return phases.map((phase, p) => ({
+ 		id: `p${p}`,
+ 		title: cleanText(phase.name),
+-		items: phase.tasks.map((task, t) => ({
+-			id: `p${p}.${t}`,
+-			text: cleanText(task.content),
+-			status: matched(task) ? "active" : STATUS[task.status],
+-		})),
++		items: phase.tasks.map((task, t) => {
++			const note = task.notes?.at(-1);
++			return {
++				id: `p${p}.${t}`,
++				text: cleanText(task.content),
++				status: matched(task) ? "active" : STATUS[task.status],
++				...(note !== undefined ? { note: cleanText(note) } : {}),
++			};
++		}),
+ 		collapsed: phase.tasks.length > 0 && phase.tasks.every(isClosed),
+ 	}));
+ }
+@@ -215,7 +212,7 @@
+ 				<checklist
+ 					key="checklist"
+ 					mode="full"
+-					phases={() => checklistPhases(phases, state.expanded ? [] : activeTodoDescriptions())}
++					phases={() => checklistPhases(phases, state.expanded ? [] : getLiveHudTodoDescriptions())}
+ 					term={{ touched: touchedPhases(args, phases, details), struck }}
+ 				/>
+ 			),
+diff --git a/packages/coding-agent/src/ui/styles/dock/status.ts b/packages/coding-agent/src/ui/styles/dock/status.ts
+--- a/packages/coding-agent/src/ui/styles/dock/status.ts
++++ b/packages/coding-agent/src/ui/styles/dock/status.ts
+@@ -38,7 +38,7 @@
+ 	const status = node.children().find(child => roleOf(child) === "omp.hud.status");
+ 	const block = status ? cx.paint(status, cx.width) : EMPTY_BLOCK;
+ 	const todo = model.todo;
+-	const view = todo?.compact() ? todo.window() : undefined;
++	const view = todo?.foldIntoStatus() ? todo.window() : undefined;
+ 	if (view) {
+ 		const lines = block.rows;
+ 		const right = todoCompactLine(cx.theme, view);
+diff --git a/packages/coding-agent/src/ui/styles/dock/todo.ts b/packages/coding-agent/src/ui/styles/dock/todo.ts
+--- a/packages/coding-agent/src/ui/styles/dock/todo.ts
++++ b/packages/coding-agent/src/ui/styles/dock/todo.ts
+@@ -148,7 +148,7 @@
+ function paintTodoHud(node: UiNode, cx: PaintContext): Block {
+ 	const model = termOf<{ todo: TodoHudModel }>(node).todo;
+ 	const view = model?.window();
+-	if (!model || !view || model.compact()) return EMPTY_BLOCK;
++	if (!model || !view || model.foldIntoStatus()) return EMPTY_BLOCK;
+ 	return { rows: todoHudRows(cx.theme, view, cx.width) };
+ }
+ 
+diff --git a/packages/coding-agent/src/ui/dock/status.tsx b/packages/coding-agent/src/ui/dock/status.tsx
+--- a/packages/coding-agent/src/ui/dock/status.tsx
++++ b/packages/coding-agent/src/ui/dock/status.tsx
+@@ -85,7 +85,7 @@
+ 	readonly occupied: Accessor<boolean> = () =>
+ 		this.current() !== undefined ||
+ 		this.idleTrailer() !== undefined ||
+-		(this.todo?.compact() === true && this.todo.window() !== undefined);
++		(this.todo?.foldIntoStatus() === true && this.todo.window() !== undefined);
+ }
+ 
+ /** See the module docs. */
+diff --git a/packages/coding-agent/src/ui/styles/tools/todo.ts b/packages/coding-agent/src/ui/styles/tools/todo.ts
+--- a/packages/coding-agent/src/ui/styles/tools/todo.ts
++++ b/packages/coding-agent/src/ui/styles/tools/todo.ts
+@@ -15,7 +15,7 @@
+ import type { Block, PaintContext } from "@oh-my-pi/pi-tui/term/paint";
+ import { branchRows, checklistItemText, isClosedItem, phaseTitleRow } from "@oh-my-pi/pi-tui/term/painters/checklist";
+ import { SPINNER_INTERVAL_MS } from "@oh-my-pi/pi-tui/term/painters/spinner";
+-import { wrap } from "@oh-my-pi/pi-tui/text/width";
++import { truncate, wrap } from "@oh-my-pi/pi-tui/text/width";
+ import type { Theme } from "@oh-my-pi/pi-tui/theme/contract";
+ import type { TspChecklistItem, TspChecklistProps } from "@oh-my-pi/pi-wire";
+ import { nodePlain, stillMark } from "./agent-common";
+@@ -31,6 +31,7 @@
+ 
+ interface TodoTerm {
+ 	readonly ops?: readonly string[];
++	readonly compactSummary?: string;
+ }
+ 
+ interface ChecklistTerm {
+@@ -185,6 +186,10 @@
+ 			rows: statusLine(theme, stillMark(theme, props), "Todo", term.ops, width),
+ 		};
+ 	const glyph = theme.fg("accent", theme.symbols.symbol("tool.todo"));
++	if (term.compactSummary) {
++		const head = `${glyph} ${theme.fg("accent", "Todo")} ${theme.fg("dim", term.compactSummary)}`;
++		return { rows: [truncate(head, width, theme.symbols.ellipsis)] };
++	}
+ 	if (!checklist) {
+ 		const note = children[0] ? `\n  ${theme.fg("dim", nodePlain(children[0]))}` : "";
+ 		return { rows: statusLine(theme, glyph, "Todo", ["0 tasks"], width, note) };

@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-import { plainToolCard } from "@oh-my-pi/pi-tui/render";
-import type { ShellRendererConfig } from "@oh-my-pi/pi-tui/tools/bash";
-import type { ToolRenderer } from "@oh-my-pi/pi-tui/tools/renderer";
+import type { ShellConfig } from "@oh-my-pi/pi-coding-agent/ui/tools/bash";
+import type { ToolPresenter } from "@oh-my-pi/pi-coding-agent/ui/tools/contract";
+import { jsx } from "@oh-my-pi/pi-tui";
 import { isRecord } from "@oh-my-pi/pi-utils";
 import type {
   JobReceipt,
@@ -11,63 +11,67 @@ import type {
 import type { JobTerminalSize } from "farstep/protocol/jobs/protocol";
 import type { JobResultOptions } from "./output";
 import { COMPLETION_TYPE } from "./records";
-import { createJobRenderer } from "./render";
+import { createJobPresenter } from "./render";
 import type { RemoteJobDetails } from "./types";
 
-export function jobPresentation(config?: ShellRendererConfig<unknown>) {
-  const renderer = createJobRenderer(
-    config ?? {
-      resolveTitle: () => "Job",
-      resolveCommand: () => undefined,
-    },
+export function jobPresentation(config?: ShellConfig<unknown>): {
+  presenter: ToolPresenter<unknown, RemoteJobDetails>;
+} {
+  const presenter = createJobPresenter(
+    config ?? { title: () => "Job", command: () => undefined, header: true },
   );
-  if (config) return renderer;
-  const target = (args: unknown) =>
-    isRecord(args)
-      ? [args.action, args.job, args.step]
-          .filter((value) => typeof value === "string")
-          .join(" ")
-      : "";
+  if (config) return { presenter };
   return {
-    ...renderer,
-    renderCall: (args, options, theme) =>
-      plainToolCard(theme, () => ({
-        status: {
-          ...(options.isPartial ? { icon: "pending" } : {}),
-          title: "Job",
-          description: target(args),
-        },
-      })),
-    describeCall: (args: unknown) => ({
-      tool: { title: "Job", target: target(args) },
-    }),
-  } satisfies ToolRenderer<unknown, RemoteJobDetails>;
+    presenter: {
+      ...presenter,
+      call(args) {
+        const target = isRecord(args)
+          ? [args.action, args.job, args.step]
+              .filter((value) => typeof value === "string")
+              .join(" ")
+          : "";
+        return { head: { title: "Job", target, targetKind: "text" } };
+      },
+    },
+  };
 }
 
 export function registerJobPresentation(api: ExtensionAPI): void {
-  const renderer = createJobRenderer({
-    resolveTitle: () => "Job completed",
-    resolveCommand: () => undefined,
+  const presenter = createJobPresenter({
+    title: () => "Job completed",
+    command: () => undefined,
+    header: true,
   });
-  api.registerMessageRenderer<RemoteJobDetails>(
-    COMPLETION_TYPE,
-    (message, options, theme) =>
-      renderer.renderResult(
-        {
-          content:
-            typeof message.content === "string"
-              ? [{ type: "text", text: message.content }]
-              : message.content,
-          ...(message.details ? { details: message.details } : {}),
-          isError:
-            message.details?.remoteState === "unknown" ||
-            (message.details?.exitCode !== undefined && message.details.exitCode !== 0),
-        },
-        { ...options, isPartial: false },
-        theme,
-        undefined,
-      ),
-  );
+  api.registerMessageRenderer<RemoteJobDetails>(COMPLETION_TYPE, (message, options) => {
+    const isError =
+      message.details?.remoteState === "unknown" ||
+      (message.details?.exitCode !== undefined && message.details.exitCode !== 0);
+    const view = presenter.result?.(
+      {
+        content:
+          typeof message.content === "string"
+            ? [{ type: "text", text: message.content }]
+            : message.content,
+        ...(message.details ? { details: message.details } : {}),
+        isError,
+      },
+      { ...options, isPartial: false, argsComplete: true, executionStarted: true },
+    );
+    if (!view) return undefined;
+    return jsx("tool", {
+      ...view.head,
+      name: "remote-job",
+      title: view.head?.title ?? "Job completed",
+      status: isError ? "error" : "success",
+      role: "omp.tool.remote-job",
+      frame: "card",
+      tone: view.tone,
+      collapsed: !options.expanded,
+      preview: view.preview,
+      term: { ...view.term, expanded: options.expanded },
+      children: view.body,
+    });
+  });
 }
 
 export function receiptStatus(receipt: Omit<JobReceipt, "snapshot" | "logs">): string {

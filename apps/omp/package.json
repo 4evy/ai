@@ -11,11 +11,11 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
-    "@oh-my-pi/pi-utils": "19.1.1",
+    "@oh-my-pi/pi-utils": "19.2.1",
     "@optique/core": "1.4.0",
     "@tailnet/tailscaled": "0.1.2",
     "valibot": "1.5.0",
-    "effect": "4.1.5",
+    "effect": "4.1.6",
     "@ai/values": "workspace:*",
     "@ai/runtime": "workspace:*",
     "@ai/toolkit": "workspace:*",
@@ -24,15 +24,15 @@
   },
   "devDependencies": {
     "@types/bun": "catalog:",
-    "puppeteer-core": "25.18.1",
+    "puppeteer-core": "25.19.0",
     "typescript": "catalog:",
     "vite": "catalog:"
   },
   "peerDependencies": {
-    "@oh-my-pi/pi-agent-core": "19.1.1",
-    "@oh-my-pi/pi-coding-agent": "19.1.1",
-    "@oh-my-pi/pi-tui": "19.1.1",
-    "@oh-my-pi/pi-wire": "19.1.1"
+    "@oh-my-pi/pi-agent-core": "19.2.1",
+    "@oh-my-pi/pi-coding-agent": "19.2.1",
+    "@oh-my-pi/pi-tui": "19.2.1",
+    "@oh-my-pi/pi-wire": "19.2.1"
   },
   "private": true,
   "type": "module",

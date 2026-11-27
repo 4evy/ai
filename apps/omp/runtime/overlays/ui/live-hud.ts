@@ -1,78 +1,55 @@
-import type { Component } from "@oh-my-pi/pi-tui";
-import type { NativeNode } from "@oh-my-pi/pi-tui/native/node";
-import type { ObservableSession } from "@oh-my-pi/pi-tui/overlays/session-observer-registry";
-import type { TodoItem } from "@oh-my-pi/pi-tui/tools/todo";
+import type { ObservableSession } from "@oh-my-pi/pi-coding-agent/task/session-observer-registry";
+import type { TodoPhase } from "@oh-my-pi/pi-coding-agent/tools/details/todo";
+import { type Accessor, type JSXNode, signal } from "@oh-my-pi/pi-tui";
 
-export interface LiveHudTodoPhase {
-  readonly name: string;
-  readonly tasks: readonly Readonly<TodoItem>[];
+export interface LiveHudAgents {
+  readonly sessions: readonly ObservableSession[];
+  readonly agentsMode: "off" | "collapsed" | "full";
+  readonly agentsExpanded: boolean;
+  readonly agentsHubKey: string;
 }
 
 /** Host snapshots for presentation only, never session mutation */
-export interface LiveHudState {
-  readonly phases: readonly LiveHudTodoPhase[];
+export interface LiveHudState extends LiveHudAgents {
+  readonly phases: readonly TodoPhase[];
   readonly activeDescriptions: readonly string[];
-  readonly sessions: readonly Readonly<ObservableSession>[];
   readonly todoHidden: boolean;
   readonly todoExpanded: boolean;
-  readonly agentsMode: "off" | "collapsed" | "full";
-  readonly agentsExpanded: boolean;
-  readonly shortcuts: {
-    readonly agentsHub: string;
-  };
 }
 
-export interface LiveTodoHud {
-  readonly component: Component;
-  readonly native: {
-    readonly checklist: NativeNode;
-    readonly fallback: NativeNode;
-  };
-}
-
-export interface LiveSubagentHud {
-  /** Stable presentation key, so unchanged observer updates need no repaint */
-  readonly key: string;
-  readonly component?: Component;
-  readonly mergedWithTodo?: boolean;
+export interface LiveHudPresentation {
+  readonly todo?: JSXNode;
+  readonly checklist?: JSXNode;
+  /** Null suppresses the stock list when the agents share the todo row */
+  readonly subagents?: Exclude<JSXNode, undefined>;
 }
 
 /** Undefined results retain the host's stock presentation */
 export interface LiveHudRenderer {
   readonly showWorkingTitle?: boolean;
   readonly compactTodoInStatus?: boolean;
-  renderTodo?(state: LiveHudState): LiveTodoHud | undefined;
-  renderSubagents?(state: LiveHudState): LiveSubagentHud | undefined;
+  render(state: LiveHudState): LiveHudPresentation | undefined;
 }
 
-let renderer: LiveHudRenderer | undefined;
-const listeners = new Set<() => void>();
+const renderer = signal<LiveHudRenderer | undefined>(undefined);
 
-const emptyDescriptions: readonly string[] = [];
-let todoDescriptions: (() => readonly string[]) | undefined;
-
-export function bindLiveHudTodoDescriptions(read: () => readonly string[]): () => void {
-  todoDescriptions = read;
-  return () => {
-    if (todoDescriptions === read) todoDescriptions = undefined;
-  };
-}
-
-export function getLiveHudTodoDescriptions(): readonly string[] {
-  return todoDescriptions?.() ?? emptyDescriptions;
-}
+export const getLiveHudRenderer: Accessor<LiveHudRenderer | undefined> = renderer;
 
 export function setLiveHudRenderer(next: LiveHudRenderer | undefined): void {
-  if (renderer === next) return;
-  renderer = next;
-  for (const listener of listeners) listener();
+  renderer.set(next);
 }
 
-export function getLiveHudRenderer(): LiveHudRenderer | undefined {
-  return renderer;
-}
+const activeDescriptions = signal<readonly string[]>([]);
 
-export function onLiveHudRendererChange(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+export const getLiveHudTodoDescriptions: Accessor<readonly string[]> =
+  activeDescriptions;
+
+export function setLiveHudTodoDescriptions(descriptions: readonly string[]): void {
+  const current = activeDescriptions.peek();
+  if (
+    current.length === descriptions.length &&
+    current.every((text, i) => text === descriptions[i])
+  )
+    return;
+  activeDescriptions.set(descriptions);
 }

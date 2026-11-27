@@ -1,1099 +1,7 @@
-diff --git a/packages/tui/src/tools/eval.ts b/packages/tui/src/tools/eval.ts
---- a/packages/tui/src/tools/eval.ts
-+++ b/packages/tui/src/tools/eval.ts
-@@ -9,7 +9,7 @@
- 	ToolRenderer,
- } from "./renderer";
- import { type TspSpan, toolIntentLabel } from "@oh-my-pi/pi-wire";
--import { code, compact, keyed, md, node, span, text } from "../native/describe";
-+import { ansi, code, compact, keyed, md, node, span, text } from "../native/describe";
- import type { NativeChild, NativeNode } from "../native/node";
- import { plainText } from "../native/spans";
- import { resultText, runBox, runFoot, type RunFootInput, runInput, runOutput, type RunState } from "./native-view";
-@@ -300,7 +300,7 @@
- 	return typeof value === "number" && Number.isFinite(value) ? value : 0;
- }
- 
--function agentEventStatus(value: unknown): AgentEventStatus {
-+export function agentEventStatus(value: unknown): AgentEventStatus {
- 	switch (value) {
- 		case "pending":
- 		case "running":
-@@ -318,7 +318,7 @@
-  * subagent: a status line (icon · id · stats) plus, while running, the current
-  * tool/intent. Drawn below the cell box so progress streams live.
-  */
--function renderAgentProgressEvents(
-+export function renderAgentProgressEvents(
- 	events: EvalStatusEvent[],
- 	theme: Theme,
- 	width: number,
-@@ -385,7 +385,7 @@
- }
- 
- /** Format a status event as a single line for display. */
--function formatStatusEvent(event: EvalStatusEvent, theme: Theme): string {
-+export function formatStatusEvent(event: EvalStatusEvent, theme: Theme): string {
- 	const { op, ...data } = event;
- 
- 	type AvailableIcon = "icon.file" | "icon.folder" | "icon.git" | "icon.package" | "cmd.globe" | "cmd.computer";
-@@ -532,7 +532,7 @@
- }
- 
- /** Format status event with expanded detail lines. */
--function formatStatusEventExpanded(event: EvalStatusEvent, theme: Theme): string[] {
-+export function formatStatusEventExpanded(event: EvalStatusEvent, theme: Theme): string[] {
- 	const lines: string[] = [];
- 	const { op, ...data } = event;
- 
-@@ -637,32 +637,31 @@
- 	previewLines: number,
- 	theme: Theme,
- 	width: number,
-+	presentation: EvalRendererOptions,
- ): { lines: readonly string[]; hiddenCount: number } {
- 	const output = cell.output;
- 	if (!output) {
- 		return { lines: [], hiddenCount: 0 };
- 	}
- 
--	// Cell output lands in renderCodeCell → renderOutputBlock, which re-wraps it
--	// at the box's inner content width. Bound the collapsed tail by VISUAL rows
--	// at that width so a long-line tail can't wrap into more rows than budgeted
--	// and scroll its mutating preview above the live-region window — the
--	// duplicate "ctrl+o to expand" scrollback spray. The caller appends its own
--	// exact hidden-count row, so the pane marker stays off here.
-+	// Bound screen rows at the code cell's content width, not logical lines
-+	// Structured output starts at its root; ordinary logs follow their tail
- 	const innerWidth = outputBlockContentWidth(width);
- 
- 	const isError = cell.status === "error";
-+	const fullOutput = expanded || (isError && presentation.expandErrors === true);
- 	const styleText = (line: string): string => theme.fg(isError ? "error" : "toolOutput", replaceTabs(line));
- 	// A table's printed text is already a terminal table, aligned to the line it starts on: keep it as text.
- 	const parts = splitEvalOutput(
- 		output,
- 		cell.views?.filter(entry => entry.view.kind !== "table"),
- 	);
-+	const hasStructuredValue = parts.some(part => part.kind === "view" && part.view.kind === "json");
- 	if (parts.some(part => part.kind === "view")) {
- 		// Printed text keeps its place; json and markdown views replace theirs with a tree / rendered Markdown.
--		const treeDepth = expanded ? JSON_TREE_MAX_DEPTH_EXPANDED : JSON_TREE_MAX_DEPTH_COLLAPSED;
--		const treeLineCap = expanded ? JSON_TREE_MAX_LINES_EXPANDED : JSON_TREE_MAX_LINES_COLLAPSED;
--		const treeScalarLen = expanded ? JSON_TREE_SCALAR_LEN_EXPANDED : JSON_TREE_SCALAR_LEN_COLLAPSED;
-+		const treeDepth = fullOutput ? JSON_TREE_MAX_DEPTH_EXPANDED : JSON_TREE_MAX_DEPTH_COLLAPSED;
-+		const treeLineCap = fullOutput ? JSON_TREE_MAX_LINES_EXPANDED : JSON_TREE_MAX_LINES_COLLAPSED;
-+		const treeScalarLen = fullOutput ? JSON_TREE_SCALAR_LEN_EXPANDED : JSON_TREE_SCALAR_LEN_COLLAPSED;
- 		const allLines: string[] = [];
- 		for (const part of parts) {
- 			if (part.kind === "text") {
-@@ -671,7 +670,12 @@
- 			}
- 			const view = part.view;
- 			if (view.kind === "json") {
--				const tree = renderJsonTreeLines(view.value, theme, treeDepth, treeLineCap, treeScalarLen);
-+				const tree = renderJsonTreeLines(view.value, theme, {
-+					maxDepth: treeDepth,
-+					maxLines: treeLineCap,
-+					maxScalarLen: treeScalarLen,
-+					hiddenRootKeys: presentation.hiddenRootKeys,
-+				});
- 				allLines.push(...tree.lines);
- 				if (tree.truncated) allLines.push(theme.fg("dim", "…"));
- 			} else if (view.kind === "markdown") {
-@@ -681,9 +685,9 @@
- 		const formatted = formatOutputPaneLines(
- 			{
- 				lines: allLines,
--				expanded,
-+				expanded: fullOutput,
- 				collapsedMaxLines: previewLines,
--				edge: "tail",
-+				edge: hasStructuredValue && !isError && presentation.structuredHead ? "head" : "tail",
- 				visual: true,
- 				width: innerWidth,
- 				showHiddenMarker: false,
-@@ -695,7 +699,7 @@
- 	const formatted = formatOutputPaneLines(
- 		{
- 			lines: output.split("\n"),
--			expanded,
-+			expanded: fullOutput,
- 			collapsedMaxLines: previewLines,
- 			edge: "tail",
- 			visual: true,
-@@ -825,25 +829,36 @@
- }
- 
- /**
-- * One cell's outputs in order: printed text (following its tail, clamped to
-- * the last `previewLines` while folded) with each view in place of its text.
-- * A json view is the host's own JSON viewer (`json`), top-level entries
-- * listed and containers folded, when it draws the kind; else a JSON tree.
-+ * Ordered output parts, with a head preview for structured values and a tail
-+ * preview for ordinary text logs. JSON views use the host's JSON viewer when
-+ * supported, otherwise a JSON tree
-  */
- function evalOutputNodes(
- 	output: string,
- 	views: readonly EvalViewEntry[] | undefined,
- 	previewLines: number,
- 	json: boolean,
-+	isError = false,
-+	presentation: EvalRendererOptions = {},
- ): NativeNode[] {
- 	if (output.trim().length === 0) return [];
--	return splitEvalOutput(output, views).map((part, i) => {
-+	const parts = splitEvalOutput(output, views);
-+	const structured = presentation.structuredHead && parts.some(part => part.kind === "view" && part.view.kind === "json");
-+	const fullOutput = isError && presentation.expandErrors === true;
-+	const outputs = parts.map((part, i) => {
- 		if (part.kind === "text") {
--			return runOutput(part.text, {
-+			if (!structured && !fullOutput) return runOutput(part.text, {
- 				role: "omp.tool.eval.output",
- 				previewLines,
- 				key: i === 0 ? "output" : `output-${i}`,
- 			});
-+			return keyed(
-+				ansi(part.text, {
-+					role: "omp.tool.eval.output",
-+					follow: structured ? undefined : true,
-+				}),
-+				i === 0 ? "output" : `output-${i}`,
-+			);
- 		}
- 		const view = part.view;
- 		if (view.kind === "table") return evalTableNode(view, `table-${i}`);
-@@ -852,6 +867,11 @@
- 		}
- 		return keyed(md(view.text), `markdown-${i}`);
- 	});
-+	// A bare native card clamps the ordered structured output from its head
-+	// while retaining its full children for the existing disclosure action
-+	return structured && !fullOutput
-+		? [node("card", { variant: "bare", preview: { lines: previewLines } }, outputs, "output")]
-+		: outputs;
- }
- 
- /** Status lines a folded cell keeps: the newest ones. */
-@@ -908,7 +928,7 @@
-  * A notebook cell as one run box: the caption (multi-cell calls only), the
-  * source, its outputs, status lines and foot. A failed cell tints its box.
-  */
--function evalCellBox(cell: EvalCellRun, index: number, total: number): NativeNode {
-+function evalCellBox(cell: EvalCellRun, index: number, total: number, presentation: EvalRendererOptions): NativeNode {
- 	let caption: NativeNode | undefined;
- 	if (total > 1) {
- 		const spans: TspSpan[] = [span(`${index + 1}/${total}`, "muted")];
-@@ -920,11 +940,12 @@
- 		[
- 			caption,
- 			cell.code.trim().length > 0 &&
--				runInput(cell.code, {
--					role: "omp.tool.eval.input",
--					lang: languageForHighlighter(cell.language),
--					wrap: false,
--				}),
-+				(presentation.describeInput?.(cell.code, languageForHighlighter(cell.language), "omp.tool.eval.input") ??
-+					runInput(cell.code, {
-+						role: "omp.tool.eval.input",
-+						lang: languageForHighlighter(cell.language),
-+						wrap: false,
-+					})),
- 			...(cell.outputs ?? []),
- 			cell.status,
- 			cell.foot && runFoot(cell.foot),
-@@ -933,8 +954,33 @@
- 	);
- }
- 
--/** Render eval code cells, structured display output, and progress events. */
--export const evalToolRenderer = {
-+/** Terminal and native status history supplied together by a renderer policy */
-+export interface EvalStatusRenderer {
-+	render(
-+		events: EvalStatusEvent[],
-+		theme: Theme,
-+		expanded: boolean,
-+		elided?: number,
-+		width?: number,
-+		spinnerFrame?: number,
-+	): string[];
-+	describe(log: StatusEventLog, expanded: boolean): NativeNode | undefined;
-+}
-+
-+/** Optional presentation choices shared by terminal and native eval views */
-+export interface EvalRendererOptions {
-+	previewLines?: number;
-+	codeMaxLines?: number;
-+	codeTail?: boolean;
-+	expandErrors?: boolean;
-+	structuredHead?: boolean;
-+	hiddenRootKeys?: readonly string[];
-+	describeInput?: (source: string, language: string, role: string) => NativeNode;
-+	outputDisclosure?: (hidden: number, theme: Theme) => string;
-+}
-+
-+/** Render eval code cells, structured display output, and progress events */
-+export const createEvalRenderer = (statusRenderer?: EvalStatusRenderer, presentation: EvalRendererOptions = {}) => ({
- 	animatedPendingPreview: true,
- 	animatedPartialResult: true,
- 	renderCall(args: EvalRenderArgs, options: RenderResultOptions, uiTheme: Theme): Component {
-@@ -975,11 +1021,8 @@
- 								status: spinnerFrame !== undefined ? "running" : "pending",
- 								spinnerFrame,
- 								width,
--								// Viewport-sized tail window following the newest streamed code
--								// line; renderResult keeps the same cap so the cell never snaps
--								// open on completion. Only ctrl+o uncaps.
--								codeTail: true,
--								codeMaxLines: windowRows,
-+								codeTail: presentation.codeTail ?? true,
-+								codeMaxLines: presentation.codeMaxLines ?? windowRows,
- 								expanded: options.expanded,
- 							};
- 							return { options: cellOptions, lines: renderCodeCell(cellOptions, uiTheme) };
-@@ -1009,7 +1052,7 @@
- 	},
- 
- 	renderResult(
--		result: { content: Array<{ type: string; text?: string }>; details?: EvalToolDetails },
-+		result: { content: Array<{ type: string; text?: string }>; details?: EvalToolDetails; isError?: boolean },
- 		options: RenderResultOptions & { renderContext?: EvalRenderContext },
- 		uiTheme: Theme,
- 		_args?: EvalRenderArgs,
-@@ -1047,8 +1090,9 @@
- 					agentLive: agentEvents.some(e => agentEventStatus(e.status) === "running"),
- 				};
- 			});
--			// Per-cell rows keyed by everything but the spinner frame: a tick only
--			// redraws running headers and running agent rows.
-+			const hasLiveAgent = displayCells.some(cell => cell.agentLive);
-+			let outputMemo: { key: string; cells: { lines: readonly string[]; hiddenCount: number }[] } | undefined;
-+			// Header-only ticks reuse cells; live agents rebuild only history and layout
- 			let bodies:
- 				| {
- 						key: string;
-@@ -1063,34 +1107,44 @@
- 					const expanded = options.renderContext?.expanded ?? options.expanded;
- 					const windowRows = previewWindowRows();
- 					const previewLines = Math.min(
--						options.renderContext?.previewLines ?? EVAL_DEFAULT_PREVIEW_LINES,
-+						presentation.previewLines ?? options.renderContext?.previewLines ?? EVAL_DEFAULT_PREVIEW_LINES,
- 						windowRows,
- 					);
--					const bodyKey = `${width}|${expanded}|${previewLines}|${windowRows}`;
-+					const outputKey = `${width}|${expanded}|${previewLines}|${windowRows}`;
-+					const bodyKey = `${outputKey}|${statusRenderer && hasLiveAgent ? spinnerFrame : ""}`;
- 					const key = `${bodyKey}|${spinnerFrame}`;
- 					if (cached?.key === key) {
- 						return cached.result;
- 					}
- 
-+					if (outputMemo?.key !== outputKey) {
-+						outputMemo = {
-+							key: outputKey,
-+							cells: displayCells.map(({ cell }) =>
-+								formatCellOutputLines(cell, expanded, previewLines, uiTheme, width, presentation),
-+							),
-+						};
-+					}
- 					if (bodies?.key !== bodyKey) {
- 						bodies = {
- 							key: bodyKey,
- 							cells: displayCells.map(({ cell, code, language, agentEvents, otherEvents }, i) => {
--								const statusLines = renderStatusEvents(otherEvents, uiTheme, expanded, cell.statusEventsElided);
--								const outputContent = formatCellOutputLines(cell, expanded, previewLines, uiTheme, width);
-+								const statusLines = (statusRenderer?.render ?? renderStatusEvents)(
-+									statusRenderer ? cell.statusEvents ?? [] : otherEvents,
-+									uiTheme,
-+									expanded,
-+									cell.statusEventsElided,
-+									outputBlockContentWidth(width),
-+									spinnerFrame,
-+								);
-+								const outputContent = outputMemo!.cells[i]!;
- 								const outputLines = [...outputContent.lines];
- 								if (!expanded && outputContent.hiddenCount > 0) {
--									outputLines.push(
--										uiTheme.fg(
--											"dim",
--											`… ${outputContent.hiddenCount} more lines (${expandKeyHint()} to expand)`,
--										),
--									);
-+									outputLines.push(presentation.outputDisclosure?.(outputContent.hiddenCount, uiTheme) ??
-+										uiTheme.fg("dim", `… ${outputContent.hiddenCount} more lines (${expandKeyHint()} to expand)`));
- 								}
- 								if (statusLines.length > 0) {
--									if (outputLines.length > 0) {
--										outputLines.push(uiTheme.fg("dim", "Status"));
--									}
-+									if (!statusRenderer && outputLines.length > 0) outputLines.push(uiTheme.fg("dim", "Status"));
- 									outputLines.push(...statusLines);
- 								}
- 								const cellOptions: CodeCellOptions = {
-@@ -1105,20 +1159,15 @@
- 									duration: cell.durationMs,
- 									output: outputLines.length > 0 ? outputLines.join("\n") : undefined,
- 									outputMaxLines: outputLines.length,
--									// Same viewport-sized tail window as the pending preview so the
--									// cell never snaps open on completion; only ctrl+o uncaps.
--									// `output` keeps its own preview cap from above.
--									codeTail: true,
--									codeMaxLines: windowRows,
-+									codeTail: presentation.codeTail ?? true,
-+									codeMaxLines: presentation.codeMaxLines ?? windowRows,
- 									expanded,
- 									width,
- 								};
- 								return {
- 									codeCell: { options: cellOptions, lines: renderCodeCell(cellOptions, uiTheme) },
--									agentLines:
--										agentEvents.length > 0
--											? renderAgentProgressEvents(agentEvents, uiTheme, width, spinnerFrame)
--											: [],
-+									agentLines: !statusRenderer && agentEvents.length > 0
-+										? renderAgentProgressEvents(agentEvents, uiTheme, width, spinnerFrame) : [],
- 									agentFrame: spinnerFrame,
- 								};
- 							}),
-@@ -1130,7 +1179,7 @@
- 						const { agentEvents, agentLive } = displayCells[i]!;
- 						const body = bodies.cells[i]!;
- 						pushCodeCellLines(lines, body.codeCell, spinnerFrame, uiTheme);
--						if (agentLive && body.agentFrame !== spinnerFrame) {
-+						if (!statusRenderer && agentLive && body.agentFrame !== spinnerFrame) {
- 							body.agentLines = renderAgentProgressEvents(agentEvents, uiTheme, width, spinnerFrame);
- 							body.agentFrame = spinnerFrame;
- 						}
-@@ -1155,6 +1204,7 @@
- 					return lines;
- 				},
- 				invalidate: () => {
-+					outputMemo = undefined;
- 					bodies = undefined;
- 					cached = undefined;
- 				},
-@@ -1175,12 +1225,13 @@
- 		const output = readOutput();
- 
- 		const statusEvents = details?.statusEvents ?? [];
--		const statusLines = renderStatusEvents(
-+		const statusLines = (statusRenderer?.render ?? renderStatusEvents)(
- 			statusEvents,
- 			uiTheme,
- 			options.renderContext?.expanded ?? options.expanded,
- 			details?.statusEventsElided,
- 		);
-+		if (!statusRenderer && statusLines.length > 0) statusLines.unshift(uiTheme.fg("dim", "Status"));
- 
- 		if (!output && statusLines.length === 0) {
- 			const lines = [timeoutLine, noticeLine, asyncLine, warningLine].filter(Boolean) as string[];
-@@ -1188,30 +1239,19 @@
- 		}
- 
- 		if (!output && statusLines.length > 0) {
--			const lines = [
--				uiTheme.fg("dim", "Status"),
--				...statusLines,
--				timeoutLine,
--				noticeLine,
--				asyncLine,
--				warningLine,
--			].filter(Boolean) as string[];
-+			const lines = [...statusLines, timeoutLine, noticeLine, asyncLine, warningLine].filter(Boolean) as string[];
- 			return new Text(lines.join("\n"), 0, 0);
- 		}
- 
--		if (options.renderContext?.expanded ?? options.expanded) {
-+		if ((options.renderContext?.expanded ?? options.expanded) ||
-+			(presentation.expandErrors && (result.isError || details?.isError))) {
- 			const styledOutput = output
- 				.split("\n")
- 				.map(line => uiTheme.fg("toolOutput", line))
- 				.join("\n");
--			const lines = [
--				styledOutput,
--				...(statusLines.length > 0 ? [uiTheme.fg("dim", "Status"), ...statusLines] : []),
--				timeoutLine,
--				noticeLine,
--				asyncLine,
--				warningLine,
--			].filter(Boolean) as string[];
-+			const lines = [styledOutput, ...statusLines, timeoutLine, noticeLine, asyncLine, warningLine].filter(
-+				Boolean,
-+			) as string[];
- 			return new Text(lines.join("\n"), 0, 0);
- 		}
- 
-@@ -1227,7 +1267,7 @@
- 		return {
- 			render: (width: number): readonly string[] => {
- 				const previewLines = Math.min(
--					options.renderContext?.previewLines ?? EVAL_DEFAULT_PREVIEW_LINES,
-+					presentation.previewLines ?? options.renderContext?.previewLines ?? EVAL_DEFAULT_PREVIEW_LINES,
- 					previewWindowRows(),
- 				);
- 				if (cachedRows !== undefined && cachedWidth === width && cachedPreviewLines === previewLines) {
-@@ -1251,7 +1291,6 @@
- 				}
- 				outputLines.push(...result.visualLines);
- 				if (statusLines.length > 0) {
--					outputLines.push(truncateToWidth(uiTheme.fg("dim", "Status"), width));
- 					for (const statusLine of statusLines) {
- 						outputLines.push(truncateToWidth(statusLine, width));
- 					}
-@@ -1290,7 +1329,7 @@
- 				cells.map(cell => cell.language),
- 				cells.length,
- 			),
--			body: cells.map((cell, i) => evalCellBox({ ...cell, foot: i === 0 ? startFoot : undefined }, i, cells.length)),
-+			body: cells.map((cell, i) => evalCellBox({ ...cell, foot: i === 0 ? startFoot : undefined }, i, cells.length, presentation)),
- 			preview: "children",
- 		};
- 	},
-@@ -1304,7 +1343,7 @@
- 		const isPartial = options.isPartial === true;
- 		const cancelled = options.cancelled === true;
- 		const expanded = options.renderContext?.expanded ?? options.expanded;
--		const previewLines = options.renderContext?.previewLines ?? EVAL_DEFAULT_PREVIEW_LINES;
-+		const previewLines = presentation.previewLines ?? options.renderContext?.previewLines ?? EVAL_DEFAULT_PREVIEW_LINES;
- 		// The call's notice and truncation join the last run's foot facts (a background job is a head badge).
- 		const callFacts = { facts: compact([details?.notice]), meta: details?.meta };
- 		const cellResults = details?.cells;
-@@ -1330,8 +1369,15 @@
- 						language,
- 						code: formatEvalCodeForDisplay(cell.code, language),
- 						title: cell.title,
--						outputs: [...evalOutputNodes(cell.output, cell.views, previewLines, options.json === true)],
--						status: evalStatusSection(cell, expanded),
-+						outputs: evalOutputNodes(
-+							cell.output,
-+							cell.views,
-+							previewLines,
-+							options.json === true,
-+							cell.status === "error",
-+							presentation,
-+						),
-+						status: (statusRenderer?.describe ?? evalStatusSection)(cell, expanded),
- 						foot: state && {
- 							state,
- 							exitCode: cell.exitCode,
-@@ -1341,6 +1387,7 @@
- 					},
- 					i,
- 					cellResults.length,
-+					presentation,
- 				);
- 			});
- 			return {
-@@ -1360,8 +1407,10 @@
- 				undefined,
- 				previewLines,
- 				options.json === true,
-+				result.isError === true || details?.isError === true,
-+				presentation,
- 			),
--			status: evalStatusSection(details ?? {}, expanded),
-+			status: (statusRenderer?.describe ?? evalStatusSection)(details ?? {}, expanded),
- 			foot: { state, elapsedMs: options.elapsedMs, ...callFacts },
- 		};
- 		const runs: EvalCellRun[] =
-@@ -1375,11 +1424,13 @@
- 				argCells.length,
- 				details,
- 			),
--			body: runs.map((run, i) => evalCellBox(run, i, runs.length)),
-+			body: runs.map((run, i) => evalCellBox(run, i, runs.length, presentation)),
- 			preview: "children",
- 		};
- 	},
- 
- 	mergeCallAndResult: true,
- 	inline: true,
--} satisfies ToolRenderer<EvalRenderArgs, EvalToolDetails>;
-+} satisfies ToolRenderer<EvalRenderArgs, EvalToolDetails>);
-+
-+export const evalToolRenderer = createEvalRenderer();
-diff --git a/packages/tui/src/tools/tool-commands.ts b/packages/tui/src/tools/tool-commands.ts
---- a/packages/tui/src/tools/tool-commands.ts
-+++ b/packages/tui/src/tools/tool-commands.ts
-@@ -45,6 +45,7 @@
- 	/** Exit status of this invocation, independent of the outer shell status. */
- 	exitCode: number;
- 	args?: Record<string, unknown>;
-+	queued?: true;
- 	tier?: ToolTier;
- 	readOnlyHint?: true;
- 	/** Details object returned by the wrapped tool. */
-@@ -97,6 +98,26 @@
- 	return replaceTabs(sanitizeText(name));
- }
- 
-+/** Arguments passed to the optional `tool-command:queued` renderer catalog entry */
-+export interface QueuedToolCommandArgs {
-+	label: string;
-+	args: Record<string, unknown>;
-+}
-+
-+/** Resolve the optional pre-execution view using the already validated shell invocation */
-+export function queuedToolCommand(
-+	dispatch: ToolCommandRenderDispatch,
-+	resolveMounted: ToolCommandRendererResolver | undefined,
-+): { renderer: ToolRenderer<QueuedToolCommandArgs>; args: QueuedToolCommandArgs } | undefined {
-+	if (!dispatch.args) return undefined;
-+	const renderer = rendererLookup?.("tool-command:queued");
-+	if (!renderer) return undefined;
-+	return {
-+		renderer,
-+		args: { label: displayLabel(dispatch.tool, resolveMounted?.(dispatch.tool)), args: dispatch.args },
-+	};
-+}
-+
- /** The wrapped tool's result as its own renderer receives it. */
- function innerResult(input: ToolCommandDispatchInput): ToolRenderResult {
- 	const { dispatch, output } = input;
-diff --git a/packages/tui/src/tools/bash.ts b/packages/tui/src/tools/bash.ts
---- a/packages/tui/src/tools/bash.ts
-+++ b/packages/tui/src/tools/bash.ts
-@@ -47,11 +47,12 @@
- } from "./native-view";
- import { renderShellVisualization, shellVizText } from "./shell-viz-render";
- import { compact, keyed, node, row, span, stableKey, text } from "../native/describe";
--import type { NativeChild } from "../native/node";
-+import type { NativeChild, NativeNode } from "../native/node";
- import { quietButton } from "../native/overlay";
- import type { ShellStepView } from "./shell-steps";
- import {
- 	describeToolCommandNode,
-+	queuedToolCommand,
- 	renderToolCommandDispatch,
- 	type ToolCommandRenderDispatch,
- 	type ToolCommandRendererResolver,
-@@ -288,6 +289,32 @@
- 	resolveCwd?: (args: TArgs | undefined) => string | undefined;
- 	resolveEnv?: (args: TArgs | undefined) => Record<string, unknown> | undefined;
- 	showHeader?: boolean;
-+	presentation?: ShellRendererPolicy;
-+}
-+
-+/** Optional shell presentation without replacing execution or output mechanics */
-+export interface ShellRendererPolicy {
-+	previewLines?: number;
-+	codeMaxLines?: number;
-+	shellPreviewLines?: number | false;
-+	describeInput?: (source: string, language: string, role: string) => NativeNode;
-+	serviceFacts?: (service: NonNullable<BashToolDetails["service"]>, expanded: boolean) => string[];
-+	showTimeout?: (expanded: boolean) => boolean;
-+	presentState?: (
-+		state: RunState | "queued",
-+		title: string,
-+		options: RenderResultOptions,
-+		theme: Theme,
-+		showHeader: boolean,
-+		intent?: string,
-+	) => Pick<ToolCardSnapshot, "header" | "headerMeta" | "phase" | "borderColor">;
-+}
-+
-+let shellRendererPolicy: ShellRendererPolicy | undefined;
-+
-+/** Apply optional presentation to existing and future shell renderer factories */
-+export function setShellRendererPolicy(policy: ShellRendererPolicy | undefined): void {
-+	shellRendererPolicy = policy;
- }
- 
- function getPartialJson<TArgs>(args: TArgs | undefined): string | undefined {
-@@ -387,6 +414,8 @@
- 	contextTimeout: number | undefined,
- 	artifactId: string | undefined,
- 	isError: boolean,
-+	expanded: boolean,
-+	policy?: ShellRendererPolicy,
- ): string[] {
- 	const { status } = uiTheme;
- 	const dim = (text: string) => uiTheme.fg("dim", text);
-@@ -400,40 +429,42 @@
- 	}
- 	if (details?.service) {
- 		const service = details.service;
--		statsParts.push(dim(`${uiTheme.icon.server} ${service.name}`));
--		statsParts.push(dim(`${serviceStateSymbol(service.state, uiTheme)} ${service.state}`));
--		statsParts.push(
--			dim(
--				service.ready
--					? `${status.success} ready`
--					: service.timedOut
--						? `${status.warning} ready timed out`
--						: `${status.error} not ready`,
--			),
--		);
--		if (service.pid !== undefined) statsParts.push(dim(`${uiTheme.icon.pid}${service.pid}`));
-+		if (policy?.serviceFacts) {
-+			for (const fact of policy.serviceFacts(service, expanded)) statsParts.push(dim(fact));
-+		} else {
-+			statsParts.push(dim(`${uiTheme.icon.server} ${service.name}`));
-+			statsParts.push(dim(`${serviceStateSymbol(service.state, uiTheme)} ${service.state}`));
-+			statsParts.push(
-+				dim(
-+					service.ready
-+						? `${status.success} ready`
-+						: service.timedOut
-+							? `${status.warning} ready timed out`
-+							: `${status.error} not ready`,
-+				),
-+			);
-+			if (service.pid !== undefined) statsParts.push(dim(`${uiTheme.icon.pid}${service.pid}`));
-+		}
- 	}
- 	// Elapsed and budget share one chip (`⏱ 1.2s/5m`): the two numbers read as a
- 	// pair, and a lone hourglass stands in before the command reports its wall
- 	// time. The icon carries the `Wall:`/`Timeout:` words, so they are dropped.
- 	let timeoutLabel: string | undefined;
--	if (timeoutDisabled) {
--		timeoutLabel = "disabled";
--	} else if (typeof timeoutSeconds === "number") {
--		timeoutLabel = formatDuration(timeoutSeconds * 1000);
--		if (requestedTimeoutSeconds !== undefined && requestedTimeoutSeconds !== timeoutSeconds) {
--			timeoutLabel += ` (requested ${formatDuration(requestedTimeoutSeconds * 1000)} clamped)`;
-+	if (policy?.showTimeout?.(expanded) ?? true) {
-+		if (timeoutDisabled) {
-+			timeoutLabel = "disabled";
-+		} else if (typeof timeoutSeconds === "number") {
-+			timeoutLabel = formatDuration(timeoutSeconds * 1000);
-+			if (requestedTimeoutSeconds !== undefined && requestedTimeoutSeconds !== timeoutSeconds) {
-+				timeoutLabel += ` (requested ${formatDuration(requestedTimeoutSeconds * 1000)} clamped)`;
-+			}
- 		}
- 	}
- 	if (wallTimeMs !== undefined) {
- 		const elapsed = formatDuration(wallTimeMs);
--		statsParts.push(
--			dim(`${uiTheme.icon.time} ${timeoutLabel === undefined ? elapsed : `${elapsed}/${timeoutLabel}`}`),
--		);
--	} else if (timeoutDisabled) {
--		statsParts.push(dim(`${status.disabled} disabled`));
-+		statsParts.push(dim(`${uiTheme.icon.time} ${timeoutLabel === undefined ? elapsed : `${elapsed}/${timeoutLabel}`}`));
- 	} else if (timeoutLabel !== undefined) {
--		statsParts.push(dim(`${status.pending} ${timeoutLabel}`));
-+		statsParts.push(dim(`${timeoutDisabled ? status.disabled : status.pending} ${timeoutLabel}`));
- 	}
- 	if (artifactId) {
- 		statsParts.push(dim(`${uiTheme.icon.output} ${spillUrl(artifactId)}`));
-@@ -548,8 +579,9 @@
- 	isPartial: boolean,
- 	cancelled: boolean,
- ): RunState {
--	if (cancelled) return "cancelled";
-+	if (cancelled || details?.async?.state === "cancelled") return "cancelled";
- 	if (details?.async?.state === "running") return "background";
-+	if (details?.async?.state === "failed") return "failed";
- 	if (isPartial) return "running";
- 	if (details?.timedOut === true) return "timed-out";
- 	if (isError || (details?.exitCode !== undefined && details.exitCode !== 0)) return "failed";
-@@ -625,10 +657,11 @@
- function shellToolCommands(
- 	details: BashToolDetails | undefined,
- 	command: string | undefined,
--): { dispatches: readonly ToolCommandRenderDispatch[]; sole: boolean } {
-+): { dispatches: readonly ToolCommandRenderDispatch[]; sole: boolean; queued?: ToolCommandRenderDispatch } {
- 	const dispatches = details?.toolCommands ?? [];
- 	const only = dispatches.length === 1 ? dispatches[0] : undefined;
--	return { dispatches, sole: only?.mode === "execute" && isSoleInvocation(command, only.tool) };
-+	if (only?.mode !== "execute" || !isSoleInvocation(command, only.tool)) return { dispatches, sole: false };
-+	return only.queued ? { dispatches, sole: false, queued: only } : { dispatches, sole: true };
- }
- 
- /** Render options of the nested card for record `index`: only the last record of a live run is still running. */
-@@ -653,28 +686,54 @@
- 	};
- }
- 
-+/** Cache source highlighting and visual capping separately from live output */
-+function createShellCommandPreview(args: BashRenderArgs, uiTheme: Theme, maxLines?: number) {
-+	let commandLines: string[] | undefined;
-+	let memo: { width: number; expanded: boolean; windowRows: number; source: readonly string[]; lines: readonly string[] } | undefined;
-+	const preview = (width: number, expanded: boolean, source?: readonly string[]): readonly string[] => {
-+		const input = source ?? (commandLines ??= formatBashCommandLines(args, uiTheme));
-+		const windowRows = previewWindowRows();
-+		if (memo?.width === width && memo.expanded === expanded && memo.windowRows === windowRows && memo.source === input) {
-+			return memo.lines;
-+		}
-+		const lines = maxLines === undefined
-+			? capPreviewLines(input, uiTheme, { expanded })
-+			: formatOutputPaneLines(
-+				{ lines: input, expanded, collapsedMaxLines: maxLines, visual: true, width },
-+				uiTheme,
-+			).lines;
-+		memo = { width, expanded, windowRows, source: input, lines };
-+		return lines;
-+	};
-+	preview.clear = () => {
-+		commandLines = undefined;
-+		memo = undefined;
-+	};
-+	return preview;
-+}
-+
- /** Builds a shell transcript renderer with caller-supplied command labels. */
- export function createShellRenderer<TArgs>(config: ShellRendererConfig<TArgs>) {
- 	return {
- 		renderCall(args: TArgs, options: RenderResultOptions, uiTheme: Theme): Component {
-+			const policy = config.presentation ?? shellRendererPolicy;
- 			const renderArgs = toBashRenderArgs(args, config);
- 			const intent = callIntent(args);
--			// Highlighting the whole (possibly still-streaming) command is the
--			// expensive part: defer it to the first paint, once per component,
--			// so a rebuild that is replaced before painting never pays for it.
--			let cmdLines: string[] | undefined;
--			const dropCommandCache = () => {
--				cmdLines = undefined;
--			};
-+			const commandPreview = createShellCommandPreview(renderArgs, uiTheme, policy?.codeMaxLines);
- 			return framedToolCard(
- 				uiTheme,
- 				({ contentWidth }) => {
--					const presentation = options.shellPresentation;
--					const commandLines = presentation
--						? visualCommandLines(presentation, renderArgs, undefined, uiTheme, contentWidth)
--						: (cmdLines ??= formatBashCommandLines(renderArgs, uiTheme));
-+					const statePresentation = policy?.presentState?.(
-+						options.executionStarted ? "running" : "queued",
-+						config.resolveTitle(args, options),
-+						options,
-+						uiTheme,
-+						config.showHeader !== false,
-+						intent,
-+					);
- 					const header =
--						config.showHeader === false
-+						statePresentation?.header ??
-+						(config.showHeader === false
- 							? intent && renderStatusLine({ title: intent, titleColor: "muted" }, uiTheme)
- 							: renderStatusLine(
- 									{
-@@ -684,19 +743,30 @@
- 										description: intent,
- 									},
- 									uiTheme,
--								);
-+								));
- 					const elapsedMs = options.executionStarted ? options.elapsedMs : undefined;
- 					return {
--						header,
- 						phase: options.spinnerFrame !== undefined ? "running" : "pending",
-+						...statePresentation,
-+						header,
- 						footerMeta:
- 							elapsedMs === undefined || elapsedMs < 1000
- 								? undefined
- 								: uiTheme.fg("dim", `elapsed ${formatDuration(Math.floor(elapsedMs / 1000) * 1000)}`),
--						sections: [{ content: capPreviewLines(commandLines, uiTheme, { expanded: options.expanded }) }],
-+						sections: [
-+							{
-+								content: commandPreview(
-+									contentWidth,
-+									options.expanded,
-+									options.shellPresentation
-+										? visualCommandLines(options.shellPresentation, renderArgs, undefined, uiTheme, contentWidth)
-+										: undefined,
-+								),
-+							},
-+						],
- 					};
- 				},
--				{ onInvalidate: dropCommandCache, onReleaseRenderCaches: dropCommandCache },
-+				{ onInvalidate: commandPreview.clear, onReleaseRenderCaches: commandPreview.clear },
- 			);
- 		},
- 
-@@ -710,17 +780,33 @@
- 			uiTheme: Theme,
- 			args?: TArgs,
- 		): Component {
-+			const policy = config.presentation ?? shellRendererPolicy;
- 			const renderArgs = toBashRenderArgs(args, config);
- 			const intent = callIntent(args);
--			let cmdLines: string[] | undefined;
--			const isError = result.isError === true;
-+			const details = result.details;
-+			const isError = result.isError === true || (details?.exitCode !== undefined && details.exitCode !== 0);
- 			const isPartial = options.isPartial === true;
-+			const state = shellRunState(details, isError, isPartial, options.cancelled === true);
- 			const success = !isPartial && !isError;
--			const details = result.details;
- 			const isTimeout = details?.timedOut === true;
- 			const toolCommands = shellToolCommands(details, renderArgs.command);
-+			if (isPartial && !options.cancelled && toolCommands.queued) {
-+				const queued = queuedToolCommand(toolCommands.queued, options.renderContext?.resolveToolCommandMounted);
-+				const view = queued?.renderer.renderCall(queued.args, options, uiTheme);
-+				if (view) return view;
-+			}
-+			const commandPreview = createShellCommandPreview(renderArgs, uiTheme, policy?.codeMaxLines);
-+			const statePresentation = policy?.presentState?.(
-+				state,
-+				config.resolveTitle(args, options),
-+				options,
-+				uiTheme,
-+				config.showHeader !== false,
-+				intent,
-+			);
- 			const header =
--				config.showHeader === false
-+				statePresentation?.header ??
-+				(config.showHeader === false
- 					? intent && renderStatusLine({ title: intent, titleColor: "muted" }, uiTheme)
- 					: renderStatusLine(
- 							success
-@@ -735,7 +821,7 @@
- 										description: intent,
- 									},
- 							uiTheme,
--						);
-+						));
- 			// Per-instance cache for the expensive inner lines computation. Mirrors
- 			// the eval-renderer pattern (`eval-render.ts:709-752`): without this,
- 			// every TUI repaint (one per keystroke when a long transcript is on
-@@ -758,7 +844,7 @@
- 			let cachedTraceKey: string | undefined;
- 			let cachedPresentation: ShellVizPresentation | undefined;
- 			const dropSnapshot = () => {
--				cmdLines = undefined;
-+				commandPreview.clear();
- 				cachedSnapshot = undefined;
- 				cachedWidth = undefined;
- 				cachedPreviewLines = undefined;
-@@ -777,7 +863,7 @@
- 					// REACTIVE: read mutable options at render time
- 					const { renderContext } = options;
- 					const expanded = renderContext?.expanded ?? options.expanded;
--					const previewLines = renderContext?.previewLines ?? BASH_DEFAULT_PREVIEW_LINES;
-+					const previewLines = policy?.previewLines ?? renderContext?.previewLines ?? BASH_DEFAULT_PREVIEW_LINES;
- 					// A traced command redraws on every folded event; its running
- 					// glyphs spin with the frame (only while the run is live). A result
- 					// without a trace yet (a call that returned as a background job before
-@@ -832,6 +918,8 @@
- 						renderContext?.timeout,
- 						rawOutputArtifact.artifactId,
- 						isError,
-+						expanded,
-+						policy,
- 					);
- 					if (elapsedSecond !== undefined && elapsedSecond > 0) {
- 						statsParts.unshift(uiTheme.fg("dim", `${uiTheme.icon.time} ${formatDuration(elapsedSecond * 1000)}`));
-@@ -867,26 +955,23 @@
- 					const outputLines: string[] = toolCommands.sole ? [] : [...formatted.lines];
- 					if (warningLine) outputLines.push(warningLine);
- 					let commandCards: Container | undefined;
--					if (toolCommands.dispatches.length > 0) {
--						commandCards = new Container();
--						const count = toolCommands.dispatches.length;
--						for (const [index, dispatch] of toolCommands.dispatches.entries()) {
--							commandCards.addChild(
--								renderToolCommandDispatch(
--									{
--										dispatch,
--										output: toolCommands.sole ? displayOutput : undefined,
--										resolveMounted: renderContext?.resolveToolCommandMounted,
--									},
--									toolCommandOptions(index, count, expanded, isPartial, options),
--									uiTheme,
--								),
--							);
--						}
-+					const count = toolCommands.dispatches.length;
-+					for (const [index, dispatch] of toolCommands.dispatches.entries()) {
-+						if (dispatch.queued) continue;
-+						(commandCards ??= new Container()).addChild(
-+							renderToolCommandDispatch(
-+								{
-+									dispatch,
-+									output: toolCommands.sole ? displayOutput : undefined,
-+									resolveMounted: renderContext?.resolveToolCommandMounted,
-+								},
-+								toolCommandOptions(index, count, expanded, isPartial, options),
-+								uiTheme,
-+							),
-+						);
- 					}
- 
- 					const snapshot: ToolCardSnapshot = {
--						header,
- 						phase: isPartial ? "partial" : isError ? (isTimeout ? "warning" : "error") : "success",
- 						// Shell cards keep the neutral segmented look in every phase: the
- 						// phase colours status and border, never a background wash. A
-@@ -894,20 +979,18 @@
- 						// drawing this card gets a muted tone rather than a success tint.
- 						applyBg: false,
- 						borderColor: success ? "dim" : undefined,
-+						...statePresentation,
-+						header,
- 						footerMeta,
- 						sections: [
- 							{
--								// Viewport-sized tail window in every state — streaming and final
--								// render identically; only ctrl+o uncaps.
--								content: capPreviewLines(
-+								content: presentation || args ? commandPreview(
-+									contentWidth,
-+									expanded,
- 									presentation
- 										? visualCommandLines(presentation, renderArgs, scriptDetails, uiTheme, contentWidth)
--										: args
--											? (cmdLines ??= formatBashCommandLines(renderArgs, uiTheme))
--											: [],
--									uiTheme,
--									{ expanded },
--								),
-+										: undefined,
-+								) : [],
- 							},
- 							...(commandCards ? [{ content: commandCards }] : []),
- 							...(toolCommands.sole && outputLines.length === 0
-@@ -932,6 +1015,7 @@
- 			);
- 		},
- 		describeCall(args: TArgs, options: RenderResultOptions): NativeToolView {
-+			const policy = config.presentation ?? shellRendererPolicy;
- 			const command = formatBashCommandText(toBashRenderArgs(args, config));
- 			// No foot until the command starts; once it runs (before any output) the clock shows.
- 			const started = options.executionStarted === true;
-@@ -950,13 +1034,15 @@
- 											replayEpoch: options.shellReplayEpoch,
- 											liveOrigin: options.executionStarted,
- 											stream: options.argsComplete !== true && options.cancelled !== true,
--											preview: { lines: RUN_INPUT_PREVIEW_LINES },
-+											...(policy?.shellPreviewLines !== false && {
-+												preview: { lines: policy?.shellPreviewLines ?? RUN_INPUT_PREVIEW_LINES },
-+											}),
- 											...(options.shellStep ? { steps: true, focus: options.shellStep.focus } : {}),
- 										},
- 										undefined,
- 										"input",
- 									)
--								: runInput(command, SHELL_INPUT),
-+								: (policy?.describeInput?.(command, "bash", SHELL_INPUT.role) ?? runInput(command, SHELL_INPUT)),
- 							started &&
- 								runFoot({ state: options.cancelled ? "cancelled" : "running", elapsedMs: options.elapsedMs }),
- 						],
-@@ -978,30 +1064,41 @@
- 			options: RenderResultContextOptions & { renderContext?: BashRenderContext },
- 			args?: TArgs,
- 		): NativeToolView {
-+			const policy = config.presentation ?? shellRendererPolicy;
- 			const details = result.details;
- 			const renderContext = options.renderContext;
- 			const isError = result.isError === true;
- 			const isPartial = options.isPartial === true;
-+			const renderArgs = toBashRenderArgs(args, config);
-+			const toolCommands = shellToolCommands(details, renderArgs.command);
-+			if (isPartial && !options.cancelled && toolCommands.queued) {
-+				const queued = queuedToolCommand(toolCommands.queued, renderContext?.resolveToolCommandMounted);
-+				const view = queued?.renderer.describeCall?.(queued.args, options);
-+				if (view) return view;
-+			}
- 			const rawOutput = renderContext?.output ?? resultText(result);
- 			const stripped = stripBashNotices(rawOutput, details);
- 			const output = stripped.text.trimEnd();
- 			const expanded = renderContext?.expanded ?? options.expanded;
- 			const showingFullOutput = expanded && renderContext?.isFullOutput === true;
--			const renderArgs = toBashRenderArgs(args, config);
- 			const command = formatBashCommandText(renderArgs);
--			const toolCommands = shellToolCommands(details, renderArgs.command);
--			const commandNodes = toolCommands.dispatches.map((dispatch, index, all) =>
--				describeToolCommandNode(
--					{
--						dispatch,
--						output: toolCommands.sole ? output : undefined,
--						resolveMounted: renderContext?.resolveToolCommandMounted,
--					},
--					toolCommandOptions(index, all.length, expanded, isPartial, options),
--					`tool-command-${index}`,
--				),
--			);
--			const previewLines = renderContext?.previewLines ?? BASH_DEFAULT_PREVIEW_LINES;
-+			const commandNodes: NativeNode[] = [];
-+			const count = toolCommands.dispatches.length;
-+			for (const [index, dispatch] of toolCommands.dispatches.entries()) {
-+				if (dispatch.queued) continue;
-+				commandNodes.push(
-+					describeToolCommandNode(
-+						{
-+							dispatch,
-+							output: toolCommands.sole ? output : undefined,
-+							resolveMounted: renderContext?.resolveToolCommandMounted,
-+						},
-+						toolCommandOptions(index, count, expanded, isPartial, options),
-+						`tool-command-${index}`,
-+					),
-+				);
-+			}
-+			const previewLines = policy?.previewLines ?? renderContext?.previewLines ?? BASH_DEFAULT_PREVIEW_LINES;
- 			const state = shellRunState(details, isError, isPartial, options.cancelled === true);
- 			// Live (a running call, or a parked job still streaming): the call's clock. Settled: the
- 			// measured wall time wins. A frozen background snapshot's run time is unknown here.
-@@ -1042,13 +1139,15 @@
- 									liveOrigin: options.executionStarted,
- 									...(displayWorkdir ? { cwd: displayWorkdir } : {}),
- 									lang: "bash",
--									preview: { lines: RUN_INPUT_PREVIEW_LINES },
-+									...(policy?.shellPreviewLines !== false && {
-+										preview: { lines: policy?.shellPreviewLines ?? RUN_INPUT_PREVIEW_LINES },
-+									}),
- 									...(step ? { steps: true, focus: step.focus } : {}),
- 								},
- 								undefined,
- 								"input",
- 							)
--						: runInput(command, SHELL_INPUT),
-+						: (policy?.describeInput?.(command, "bash", SHELL_INPUT.role) ?? runInput(command, SHELL_INPUT)),
- 					...commandNodes,
- 					...(stepOutput
- 						? describeStepOutput(stepOutput, previewLines)
-diff --git a/packages/tui/src/tools/json-tree.ts b/packages/tui/src/tools/json-tree.ts
---- a/packages/tui/src/tools/json-tree.ts
-+++ b/packages/tui/src/tools/json-tree.ts
-@@ -28,6 +28,17 @@
- const HIDDEN_ARG_KEYS = { [INTENT_FIELD]: 1, __partialJson: 1 };
- const DEFAULT_HIDDEN_ROOT_KEYS: readonly string[] = Object.keys(HIDDEN_ARG_KEYS);
- 
-+/** Optional label styling shared by terminal and native trees */
-+export interface JsonTreePresentation {
-+	keyColor(depth: number, color: ThemeColor | undefined, native: boolean): ThemeColor | undefined;
-+}
-+
-+let jsonTreePresentation: JsonTreePresentation | undefined;
-+
-+export function setJsonTreePresentation(policy: JsonTreePresentation | undefined): void {
-+	jsonTreePresentation = policy;
-+}
-+
- const ARGS_INLINE_PAIR_SEP = ", ";
- const ARGS_INLINE_PAIR_SEP_WIDTH = Bun.stringWidth(ARGS_INLINE_PAIR_SEP);
- const ARGS_INLINE_MORE = "…";
-@@ -375,7 +386,7 @@
- 			let body: readonly string[];
- 			const displayKey = item.key ? sanitize(item.key) : undefined;
- 			const label = theme.fg(
--				item.keyColor ?? "muted",
-+				jsonTreePresentation?.keyColor(item.depth, item.keyColor, false) ?? item.keyColor ?? "muted",
- 				displayKey || (item.kind === "array" ? "array" : item.kind === "object" ? "object" : "value"),
- 			);
- 			if (item.kind === "placeholder") {
-@@ -517,7 +528,8 @@
- 	): TspTreeNode => {
- 		budget--;
- 		const id = `${nextId++}`;
--		const keySpans: TspSpan[] = key === undefined ? [] : [span(plainText(key), keyColor)];
-+		const keySpans: TspSpan[] = key === undefined ? [] : [span(plainText(key),
-+			jsonTreePresentation ? jsonTreePresentation.keyColor(depth, keyColor, true) : keyColor)];
- 		const prefix = keySpans.length > 0 ? [...keySpans, span(": ", "muted")] : [];
- 		const inline = inlineJson(entry, plainText);
- 		if (inline) return { id, label: [...prefix, ...inline.map(([text, color]) => span(text, color))] };
 diff --git a/packages/coding-agent/src/exec/tool-command-host.ts b/packages/coding-agent/src/exec/tool-command-host.ts
 --- a/packages/coding-agent/src/exec/tool-command-host.ts
 +++ b/packages/coding-agent/src/exec/tool-command-host.ts
-@@ -71,8 +71,10 @@
+@@ -71,8 +71,10 @@ export function createToolCommandHandler(options: {
  	onDispatch?: (dispatch: ToolCommandDispatch, index: number) => void;
  	/** A running dispatch reported partial details. */
  	onProgress?: (dispatch: ToolCommandDispatch, index: number) => void;
@@ -1105,7 +13,7 @@ diff --git a/packages/coding-agent/src/exec/tool-command-host.ts b/packages/codi
  	let invocations = 0;
  	return async request => {
  		throwIfAborted(signal);
-@@ -118,6 +120,7 @@
+@@ -118,6 +120,7 @@ export function createToolCommandHandler(options: {
  							}
  						: undefined,
  					context,
@@ -1113,38 +21,10 @@ diff --git a/packages/coding-agent/src/exec/tool-command-host.ts b/packages/codi
  				);
  				dispatch = outcome.dispatch;
  				throwIfAborted(signal);
-diff --git a/packages/coding-agent/src/tools/tool-commands.ts b/packages/coding-agent/src/tools/tool-commands.ts
---- a/packages/coding-agent/src/tools/tool-commands.ts
-+++ b/packages/coding-agent/src/tools/tool-commands.ts
-@@ -104,6 +104,8 @@
- 	exitCode: number;
- 	/** Validated renderer args, projected where execution-only payloads are unnecessary. */
- 	args?: Record<string, unknown>;
-+	/** Live snapshot before the validated invocation enters execution */
-+	queued?: true;
- 	/**
- 	 * Approval tier of the wrapped tool for {@link args} (`read` = no workspace
- 	 * mutation). Absent for `help` dispatches and calls whose tier could not be
-@@ -427,6 +429,7 @@
- 	signal?: AbortSignal,
- 	onUpdate?: AgentToolUpdateCallback<ToolCommandDispatch>,
- 	context?: AgentToolContext,
-+	onQueued?: (dispatch: ToolCommandDispatch) => void,
- ): Promise<{ result: AgentToolResult<unknown>; dispatch: ToolCommandDispatch }> {
- 	let dispatch: ToolCommandDispatch = { tool: name, mode: "execute", exitCode: 1 };
- 	try {
-@@ -471,6 +474,7 @@
- 					},
- 				}
- 			: undefined;
-+		onQueued?.({ ...dispatch, queued: true });
- 		const result = await executable.execute(toolCallId, validated, signal, innerOnUpdate, executionContext);
- 		return { result, dispatch: { ...dispatch, exitCode: result.isError ? 1 : 0, inner: result.details } };
- 	} catch (error) {
 diff --git a/packages/coding-agent/src/tools/bash.ts b/packages/coding-agent/src/tools/bash.ts
 --- a/packages/coding-agent/src/tools/bash.ts
 +++ b/packages/coding-agent/src/tools/bash.ts
-@@ -773,7 +773,7 @@
+@@ -787,7 +787,7 @@ class ToolCommandRecorder {
  	progress(dispatch: ToolCommandDispatch, index: number): void {
  		if (this.#finished.has(index)) return;
  		const current = this.#records[index];
@@ -1153,27 +33,1293 @@ diff --git a/packages/coding-agent/src/tools/bash.ts b/packages/coding-agent/src
  	}
  
  	/** Records so far, in invocation order. */
-@@ -1088,6 +1088,10 @@
- 	): ShellCommands | undefined {
- 		if (names.length === 0) return undefined;
+@@ -1105,6 +1105,10 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
+ 		const o2ctl = this.#launchEnabled && !names.includes(O2CTL_COMMAND);
+ 		if (names.length === 0 && !o2ctl) return undefined;
  		const { recorder, onChange } = options;
 +		const onProgress = (dispatch: ToolCommandDispatch, index: number) => {
 +			recorder.progress(dispatch, index);
 +			onChange?.();
 +		};
+ 		const tools = createToolCommandHandler({
+ 			session: this.session,
+ 			toolCallId: options.toolCallId,
+@@ -1114,10 +1118,8 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
+ 				recorder.finish(dispatch, index);
+ 				onChange?.();
+ 			},
+-			onProgress: (dispatch, index) => {
+-				recorder.progress(dispatch, index);
+-				onChange?.();
+-			},
++			onQueued: onChange ? onProgress : undefined,
++			onProgress,
+ 		});
  		return {
- 			names: [...names],
- 			handler: createToolCommandHandler({
-@@ -1099,10 +1103,8 @@
- 					recorder.finish(dispatch, index);
- 					onChange?.();
- 				},
--				onProgress: (dispatch, index) => {
--					recorder.progress(dispatch, index);
--					onChange?.();
--				},
-+				onQueued: onChange ? onProgress : undefined,
-+				onProgress,
- 			}),
+ 			names: o2ctl ? [...names, O2CTL_COMMAND] : [...names],
+diff --git a/packages/coding-agent/src/tools/details/tool-commands.ts b/packages/coding-agent/src/tools/details/tool-commands.ts
+--- a/packages/coding-agent/src/tools/details/tool-commands.ts
++++ b/packages/coding-agent/src/tools/details/tool-commands.ts
+@@ -1,5 +1,11 @@
+ import type { ToolTier } from "@oh-my-pi/pi-agent-core";
+ 
++/** Validated args handed to the optional queued tool command presenter */
++export interface QueuedToolCommandArgs {
++	label: string;
++	args: Record<string, unknown>;
++}
++
+ /** One tool command invocation inside a bash run, as recorded on the bash result. */
+ export interface ToolCommandRenderDispatch {
+ 	tool: string;
+@@ -7,6 +13,7 @@ export interface ToolCommandRenderDispatch {
+ 	/** Exit status of this invocation, independent of the outer shell status. */
+ 	exitCode: number;
+ 	args?: Record<string, unknown>;
++	queued?: true;
+ 	tier?: ToolTier;
+ 	readOnlyHint?: true;
+ 	/** Details object returned by the wrapped tool. */
+diff --git a/packages/coding-agent/src/tools/tool-commands.ts b/packages/coding-agent/src/tools/tool-commands.ts
+--- a/packages/coding-agent/src/tools/tool-commands.ts
++++ b/packages/coding-agent/src/tools/tool-commands.ts
+@@ -104,6 +104,8 @@ export interface ToolCommandDispatch {
+ 	exitCode: number;
+ 	/** Validated renderer args, projected where execution-only payloads are unnecessary. */
+ 	args?: Record<string, unknown>;
++	/** Live snapshot before the validated invocation enters execution */
++	queued?: true;
+ 	/**
+ 	 * Approval tier of the wrapped tool for {@link args} (`read` = no workspace
+ 	 * mutation). Absent for `help` dispatches and calls whose tier could not be
+@@ -427,6 +429,7 @@ export async function dispatchToolCommand(
+ 	signal?: AbortSignal,
+ 	onUpdate?: AgentToolUpdateCallback<ToolCommandDispatch>,
+ 	context?: AgentToolContext,
++	onQueued?: (dispatch: ToolCommandDispatch) => void,
+ ): Promise<{ result: AgentToolResult<unknown>; dispatch: ToolCommandDispatch }> {
+ 	let dispatch: ToolCommandDispatch = { tool: name, mode: "execute", exitCode: 1 };
+ 	try {
+@@ -471,6 +474,7 @@ export async function dispatchToolCommand(
+ 					},
+ 				}
+ 			: undefined;
++		onQueued?.({ ...dispatch, queued: true });
+ 		const result = await executable.execute(toolCallId, validated, signal, innerOnUpdate, executionContext);
+ 		return { result, dispatch: { ...dispatch, exitCode: result.isError ? 1 : 0, inner: result.details } };
+ 	} catch (error) {
+diff --git a/packages/coding-agent/src/ui/styles/tools/bash.ts b/packages/coding-agent/src/ui/styles/tools/bash.ts
+--- a/packages/coding-agent/src/ui/styles/tools/bash.ts
++++ b/packages/coding-agent/src/ui/styles/tools/bash.ts
+@@ -16,10 +16,10 @@ import { highlightCode } from "@oh-my-pi/pi-tui/text/highlight";
+ import type { Theme } from "@oh-my-pi/pi-tui/theme/contract";
+ import type { ShellVizPresentation } from "@oh-my-pi/pi-wire";
+ import type { BashStat, BashTerm } from "../../tools/bash";
++import { sourcePreview } from "./code-cell";
+ import { resultPictures, withoutDrawnPlaceholders } from "./file-common";
+ import {
+ 	bracketed,
+-	capLines,
+ 	frameInner,
+ 	frameRows,
+ 	PREVIEW_WINDOW_ROWS,
+@@ -93,7 +93,11 @@ function paintBash(node: UiNode, cx: PaintContext): Block {
+ 			commandPrefix && command.startsWith(`${commandPrefix} `) ? command.slice(commandPrefix.length + 1) : command;
+ 		lines = commandLines(theme, body, commandPrefix);
+ 	}
+-	const inputRows = expanded ? lines : capLines(theme, lines, PREVIEW_WINDOW_ROWS);
++	const inputRows = expanded
++		? lines
++		: sourcePreview(
++				theme, lines, term.codeMaxLines ?? PREVIEW_WINDOW_ROWS, frameInner(width), term.codeMaxLines === undefined,
++			);
+ 	const outcome = term.outcome;
+ 	const title = typeof props.title === "string" ? props.title : "";
+ 	let header: string | undefined;
+@@ -103,9 +107,15 @@ function paintBash(node: UiNode, cx: PaintContext): Block {
+ 			: outcome === "success"
+ 				? theme.fg("accent", theme.symbols.symbol("tool.bash"))
+ 				: statusIcon(cx, outcome === "running" ? "pending" : outcome === "warning" ? "warning" : "error");
+-		const line: StatusLine = { glyph, title, ...(term.intent ? { description: term.intent } : {}) };
++		const line: StatusLine = {
++			glyph,
++			title: term.stateLabel ? `${term.stateLabel}${theme.symbols.symbol("sep.dot")}${title}` : title,
++			...(term.intent ? { description: term.intent } : {}),
++		};
+ 		header = statusLine(theme, line);
+-	} else if (term.intent) header = statusLine(theme, { title: term.intent, titleColor: "muted" });
++	} else if (term.intent || term.stateLabel) {
++		header = statusLine(theme, { title: term.intent ?? term.stateLabel!, titleColor: "muted", ...(term.intent && term.stateLabel ? { meta: [term.stateLabel] } : {}) });
++	}
+ 
+ 	if (!term.result) {
+ 		// A call sealed while running keeps the time it ran.
+diff --git a/packages/coding-agent/src/ui/styles/tools/code-cell.ts b/packages/coding-agent/src/ui/styles/tools/code-cell.ts
+--- a/packages/coding-agent/src/ui/styles/tools/code-cell.ts
++++ b/packages/coding-agent/src/ui/styles/tools/code-cell.ts
+@@ -5,9 +5,10 @@
+  * Shared by the read and eval looks.
+  */
+ import { formatDuration } from "@oh-my-pi/pi-utils";
++import { LRUCache } from "@oh-my-pi/pi-utils/lru";
+ import type { PaintContext } from "@oh-my-pi/pi-tui/term/paint";
+ import { highlightCode } from "@oh-my-pi/pi-tui/text/highlight";
+-import { replaceTabs } from "@oh-my-pi/pi-tui/text/width";
++import { replaceTabs, truncate, wrap } from "@oh-my-pi/pi-tui/text/width";
+ import type { Theme } from "@oh-my-pi/pi-tui/theme/contract";
+ import { expandHint, frameInner, frameRows, hangingWrap, statusIcon } from "./frame";
+ 
+@@ -25,9 +26,14 @@ export interface CodeCell {
+ 	readonly status?: CellStatus;
+ 	readonly duration?: number;
+ 	readonly output?: string;
++	/** Already styled output rows with their own preview cap */
++	readonly outputRows?: readonly string[];
+ 	readonly outputMaxLines?: number;
++	/** Maximum wrapped source rows when collapsed */
+ 	readonly codeMaxLines?: number;
+-	/** Show the last `codeMaxLines` rows (the streaming edge) under an `… N earlier lines` marker. */
++	/** Stable display cell used to reuse source rows across clock ticks */
++	readonly sourceKey?: object;
++	/** Follow the streaming edge instead of showing the first source rows */
+ 	readonly codeTail?: boolean;
+ 	readonly expanded: boolean;
+ 	/** Lead the head with the language icon. */
+@@ -122,14 +128,82 @@ export function cellOutputLines(
+ 	return [...shown, theme.fg("dim", `${moreLines(hidden)} ${expandHint(theme)}`)];
+ }
+ 
+-/** The source rows of a code cell at the frame's inner width. */
+-export function codeCellLines(cx: PaintContext, cell: CodeCell, width: number): string[] {
++/** Wrap and bound a source preview; a minified line cannot fill the viewport */
++export function sourcePreview(
++	theme: Theme,
++	lines: readonly string[],
++	limit: number,
++	width: number,
++	tail: boolean,
++	hidden = 0,
++	pad = "",
++): string[] {
++	width = Math.max(1, width);
++	const shown: string[] = [];
++	let clipped = false;
++	for (let i = 0; i < lines.length; i++) {
++		const row = lines[tail ? lines.length - i - 1 : i]!;
++		const available = limit - shown.length;
++		if (available <= 0) {
++			clipped = true;
++			break;
++		}
++		const wrapped = row ? wrap(row, width) : [""];
++		clipped ||= wrapped.length > available;
++		if (tail) {
++			for (let j = wrapped.length - 1; j >= Math.max(0, wrapped.length - available); j--) shown.push(wrapped[j]!);
++		} else {
++			for (let j = 0; j < Math.min(wrapped.length, available); j++) shown.push(wrapped[j]!);
++		}
++		if (clipped) break;
++	}
++	if (tail) shown.reverse();
++	if (clipped || hidden > 0) {
++		const label = clipped ? (tail ? "Earlier source" : "More source") : tail ? `… ${hidden} earlier ${hidden === 1 ? "line" : "lines"}` : moreLines(hidden);
++		const marker = truncate(theme.fg("dim", pad + label) + " " + expandHint(theme), width);
++		if (tail) shown.unshift(marker);
++		else shown.push(marker);
++	}
++	return shown;
++}
++
++interface CellSourceMemo {
++	readonly theme: Theme;
++	readonly width: number;
++	readonly cell: Pick<CodeCell, "code" | "language" | "expanded" | "codeMaxLines" | "codeTail" | "codeStartLine" | "codeLineNumbers">;
++	readonly rows: readonly string[];
++}
++
++const sourceMemos = new LRUCache<object, CellSourceMemo>({
++	max: 128,
++	maxSize: 1024 * 1024,
++	sizeCalculation: memo => memo.rows.reduce((size, row) => size + row.length, memo.cell.code.length + 1),
++});
++
++/** The source rows of a code cell at the frame's inner width */
++export function codeCellLines(cx: PaintContext, cell: CodeCell, width: number): readonly string[] {
+ 	const theme = cx.theme;
++	const key = cell.sourceKey;
++	const memo = key && sourceMemos.get(key);
++	if (memo?.theme === theme && memo.width === width && memo.cell.expanded === cell.expanded &&
++		memo.cell.code === cell.code && memo.cell.language === cell.language &&
++		memo.cell.codeMaxLines === cell.codeMaxLines && memo.cell.codeTail === cell.codeTail &&
++		memo.cell.codeStartLine === cell.codeStartLine && memo.cell.codeLineNumbers === cell.codeLineNumbers
++	) return memo.rows;
++	const rows = renderCellSource(theme, cell, width);
++	if (key) {
++		const { code, language, expanded, codeMaxLines, codeTail, codeStartLine, codeLineNumbers } = cell;
++		sourceMemos.set(key, { theme, width, cell: { code, language, expanded, codeMaxLines, codeTail, codeStartLine, codeLineNumbers }, rows });
++	}
++	return rows;
++}
++
++function renderCellSource(theme: Theme, cell: CodeCell, width: number): string[] {
+ 	const codeMax = cell.codeMaxLines ?? 12;
+ 	const raw = terminalLines(replaceTabs(cell.code ?? ""));
+ 	const shownCount = cell.expanded ? raw.length : Math.min(raw.length, codeMax);
+ 	const hidden = raw.length - shownCount;
+-	const tail = cell.codeTail === true && !cell.expanded && hidden > 0;
++	const tail = cell.codeTail === true && !cell.expanded;
+ 	const start = tail ? raw.length - shownCount : 0;
+ 	const code = highlightCode(raw.slice(start, start + shownCount).join("\n"), cell.language, theme);
+ 	let numbers: readonly (number | null)[] | undefined;
+@@ -150,19 +224,14 @@ export function codeCellLines(cx: PaintContext, cell: CodeCell, width: number):
+ 			lines.push(...hangingWrap(theme.fg("dim", `${label} `), " ".repeat(gutter + 1), code[i]!, frameInner(width)));
+ 		}
+ 	} else lines.push(...code);
+-	if (hidden > 0) {
+-		const pad = gutter > 0 ? " ".repeat(gutter + 1) : "";
+-		const hint = cell.expanded ? "" : ` ${expandHint(theme)}`;
+-		if (tail) lines.unshift(theme.fg("dim", `${pad}… ${hidden} earlier ${hidden === 1 ? "line" : "lines"}${hint}`));
+-		else lines.push(theme.fg("dim", `${pad}${moreLines(hidden)}${hint}`));
+-	}
+-	return lines;
++	if (cell.expanded) return lines;
++	return sourcePreview(theme, lines, codeMax, frameInner(width), tail, hidden, gutter > 0 ? " ".repeat(gutter + 1) : "");
+ }
+ 
+ /** A framed code cell at `width`. */
+ export function codeCellRows(cx: PaintContext, cell: CodeCell, width: number): string[] {
+ 	const theme = cx.theme;
+-	const output = cellOutputLines(theme, cell.output, cell.expanded, cell.outputMaxLines ?? 6);
++	const output = cell.outputRows ?? cellOutputLines(theme, cell.output, cell.expanded, cell.outputMaxLines ?? 6);
+ 	const sections: { label?: string; lines: readonly string[] }[] = [{ lines: codeCellLines(cx, cell, width) }];
+ 	if (output.length > 0) sections.push({ label: theme.fg("toolTitle", "Output"), lines: output });
+ 	return frameRows(theme, width, { head: cellHead(cx, cell), sections, ...cellFrame(cell.status) });
+diff --git a/packages/coding-agent/src/ui/styles/tools/eval.ts b/packages/coding-agent/src/ui/styles/tools/eval.ts
+--- a/packages/coding-agent/src/ui/styles/tools/eval.ts
++++ b/packages/coding-agent/src/ui/styles/tools/eval.ts
+@@ -16,12 +16,13 @@ import { renderMarkdown } from "@oh-my-pi/pi-tui/text/markdown/index";
+ import { replaceTabs, truncate, visibleWidth, wrap } from "@oh-my-pi/pi-tui/text/width";
+ import type { Theme } from "@oh-my-pi/pi-tui/theme/contract";
+ import { formatDuration, formatNumber, sanitizeText } from "@oh-my-pi/pi-utils";
++import { LRUCache } from "@oh-my-pi/pi-utils/lru";
+ import { type EvalStatusEvent, splitEvalOutput } from "../../../tools/details/eval";
+ import { formatArtifactErrorNotice, formatTruncationMetaNotice } from "../../../tools/output-meta-format";
+ import { FEED_MODEL_BADGE_WIDTH, isFeedModelBadgeEnabled, shortenPath } from "../../../utils/render-utils";
+ import { expandKeyLabel } from "../../keys/hints";
+ import { feedModel } from "../../tools/agent-common";
+-import { type EvalTerm, type EvalTermCell, formatMcpProgress, highlightLanguage, mcpProgress } from "../../tools/eval";
++import { type EvalRendererOptions, type EvalTerm, type EvalTermCell, formatMcpProgress, highlightLanguage, mcpProgress } from "../../tools/eval";
+ import { styledModelBadge } from "./agent-common";
+ import { resultPictures, withoutDrawnPlaceholders } from "./file-common";
+ import { codeCellRows } from "./code-cell";
+@@ -70,7 +71,7 @@ function plural(count: unknown, one: string, many: string): string {
+ }
+ 
+ /** One status event as a line: icon, muted op, dim summary. */
+-function statusEventLine(theme: Theme, event: EvalStatusEvent): string {
++export function formatStatusEvent(event: EvalStatusEvent, theme: Theme): string {
+ 	const { op, ...data } = event;
+ 	const icon = theme.fg("muted", theme.symbols.symbol(OP_ICONS[op] ?? "icon.file"));
+ 	if (data.error) return `${icon} ${theme.fg("warning", op)}: ${theme.fg("dim", String(data.error))}`;
+@@ -166,8 +167,8 @@ function statusEventLine(theme: Theme, event: EvalStatusEvent): string {
+ }
+ 
+ /** A status event's line plus, expanded, its listed items or preview. */
+-function statusEventLines(theme: Theme, event: EvalStatusEvent): string[] {
+-	const lines = [statusEventLine(theme, event)];
++export function formatStatusEventExpanded(event: EvalStatusEvent, theme: Theme): string[] {
++	const lines = [formatStatusEvent(event, theme)];
+ 	const { op, ...data } = event;
+ 	const items = (value: unknown, format: (item: unknown) => string, max = 5): void => {
+ 		const list = Array.isArray(value) ? value : [];
+@@ -232,10 +233,10 @@ function statusRows(theme: Theme, events: readonly EvalStatusEvent[], expanded:
+ 		const last = i === visible.length - 1;
+ 		const branch = theme.fg("dim", last ? tree.last : tree.branch);
+ 		if (!expanded) {
+-			rows.push(`${branch} ${statusEventLine(theme, event)}`);
++			rows.push(`${branch} ${formatStatusEvent(event, theme)}`);
+ 			return;
+ 		}
+-		const lines = statusEventLines(theme, event);
++		const lines = formatStatusEventExpanded(event, theme);
+ 		rows.push(`${branch} ${lines[0]}`);
+ 		const cont = theme.fg("dim", last ? "   " : `${tree.vertical}  `);
+ 		for (const line of lines.slice(1)) rows.push(`${cont}${line}`);
+@@ -243,18 +244,49 @@ function statusRows(theme: Theme, events: readonly EvalStatusEvent[], expanded:
+ 	return rows;
+ }
+ 
+-/** Wrap rows at `width` and keep the last `limit` visual rows; the skipped count. */
+-function visualTail(lines: readonly string[], limit: number, width: number): { rows: string[]; skipped: number } {
++/** Count the wrapped rows while retaining only the requested preview edge */
++function visualWindow(
++	lines: readonly string[], limit: number, width: number, head = false,
++): { rows: string[]; skipped: number } {
+ 	const rows: string[] = [];
++	let count = 0;
+ 	for (const line of lines) {
+ 		const wrapped = wrap(line, Math.max(1, width));
+-		rows.push(...(wrapped.length > 0 ? wrapped : [""]));
++		for (const row of wrapped.length > 0 ? wrapped : [""]) {
++			if (limit > 0 && (!head || count < limit)) rows[count % limit] = row;
++			count++;
++		}
+ 	}
+-	if (rows.length <= limit) return { rows, skipped: 0 };
+-	return {
+-		rows: rows.slice(rows.length - limit),
+-		skipped: rows.length - limit,
+-	};
++	if (head || count <= limit || limit <= 0) return { rows, skipped: Math.max(0, count - limit) };
++	const at = count % limit;
++	return { rows: at ? [...rows.slice(at), ...rows.slice(0, at)] : rows, skipped: count - limit };
++}
++
++interface CellOutputMemo {
++	readonly theme: Theme;
++	readonly width: number;
++	readonly expanded: boolean;
++	readonly previewLines: number;
++	readonly presentation?: EvalRendererOptions;
++	readonly output: { rows: string[]; hidden: number };
++}
++
++const cellOutputs = new LRUCache<EvalTermCell, CellOutputMemo>({
++	max: 128,
++	maxSize: 2 * 1024 * 1024,
++	sizeCalculation: (memo, cell) => memo.output.rows.reduce((size, row) => size + row.length, (cell.output?.length ?? 0) + 1),
++});
++
++function renderCellOutput(
++	theme: Theme, cell: EvalTermCell, expanded: boolean, previewLines: number, width: number,
++	presentation?: EvalRendererOptions,
++): { rows: string[]; hidden: number } {
++	const memo = cellOutputs.get(cell);
++	if (memo?.theme === theme && memo.width === width && memo.expanded === expanded &&
++		memo.previewLines === previewLines && memo.presentation === presentation) return memo.output;
++	const output = renderCellOutput(theme, cell, expanded, previewLines, width, presentation);
++	cellOutputs.set(cell, { theme, width, expanded, previewLines, presentation, output });
++	return output;
+ }
+ 
+ /** A cell's output rows (text in the output or error color, views as trees / Markdown), tail-capped while collapsed. */
+@@ -264,10 +296,12 @@ function cellOutputRows(
+ 	expanded: boolean,
+ 	previewLines: number,
+ 	width: number,
++	presentation: EvalRendererOptions | undefined,
+ ): { rows: string[]; hidden: number } {
+ 	const output = cell.output;
+ 	if (!output) return { rows: [], hidden: 0 };
+ 	const inner = frameInner(width);
++	const full = expanded || (cell.status === "error" && presentation?.expandErrors === true);
+ 	const style = (line: string): string =>
+ 		theme.fg(cell.status === "error" ? "error" : "toolOutput", replaceTabs(line));
+ 	const parts = splitEvalOutput(
+@@ -283,36 +317,43 @@ function cellOutputRows(
+ 			}
+ 			const view = part.view;
+ 			if (view.kind === "json") {
+-				const tree = jsonTreeRows(theme, view.value, expanded ? EXPANDED_TREE : COLLAPSED_TREE);
++				const tree = jsonTreeRows(theme, view.value, full ? EXPANDED_TREE : COLLAPSED_TREE, presentation?.hiddenRootKeys);
+ 				lines.push(...tree.rows);
+ 				if (tree.truncated) lines.push(theme.fg("dim", "…"));
+ 			} else if (view.kind === "markdown") lines.push(...renderMarkdown(view.text, inner, { theme }));
+ 		}
+ 	} else for (const line of output.split("\n")) lines.push(style(line));
+-	if (expanded) return { rows: lines, hidden: 0 };
+-	const tail = visualTail(lines, previewLines, inner);
++	if (full) return { rows: lines, hidden: 0 };
++	const head = cell.status !== "error" && presentation?.structuredHead && parts.some(part => part.kind === "view" && part.view.kind === "json");
++	const tail = visualWindow(lines, previewLines, inner, head);
+ 	return { rows: tail.rows, hidden: tail.skipped };
+ }
+ 
+-/** The spinner (or the still running glyph) in the accent color. */
+-function runningGlyph(cx: PaintContext): string {
+-	const theme = cx.theme;
+-	if (cx.reduceMotion) return theme.fg("accent", theme.symbols.symbol("status.running"));
+-	const frames = theme.symbols.spinnerFrames;
+-	return theme.fg("accent", frames[Math.floor(cx.now() / SPINNER_INTERVAL_MS) % frames.length]!);
++type AgentEventStatus = "pending" | "running" | "completed" | "failed" | "aborted";
++
++export function agentEventStatus(value: unknown): AgentEventStatus {
++	switch (value) {
++		case "pending":
++		case "completed":
++		case "failed":
++		case "aborted":
++			return value;
++		default:
++			return "running";
++	}
+ }
+ 
+ /** `agent()` progress rows under a cell. */
+-function agentRows(cx: PaintContext, events: readonly EvalStatusEvent[], width: number): string[] {
+-	const theme = cx.theme;
++export function renderAgentProgressEvents(
++	events: readonly EvalStatusEvent[], theme: Theme, width: number, spinnerFrame?: number,
++): string[] {
+ 	const symbol = (key: string): string => theme.symbols.symbol(key);
+ 	const rows: string[] = [];
+ 	events.forEach((event, i) => {
+ 		const last = i === events.length - 1;
+ 		const prefix = theme.fg("dim", last ? symbol("tree.last") : symbol("tree.branch"));
+ 		const cont = last ? "   " : `${theme.fg("dim", symbol("tree.vertical"))}  `;
+-		const raw = typeof event.status === "string" ? event.status : "running";
+-		const status = ["pending", "running", "completed", "failed", "aborted"].includes(raw) ? raw : "running";
++		const status = agentEventStatus(event.status);
+ 		const text = (key: string): string | undefined => {
+ 			const value = event[key];
+ 			return typeof value === "string" && value.length > 0 ? value : undefined;
+@@ -325,7 +366,7 @@ function agentRows(cx: PaintContext, events: readonly EvalStatusEvent[], width:
+ 			status === "completed"
+ 				? theme.fg("accent", symbol("tool.eval"))
+ 				: status === "running"
+-					? runningGlyph(cx)
++					? theme.fg("accent", theme.symbols.spinnerFrames[spinnerFrame ?? -1] ?? symbol("status.running"))
+ 					: status === "failed"
+ 						? theme.fg("error", symbol("status.error"))
+ 						: status === "aborted"
+@@ -424,6 +465,10 @@ function paintEval(node: UiNode, cx: PaintContext): Block {
+ 	const width = cx.width;
+ 	const expanded = term.cellsExpanded ?? isExpanded(props);
+ 	const cells = term.cells;
++	const presentation = term.presentation;
++	const renderer = term.statusRenderer;
++	const frameCount = theme.symbols.spinnerFrames.length;
++	const spinnerFrame = !cx.reduceMotion && frameCount > 0 ? Math.floor(cx.now() / SPINNER_INTERVAL_MS) % frameCount : undefined;
+ 	if (term.phase === "call") {
+ 		if (cells.length === 0)
+ 			return {
+@@ -443,8 +488,9 @@ function paintEval(node: UiNode, cx: PaintContext): Block {
+ 						total: cells.length,
+ 						...(cell.title !== undefined ? { title: cell.title } : {}),
+ 						status: cx.reduceMotion ? "pending" : "running",
+-						codeTail: true,
+-						codeMaxLines: PREVIEW_WINDOW_ROWS,
++						sourceKey: cell,
++						codeTail: presentation?.codeTail ?? true,
++						codeMaxLines: presentation?.codeMaxLines ?? PREVIEW_WINDOW_ROWS,
+ 						expanded,
+ 					},
+ 					width,
+@@ -458,13 +504,17 @@ function paintEval(node: UiNode, cx: PaintContext): Block {
+ 	if (term.phase === "cells") {
+ 		const rows: string[] = [];
+ 		cells.forEach((cell, i) => {
+-			const status = statusRows(theme, cell.events ?? [], expanded, cell.elided);
+-			const output = cellOutputRows(theme, cell, expanded, previewLines, width);
++			const events = cell.events ?? [];
++			const status = renderer
++				? renderer.render(events, theme, expanded, cell.elided, frameInner(width), spinnerFrame)
++				: statusRows(theme, events, expanded, cell.elided);
++			const output = cellOutputRows(theme, cell, expanded, previewLines, width, presentation);
+ 			const lines = [...output.rows];
+ 			if (!expanded && output.hidden > 0)
+-				lines.push(theme.fg("dim", `… ${output.hidden} more lines (${expandKeyLabel(theme)} to expand)`));
++				lines.push(presentation?.outputDisclosure?.(output.hidden, theme) ??
++					theme.fg("dim", `… ${output.hidden} more lines (${expandKeyLabel(theme)} to expand)`));
+ 			if (status.length > 0) {
+-				if (lines.length > 0) lines.push(theme.fg("dim", "Status"));
++				if (!renderer && lines.length > 0) lines.push(theme.fg("dim", "Status"));
+ 				lines.push(...status);
+ 			}
+ 			rows.push(
+@@ -479,15 +529,16 @@ function paintEval(node: UiNode, cx: PaintContext): Block {
+ 						...(cell.title !== undefined ? { title: cell.title } : {}),
+ 						...(cell.status ? { status: cell.status } : {}),
+ 						...(cell.durationMs !== undefined ? { duration: cell.durationMs } : {}),
+-						...(lines.length > 0 ? { output: lines.join("\n"), outputMaxLines: lines.length } : {}),
+-						codeTail: true,
+-						codeMaxLines: PREVIEW_WINDOW_ROWS,
++						outputRows: lines,
++						sourceKey: cell,
++						codeTail: presentation?.codeTail ?? true,
++						codeMaxLines: presentation?.codeMaxLines ?? PREVIEW_WINDOW_ROWS,
+ 						expanded,
+ 					},
+ 					width,
+ 				),
+ 			);
+-			if (cell.agents && cell.agents.length > 0) rows.push(...agentRows(cx, cell.agents, width));
++			if (!renderer && cell.agents?.length) rows.push(...renderAgentProgressEvents(cell.agents, theme, width, spinnerFrame));
+ 			if (i < cells.length - 1) rows.push("");
+ 		});
+ 		return { rows: [...rows, ...imagePlaceholderRows(node, cx), ...notes] };
+@@ -497,17 +548,20 @@ function paintEval(node: UiNode, cx: PaintContext): Block {
+ 		props.term?.imageLinks,
+ 		resultPictures(node, cx).length,
+ 	).trimEnd();
+-	const status = statusRows(theme, term.events ?? [], expanded, term.elided);
+-	const statusBlock = status.length > 0 ? [theme.fg("dim", "Status"), ...status] : [];
++	const events = term.events ?? [];
++	const status = renderer
++		? renderer.render(events, theme, expanded, term.elided, width, spinnerFrame)
++		: statusRows(theme, events, expanded, term.elided);
++	const statusBlock = !renderer && status.length > 0 ? [theme.fg("dim", "Status"), ...status] : status;
+ 	if (!output && status.length === 0) return { rows: notes.length > 0 ? wrap(notes.join("\n"), width) : [] };
+-	if (!output || expanded) {
++	if (!output || expanded || (term.isError && presentation?.expandErrors)) {
+ 		const styled = output ? output.split("\n").map(line => theme.fg("toolOutput", line)) : [];
+ 		return {
+ 			rows: wrap([...styled, ...statusBlock, ...notes].join("\n"), width),
  		};
  	}
+ 	const styled = output.split("\n").map(line => theme.fg("toolOutput", line));
+-	const tail = visualTail(["", ...styled], previewLines, width);
++	const tail = visualWindow(["", ...styled], previewLines, width);
+ 	const rows: string[] = [];
+ 	if (tail.skipped > 0) {
+ 		rows.push(
+diff --git a/packages/coding-agent/src/ui/styles/tools/json-tree.ts b/packages/coding-agent/src/ui/styles/tools/json-tree.ts
+--- a/packages/coding-agent/src/ui/styles/tools/json-tree.ts
++++ b/packages/coding-agent/src/ui/styles/tools/json-tree.ts
+@@ -22,6 +22,17 @@ export interface JsonTreeLimits {
+ 	readonly maxScalar: number;
+ }
+ 
++/** Optional label styling for JSON trees */
++export interface JsonTreePresentation {
++	keyColor(depth: number, color: string | undefined, native: boolean): string | undefined;
++}
++
++let jsonTreePresentation: JsonTreePresentation | undefined;
++
++export function setJsonTreePresentation(policy: JsonTreePresentation | undefined): void {
++	jsonTreePresentation = policy;
++}
++
+ /** Limits of an expanded tree. */
+ export const EXPANDED_TREE: JsonTreeLimits = { maxDepth: 6, maxLines: 200, maxScalar: 2000 };
+ /** Limits of a collapsed tree. */
+@@ -95,11 +106,15 @@ export function jsonTreeRows(
+ 	const rows: string[] = [];
+ 	let truncated = false;
+ 	const entriesOf = (container: unknown, root: boolean): [string, unknown, string][] => {
+-		if (Array.isArray(container)) return container.map((entry, i) => [String(i), entry, "dim"]);
++		// One lookahead preserves the last-branch glyph without copying the whole input
++		const limit = limits.maxLines - rows.length + 1;
++		if (Array.isArray(container))
++			return Array.from({ length: Math.min(limit, container.length) }, (_, i) => [String(i), container[i], "dim"]);
+ 		const out: [string, unknown, string][] = [];
+ 		for (const key in container as Record<string, unknown>) {
+-			if (root && hidden.includes(key)) continue;
++			if (!Object.hasOwn(container as object, key) || (root && hidden.includes(key))) continue;
+ 			out.push([key, (container as Record<string, unknown>)[key], "muted"]);
++			if (out.length >= limit) break;
+ 		}
+ 		return out;
+ 	};
+@@ -111,11 +126,12 @@ export function jsonTreeRows(
+ 	const entryRows = (
+ 		key: string,
+ 		keyColor: string,
++		depth: number,
+ 		entry: unknown,
+ 		first: string,
+ 		continuation: string,
+ 	): { rows: string[]; container: boolean } => {
+-		const label = theme.fg(keyColor, key);
++		const label = theme.fg(jsonTreePresentation?.keyColor(depth, keyColor, false) ?? keyColor, key);
+ 		if (entry !== null && typeof entry === "object") {
+ 			const inline = inlineValue(theme, entry);
+ 			if (inline !== undefined) return { rows: [`${first}${label}: ${inline}`], container: false };
+@@ -142,6 +158,14 @@ export function jsonTreeRows(
+ 			container: false,
+ 		};
+ 	};
++	const append = (lines: readonly string[]): void => {
++		const room = limits.maxLines - rows.length;
++		if (lines.length <= room) rows.push(...lines);
++		else {
++			for (let i = 0; i < room; i++) rows.push(lines[i]!);
++			truncated = true;
++		}
++	};
+ 	const lastBranch = theme.fg("dim", theme.symbols.symbol("tree.last"));
+ 	const branch = theme.fg("dim", theme.symbols.symbol("tree.branch"));
+ 	const hook = theme.symbols.symbol("tree.hook");
+@@ -164,8 +188,8 @@ export function jsonTreeRows(
+ 			const last = i === entries.length - 1;
+ 			// The rails of open ancestors stay unstyled.
+ 			const below = `${gutter}${last ? "   " : `${vertical}  `}`;
+-			const row = entryRows(key, keyColor, entry, `${gutter}${last ? lastBranch : branch} `, below);
+-			rows.push(...row.rows);
++			const row = entryRows(key, keyColor, depth, entry, `${gutter}${last ? lastBranch : branch} `, below);
++			append(row.rows);
+ 			if (row.container) walk(entry as object, depth + 1, below);
+ 		});
+ 	};
+@@ -183,8 +207,8 @@ export function jsonTreeRows(
+ 			return;
+ 		}
+ 		const lead = i === 0 ? `${theme.fg("dim", hook)} ` : hookPad;
+-		const row = entryRows(key, keyColor, entry, `${lead}${theme.fg("dim", bullet)} `, gutter);
+-		rows.push(...row.rows);
++		const row = entryRows(key, keyColor, 1, entry, `${lead}${theme.fg("dim", bullet)} `, gutter);
++		append(row.rows);
+ 		if (row.container) walk(entry as object, 2, gutter);
+ 	});
+ 	return { rows, truncated };
+diff --git a/packages/coding-agent/src/ui/styles/tools/tool-command.ts b/packages/coding-agent/src/ui/styles/tools/tool-command.ts
+--- a/packages/coding-agent/src/ui/styles/tools/tool-command.ts
++++ b/packages/coding-agent/src/ui/styles/tools/tool-command.ts
+@@ -16,7 +16,7 @@ import { truncate } from "@oh-my-pi/pi-tui/text/width";
+ import type { ToolCommandTerm } from "../../tools/tool-command";
+ import { defaultCardRows, tint } from "./default";
+ import { legacyPartRows } from "./legacy";
+-import { statusGlyph, statusIcon, statusLine } from "./frame";
++import { frameInner, frameRows, statusGlyph, statusIcon, statusLine } from "./frame";
+ import { defineToolLook, isExpanded, toolLook, toolProps } from "./look";
+ 
+ /** The `--help` row. */
+@@ -30,11 +30,23 @@ function helpRow(cx: PaintContext, term: ToolCommandTerm, width: number): string
+ 	return truncate(line, width);
+ }
+ 
++function queuedRows(cx: PaintContext, term: ToolCommandTerm, children: readonly UiNode[], width: number): string[] {
++	const lines: string[] = [];
++	const inner = Math.max(1, frameInner(width));
++	for (const child of children) lines.push(...cx.paint(child, inner).rows);
++	return frameRows(cx.theme, width, {
++		head: statusLine(cx.theme, { glyph: statusIcon(cx, "pending"), title: term.queuedLabel ?? term.commandLabel }),
++		sections: [{ lines }],
++		bg: "toolPendingBg",
++	});
++}
++
+ /** A nested tool command card inside a shell run, at `width`. */
+ export function toolCommandRows(node: UiNode, cx: PaintContext, width: number, expanded: boolean): string[] {
+ 	const term = (node.props() as { term?: ToolCommandTerm & { tone?: string } }).term;
+ 	if (!term) return [];
+ 	if (term.mode === "help") return [helpRow(cx, term, width)];
++	if (term.mode === "queued") return queuedRows(cx, term, node.children().slice(1), width);
+ 	if (term.mode === "legacy") return legacyPartRows(cx, term.parts ?? [], width);
+ 	const inner = term.inner && term.inner !== "default" ? toolLook(term.inner) : undefined;
+ 	// The wrapped tool's look at the nested card's width (getters keep reading the paint environment).
+@@ -60,6 +72,7 @@ function paintToolCommand(node: UiNode, cx: PaintContext): Block {
+ 	const term = props.term as ToolCommandTerm | undefined;
+ 	if (!term) return { rows: [] };
+ 	if (term.mode === "help") return { rows: [helpRow(cx, term, cx.width)] };
++	if (term.mode === "queued") return { rows: queuedRows(cx, term, node.children(), cx.width) };
+ 	if (term.mode === "legacy") return { rows: legacyPartRows(cx, term.parts ?? [], cx.width) };
+ 	const inner = term.inner && term.inner !== "default" ? toolLook(term.inner) : undefined;
+ 	if (inner) return inner.paint(node, cx);
+diff --git a/packages/coding-agent/src/ui/tools/bash.tsx b/packages/coding-agent/src/ui/tools/bash.tsx
+--- a/packages/coding-agent/src/ui/tools/bash.tsx
++++ b/packages/coding-agent/src/ui/tools/bash.tsx
+@@ -16,7 +16,7 @@ import { stripOutputNotice, stripTrailingNotice } from "../../tools/output-meta-
+ import { resultText } from "./default";
+ import type { ToolHead, ToolPresenter, ToolResult, ToolView, ToolViewState } from "./contract";
+ import { registerToolPresenter } from "./registry";
+-import { type ToolCommandDispatch, ToolCommandNode, type ToolCommandResolver } from "./tool-command";
++import { queuedToolCommand, type ToolCommandDispatch, ToolCommandNode, type ToolCommandResolver } from "./tool-command";
+ import {
+ 	displayWorkdir,
+ 	formatMinimized,
+@@ -128,6 +128,8 @@ export interface BashTerm {
+ 	readonly previewLines?: number;
+ 	/** The whole call was one tool command, whose card stands for the output. */
+ 	readonly sole?: boolean;
++	readonly codeMaxLines?: number;
++	readonly stateLabel?: string;
+ }
+ 
+ /** How a shell-like tool's args map to a command line. */
+@@ -138,6 +140,25 @@ export interface ShellConfig<TArgs> {
+ 	readonly env?: (args: TArgs | undefined) => Record<string, unknown> | undefined;
+ 	/** Draw the status line in the frame's top edge. */
+ 	readonly header: boolean;
++	readonly presentation?: ShellRendererPolicy;
++}
++
++/** Display choices shared by shell-like tools on both surfaces */
++export interface ShellRendererPolicy {
++	previewLines?: number;
++	codeMaxLines?: number;
++	shellPreviewLines?: number | false;
++	describeInput?: (source: string, language: string, role: string) => JSXNode;
++	serviceFacts?: (service: NonNullable<BashDetails["service"]>, expanded: boolean) => string[];
++	showTimeout?: (expanded: boolean) => boolean;
++	stateLabel?: (state: RunState | "queued") => string;
++}
++
++let shellRendererPolicy: ShellRendererPolicy | undefined;
++
++/** Apply display choices to existing and future shell presenters */
++export function setShellRendererPolicy(policy: ShellRendererPolicy | undefined): void {
++	shellRendererPolicy = policy;
+ }
+ 
+ /** Collapsed output rows of a shell result. */
+@@ -259,8 +280,9 @@ function runState(
+ 	isPartial: boolean,
+ 	cancelled: boolean,
+ ): RunState {
+-	if (cancelled) return "cancelled";
++	if (cancelled || details?.async?.state === "cancelled") return "cancelled";
+ 	if (details?.async?.state === "running") return "background";
++	if (details?.async?.state === "failed") return "failed";
+ 	if (isPartial) return "running";
+ 	if (details?.timedOut === true) return "timed-out";
+ 	if (isError || (details?.exitCode !== undefined && details.exitCode !== 0)) return "failed";
+@@ -301,11 +323,15 @@ function footerStats(
+ 	contextTimeout: number | undefined,
+ 	artifactId: string | undefined,
+ 	isError: boolean,
++	expanded: boolean,
++	policy: ShellRendererPolicy | undefined,
+ ): BashStat[] {
+ 	const stats: BashStat[] = [];
+ 	if (details?.async?.state === "running") stats.push({ icon: "icon.job", text: details.async.jobId });
+ 	const service = details?.service;
+-	if (service) {
++	if (service && policy?.serviceFacts) {
++		for (const text of policy.serviceFacts(service, expanded)) stats.push({ text });
++	} else if (service) {
+ 		stats.push({ icon: "icon.server", text: service.name });
+ 		stats.push({ icon: serviceStateIcon(service.state), text: service.state });
+ 		stats.push(
+@@ -317,8 +343,9 @@ function footerStats(
+ 		);
+ 		if (service.pid !== undefined) stats.push({ icon: "icon.pid", iconSeparator: "", text: String(service.pid) });
+ 	}
+-	const timeoutDisabled = details?.timeoutDisabled === true || contextTimeout === 0;
+-	const timeoutSeconds = timeoutDisabled ? undefined : (details?.timeoutSeconds ?? contextTimeout);
++	const showTimeout = policy?.showTimeout?.(expanded) ?? true;
++	const timeoutDisabled = showTimeout && (details?.timeoutDisabled === true || contextTimeout === 0);
++	const timeoutSeconds = timeoutDisabled || !showTimeout ? undefined : (details?.timeoutSeconds ?? contextTimeout);
+ 	let timeoutLabel: string | undefined;
+ 	if (timeoutDisabled) timeoutLabel = "disabled";
+ 	else if (typeof timeoutSeconds === "number") {
+@@ -347,11 +374,17 @@ function footerStats(
+ }
+ 
+ /** The run box's quiet foot facts. */
+-function footFacts(details: BashDetails | undefined, artifactId: string | undefined): string[] {
++function footFacts(
++	details: BashDetails | undefined,
++	artifactId: string | undefined,
++	expanded: boolean,
++	policy: ShellRendererPolicy | undefined,
++): string[] {
+ 	const facts: string[] = [];
+ 	if (details?.async?.state === "running") facts.push(`Job ${details.async.jobId}`);
+ 	const service = details?.service;
+-	if (service) {
++	if (service && policy?.serviceFacts) facts.push(...policy.serviceFacts(service, expanded));
++	else if (service) {
+ 		facts.push(`Service ${service.name}`, service.state);
+ 		facts.push(service.ready ? "ready" : service.timedOut ? "ready timed out" : "not ready");
+ 		if (service.pid !== undefined) facts.push(`PID ${service.pid}`);
+@@ -394,6 +427,7 @@ function ShellInput(props: {
+ 	readonly liveOrigin: boolean;
+ 	readonly stream?: boolean;
+ 	readonly cwd?: string;
++	readonly previewLines?: number | false;
+ }): JSXNode {
+ 	const step = props.context.shellStep;
+ 	const onEvent = props.context.shellEvent;
+@@ -407,7 +441,7 @@ function ShellInput(props: {
+ 			liveOrigin={props.liveOrigin}
+ 			stream={props.stream}
+ 			cwd={props.cwd}
+-			preview={{ lines: RUN_INPUT_PREVIEW_LINES }}
++			preview={props.previewLines === false ? undefined : { lines: props.previewLines ?? RUN_INPUT_PREVIEW_LINES }}
+ 			steps={step ? true : undefined}
+ 			focus={step?.focus}
+ 			{...(onEvent
+@@ -434,10 +468,14 @@ export function shellPresenter<TArgs>(config: ShellConfig<TArgs>): ToolPresenter
+ 			details?.cwd !== undefined ? details.cdSeparator : undefined,
+ 		);
+ 	};
++	const describeInput = (command: string, policy: ShellRendererPolicy | undefined): JSXNode =>
++		policy?.describeInput?.(command, "bash", "omp.tool.bash.command") ??
++		<RunInput source={command} role="omp.tool.bash.command" lang="bash" wrap />;
+ 	return {
+ 		merge: true,
+ 		inline: true,
+ 		call(args, state): ToolView {
++			const policy = config.presentation ?? shellRendererPolicy;
+ 			const cmd = line(args);
+ 			const started = state.executionStarted;
+ 			const shell = state.renderContext as ShellContext | undefined;
+@@ -450,11 +488,12 @@ export function shellPresenter<TArgs>(config: ShellConfig<TArgs>): ToolPresenter
+ 							<ShellInput
+ 								context={shell!}
+ 								presentation={presentation}
++								previewLines={policy?.shellPreviewLines}
+ 								liveOrigin={state.executionStarted}
+ 								stream={!state.argsComplete && state.cancelled !== true}
+ 							/>
+ 						) : (
+-							<RunInput source={cmd.text} role="omp.tool.bash.command" lang="bash" wrap />
++							describeInput(cmd.text, policy)
+ 						)}
+ 						{started && <RunFoot state={state.cancelled ? "cancelled" : "running"} elapsedMs={state.elapsedMs} />}
+ 					</RunBox>
+@@ -465,14 +504,17 @@ export function shellPresenter<TArgs>(config: ShellConfig<TArgs>): ToolPresenter
+ 					look: "bash",
+ 					prefix: cmd.prefix,
+ 					header: config.header,
++					codeMaxLines: policy?.codeMaxLines,
++					stateLabel: policy?.stateLabel?.(state.cancelled ? "cancelled" : started ? "running" : "queued"),
+ 					...(callIntent(args) ? { intent: callIntent(args) } : {}),
+ 				} satisfies BashTerm,
+ 			};
+ 		},
+ 		result(result: ToolResult<BashDetails>, state: ToolViewState, args?: TArgs): ToolView {
++			const policy = config.presentation ?? shellRendererPolicy;
+ 			const details = result.details;
+ 			const context = state.renderContext as BashRenderContext | undefined;
+-			const isError = result.isError === true;
++			const isError = result.isError === true || (details?.exitCode !== undefined && details.exitCode !== 0);
+ 			const isPartial = state.isPartial;
+ 			const raw = context?.output ?? resultText(result);
+ 			const stripped = stripNotices(raw, details);
+@@ -480,7 +522,7 @@ export function shellPresenter<TArgs>(config: ShellConfig<TArgs>): ToolPresenter
+ 			const expanded = context?.expanded ?? state.expanded;
+ 			const showingFull = expanded && context?.isFullOutput === true;
+ 			const cmd = line(args);
+-			const previewLines = context?.previewLines ?? DEFAULT_PREVIEW_LINES;
++			const previewLines = policy?.previewLines ?? context?.previewLines ?? DEFAULT_PREVIEW_LINES;
+ 			const shell = state.renderContext as ShellContext | undefined;
+ 			const presentation = shell?.shellPresentation;
+ 			const runStateValue = runState(details, isError, isPartial, state.cancelled === true);
+@@ -493,7 +535,13 @@ export function shellPresenter<TArgs>(config: ShellConfig<TArgs>): ToolPresenter
+ 			const dispatches = details?.toolCommands ?? [];
+ 			const only = dispatches.length === 1 ? dispatches[0] : undefined;
+ 			const sole = only?.mode === "execute" && isSoleInvocation(config.command(args), only.tool);
++			if (sole && only.queued && isPartial && !state.cancelled) {
++				const queued = queuedToolCommand({ dispatch: only, resolveMounted: context?.resolveToolCommandMounted }, state);
++				if (queued) return queued;
++			}
++			const showInnerOutput = sole && !only.queued;
+ 			const commandNodes = dispatches.map((dispatch, index) => {
++				if (dispatch.queued) return undefined;
+ 				const running = isPartial && index === dispatches.length - 1;
+ 				const nested: ToolViewState = {
+ 					expanded,
+@@ -505,7 +553,7 @@ export function shellPresenter<TArgs>(config: ShellConfig<TArgs>): ToolPresenter
+ 				return (
+ 					<ToolCommandNode
+ 						nodeKey={`tool-command-${index}`}
+-						input={{ dispatch, ...(sole ? { output } : {}), resolveMounted: context?.resolveToolCommandMounted }}
++						input={{ dispatch, ...(showInnerOutput ? { output } : {}), resolveMounted: context?.resolveToolCommandMounted }}
+ 						state={nested}
+ 					/>
+ 				);
+@@ -516,33 +564,33 @@ export function shellPresenter<TArgs>(config: ShellConfig<TArgs>): ToolPresenter
+ 						<ShellInput
+ 							context={shell!}
+ 							presentation={presentation}
++							previewLines={policy?.shellPreviewLines}
+ 							liveOrigin={state.executionStarted}
+ 							cwd={displayWorkdir(config.cwd?.(args))}
+ 						/>
+ 					) : (
+-						<RunInput source={cmd.text} role="omp.tool.bash.command" lang="bash" wrap />
++						describeInput(cmd.text, policy)
+ 					)}
+ 					{commandNodes}
+-					{!sole && output.trim().length > 0 && (
++					{!showInnerOutput && output.trim().length > 0 && (
+ 						<RunOutput output={output} role="omp.tool.bash.output" previewLines={previewLines} />
+ 					)}
+ 					<RunFoot
+ 						state={runStateValue}
+ 						exitCode={details?.exitCode}
+ 						elapsedMs={elapsedMs}
+-						facts={footFacts(details, stripped.artifactId)}
++						facts={footFacts(details, stripped.artifactId, expanded, policy)}
+ 						meta={meta ? { ...meta, truncation: showingFull ? undefined : meta.truncation } : undefined}
+ 					/>
+ 				</RunBox>
+ 			);
+-			const timedOut = details?.timedOut === true;
+ 			const warning = outputNotices(
+ 				meta ? { ...meta, truncation: showingFull ? undefined : meta.truncation } : undefined,
+ 			).join(". ");
+ 			return {
+ 				head: shellHead(config.title(args), cmd.text, callIntent(args), details, !isPartial),
+ 				body,
+-				...(runStateValue === "timed-out" ? { tone: "warning" as const } : {}),
++				...(runStateValue === "timed-out" ? { tone: "warning" as const } : runStateValue === "failed" ? { tone: "error" as const } : {}),
+ 				preview: "children",
+ 				inline: true,
+ 				term: {
+@@ -551,12 +599,20 @@ export function shellPresenter<TArgs>(config: ShellConfig<TArgs>): ToolPresenter
+ 					header: config.header,
+ 					...(callIntent(args) ? { intent: callIntent(args) } : {}),
+ 					result: true,
+-					outcome: isPartial ? "running" : isError ? (timedOut ? "warning" : "error") : "success",
+-					stats: footerStats(details, context?.timeout, stripped.artifactId, isError),
++					outcome: runStateValue === "timed-out"
++						? "warning"
++						: runStateValue === "failed"
++							? "error"
++							: runStateValue === "running" || runStateValue === "background"
++								? "running"
++								: "success",
++					stats: footerStats(details, context?.timeout, stripped.artifactId, isError, expanded, policy),
++					codeMaxLines: policy?.codeMaxLines,
++					stateLabel: policy?.stateLabel?.(runStateValue),
+ 					liveClock: isPartial && details?.wallTimeMs === undefined,
+ 					...(warning ? { warning } : {}),
+ 					previewLines,
+-					...(sole ? { sole } : {}),
++					...(showInnerOutput ? { sole: true } : {}),
+ 				} satisfies BashTerm,
+ 			};
+ 		},
+diff --git a/packages/coding-agent/src/ui/tools/eval.tsx b/packages/coding-agent/src/ui/tools/eval.tsx
+--- a/packages/coding-agent/src/ui/tools/eval.tsx
++++ b/packages/coding-agent/src/ui/tools/eval.tsx
+@@ -10,6 +10,7 @@
+  */
+ 
+ import type { JSXNode } from "@oh-my-pi/pi-tui";
++import type { Theme } from "@oh-my-pi/pi-tui/theme/contract";
+ import { replaceTabs, truncate } from "@oh-my-pi/pi-tui/text/width";
+ import { sanitizeText } from "@oh-my-pi/pi-utils";
+ import type { TspSpan } from "@oh-my-pi/pi-wire";
+@@ -68,9 +69,37 @@ export interface EvalTermCell {
+ 	readonly agents?: readonly EvalStatusEvent[];
+ }
+ 
++/** Status history presentation shared by terminal and native eval views */
++export interface EvalStatusRenderer {
++	render(
++		events: readonly EvalStatusEvent[],
++		theme: Theme,
++		expanded: boolean,
++		elided?: number,
++		width?: number,
++		spinnerFrame?: number,
++	): string[];
++	describe(log: StatusEventLog, expanded: boolean): JSXNode;
++}
++
++/** Optional display choices for an eval presenter */
++export interface EvalRendererOptions {
++	previewLines?: number;
++	codeMaxLines?: number;
++	codeTail?: boolean;
++	expandErrors?: boolean;
++	structuredHead?: boolean;
++	hiddenRootKeys?: readonly string[];
++	describeInput?: (source: string, language: string, role: string) => JSXNode;
++	outputDisclosure?: (hidden: number, theme: Theme) => string;
++}
++
+ /** Terminal-only facts of an eval call (`term`). */
+ export interface EvalTerm {
+ 	readonly look: "eval";
++	readonly presentation?: EvalRendererOptions;
++	readonly statusRenderer?: EvalStatusRenderer;
++	readonly isError?: boolean;
+ 	readonly phase: "call" | "cells" | "output";
+ 	readonly cells: readonly EvalTermCell[];
+ 	/** The viewport context's expansion (over the block's), results only. */
+@@ -237,9 +266,14 @@ function TableView(props: { readonly view: Extract<EvalView, { kind: "table" }>;
+ }
+ 
+ /** A cell's outputs in print order: text as a following terminal, views in place of their text. */
+-function outputNodes(output: string, views: readonly EvalViewEntry[] | undefined, previewLines: number): JSXNode[] {
+-	if (output.trim().length === 0) return [];
+-	return splitEvalOutput(output, views).map((part, i) => {
++function outputNodes(output: string, views: readonly EvalViewEntry[] | undefined, previewLines: number, isError: boolean, presentation?: EvalRendererOptions): JSXNode[] {
++	if (!output.trim()) return [];
++	const parts = splitEvalOutput(output, views);
++	const full = isError && presentation?.expandErrors === true;
++	const structured = !isError && presentation?.structuredHead && parts.some(part => part.kind === "view" && part.view.kind === "json");
++	const nodes = parts.map((part, i) => {
++		if (part.kind === "text" && (full || structured))
++			return <ansi key={i === 0 ? "output" : `output-${i}`} role="omp.tool.eval.output" text={part.text} />;
+ 		if (part.kind === "text")
+ 			return (
+ 				<RunOutput
+@@ -251,9 +285,16 @@ function outputNodes(output: string, views: readonly EvalViewEntry[] | undefined
+ 			);
+ 		const view = part.view;
+ 		if (view.kind === "table") return <TableView view={view} nodeKey={`table-${i}`} />;
+-		if (view.kind === "json") return <json key={`json-${i}`} value={view.value as never} />;
++		if (view.kind === "json") {
++			const hidden = presentation?.hiddenRootKeys;
++			const value = hidden?.length && view.value !== null && typeof view.value === "object" && !Array.isArray(view.value)
++				? Object.fromEntries(Object.entries(view.value).filter(([key]) => !hidden.includes(key)))
++				: view.value;
++			return <json key={`json-${i}`} value={value as never} />;
++		}
+ 		return <md key={`markdown-${i}`} text={view.text} />;
+ 	});
++	return structured ? [<card key="output" variant="bare" preview={{ lines: previewLines }}>{nodes}</card>] : nodes;
+ }
+ 
+ function cellState(status: EvalCellResult["status"], cancelled: boolean): RunState | undefined {
+@@ -279,7 +320,7 @@ interface CellRun {
+ }
+ 
+ /** One cell as one run box; a failed cell tints its box. */
+-function CellBox(props: { readonly cell: CellRun; readonly index: number; readonly total: number }): JSXNode {
++function CellBox(props: { readonly cell: CellRun; readonly index: number; readonly total: number; readonly presentation?: EvalRendererOptions }): JSXNode {
+ 	const { cell, index, total } = props;
+ 	let caption: JSXNode;
+ 	if (total > 1) {
+@@ -292,6 +333,7 @@ function CellBox(props: { readonly cell: CellRun; readonly index: number; readon
+ 		<RunBox nodeKey={`cell-${index}`} tone={cell.foot?.state === "failed" ? "error" : undefined}>
+ 			{caption}
+ 			{cell.code.trim().length > 0 && (
++				props.presentation?.describeInput?.(cell.code, highlightLanguage(cell.language), "omp.tool.eval.input") ??
+ 				<RunInput
+ 					source={cell.code}
+ 					role="omp.tool.eval.input"
+@@ -326,7 +368,7 @@ function evalHead(
+ 	};
+ }
+ 
+-function callView(args: EvalArgs, state: ToolViewState): ToolView {
++function callView(args: EvalArgs, state: ToolViewState, presentation?: EvalRendererOptions): ToolView {
+ 	const cells = argCells(args);
+ 	const startFoot: RunFootProps | undefined = state.executionStarted
+ 		? {
+@@ -345,24 +387,38 @@ function callView(args: EvalArgs, state: ToolViewState): ToolView {
+ 				cell={{ ...cell, ...(i === 0 && startFoot ? { foot: startFoot } : {}) }}
+ 				index={i}
+ 				total={cells.length}
++				presentation={presentation}
+ 			/>
+ 		)),
+ 		preview: "children",
+-		term: { look: "eval", phase: "call", cells } satisfies EvalTerm,
++		term: { look: "eval", phase: "call", cells, presentation } satisfies EvalTerm,
+ 	};
+ }
+ 
+-function resultView(result: ToolResult<EvalToolDetails>, state: ToolViewState, args?: EvalArgs): ToolView {
++function resultView(
++	result: ToolResult<EvalToolDetails>,
++	state: ToolViewState,
++	args: EvalArgs | undefined,
++	statusRenderer?: EvalStatusRenderer,
++	presentation?: EvalRendererOptions,
++): ToolView {
+ 	const details = result.details;
+ 	const context = state.renderContext as EvalRenderContext | undefined;
+ 	const cancelled = state.cancelled === true;
+ 	const expanded = context?.expanded ?? state.expanded;
+-	const previewLines = context?.previewLines ?? DEFAULT_PREVIEW_LINES;
++	const previewLines = presentation?.previewLines ?? context?.previewLines ?? DEFAULT_PREVIEW_LINES;
++	const isError = result.isError === true || details?.isError === true;
++	const status = (log: StatusEventLog): JSXNode => statusRenderer
++		? statusRenderer.describe(log, expanded)
++		: <StatusSection log={log} expanded={expanded} />;
+ 	const callFacts = {
+ 		facts: details?.notice ? [details.notice] : [],
+ 		meta: details?.meta,
+ 	};
+ 	const shared = {
++		presentation,
++		statusRenderer,
++		isError,
+ 		cellsExpanded: expanded,
+ 		previewLines,
+ 		...(typeof context?.timeout === "number" ? { timeout: context.timeout } : {}),
+@@ -374,6 +430,7 @@ function resultView(result: ToolResult<EvalToolDetails>, state: ToolViewState, a
+ 	if (cellResults && cellResults.length > 0) {
+ 		const languages = cellResults.map(cell => cell.language ?? details?.language ?? "python");
+ 		const states = cellResults.map(cell => cellState(cell.status, cancelled));
++		const codes = cellResults.map((cell, i) => formatEvalCodeForDisplay(cell.code, languages[i]!));
+ 		const factsIndex = states.findLastIndex(value => value !== undefined);
+ 		let earlierMs = 0;
+ 		const boxes = cellResults.map((cell, i) => {
+@@ -390,10 +447,10 @@ function resultView(result: ToolResult<EvalToolDetails>, state: ToolViewState, a
+ 				<CellBox
+ 					cell={{
+ 						language,
+-						code: formatEvalCodeForDisplay(cell.code, language),
++						code: codes[i]!,
+ 						...(cell.title !== undefined ? { title: cell.title } : {}),
+-						outputs: outputNodes(cell.output, cell.views, previewLines),
+-						status: <StatusSection log={cell} expanded={expanded} />,
++						outputs: outputNodes(cell.output, cell.views, previewLines, cell.status === "error", presentation),
++						status: status(cell),
+ 						...(cellStateValue
+ 							? {
+ 									foot: {
+@@ -407,21 +464,22 @@ function resultView(result: ToolResult<EvalToolDetails>, state: ToolViewState, a
+ 					}}
+ 					index={i}
+ 					total={cellResults.length}
++					presentation={presentation}
+ 				/>
+ 			);
+ 		});
+ 		const cells: EvalTermCell[] = cellResults.map((cell, i) => {
+ 			const events = cell.statusEvents ?? [];
+-			const agents = events.filter(event => event.op === "agent");
++			const agents = statusRenderer ? [] : events.filter(event => event.op === "agent");
+ 			return {
+ 				language: languages[i]!,
+-				code: formatEvalCodeForDisplay(cell.code, languages[i]!),
++				code: codes[i]!,
+ 				...(cell.title !== undefined ? { title: cell.title } : {}),
+ 				status: cell.status,
+ 				...(cell.durationMs !== undefined ? { durationMs: cell.durationMs } : {}),
+ 				output: cell.output,
+ 				...(cell.views ? { views: cell.views } : {}),
+-				events: agents.length > 0 ? events.filter(event => event.op !== "agent") : events,
++				events: !statusRenderer && agents.length > 0 ? events.filter(event => event.op !== "agent") : events,
+ 				...(cell.statusEventsElided ? { elided: cell.statusEventsElided } : {}),
+ 				agents,
+ 			};
+@@ -446,12 +504,12 @@ function resultView(result: ToolResult<EvalToolDetails>, state: ToolViewState, a
+ 		? "cancelled"
+ 		: state.isPartial
+ 			? "running"
+-			: result.isError
++			: isError
+ 				? "failed"
+ 				: "done";
+ 	const last: Omit<CellRun, "language" | "code" | "title"> = {
+-		outputs: outputNodes(output, undefined, previewLines),
+-		status: <StatusSection log={details ?? {}} expanded={expanded} />,
++		outputs: outputNodes(output, undefined, previewLines, isError, presentation),
++		status: status(details ?? {}),
+ 		foot: { state: runState, elapsedMs: state.elapsedMs, ...callFacts },
+ 	};
+ 	const runs: CellRun[] =
+@@ -465,7 +523,7 @@ function resultView(result: ToolResult<EvalToolDetails>, state: ToolViewState, a
+ 			calls.length,
+ 			details,
+ 		),
+-		body: runs.map((run, i) => <CellBox cell={run} index={i} total={runs.length} />),
++		body: runs.map((run, i) => <CellBox cell={run} index={i} total={runs.length} presentation={presentation} />),
+ 		preview: "children",
+ 		term: {
+ 			look: "eval",
+@@ -479,10 +537,18 @@ function resultView(result: ToolResult<EvalToolDetails>, state: ToolViewState, a
+ 	};
+ }
+ 
+-export const evalPresenter: ToolPresenter<EvalArgs, EvalToolDetails> = {
+-	merge: true,
+-	call: callView,
+-	result: resultView,
+-};
++/** Build an eval presenter with optional display and status history policies */
++export function createEvalRenderer(
++	statusRenderer?: EvalStatusRenderer,
++	presentation?: EvalRendererOptions,
++): ToolPresenter<EvalArgs, EvalToolDetails> {
++	return {
++		merge: true,
++		call: (args, state) => callView(args, state, presentation),
++		result: (result, state, args) => resultView(result, state, args, statusRenderer, presentation),
++	};
++}
++
++export const evalPresenter = createEvalRenderer();
+ 
+ registerToolPresenter("eval", evalPresenter);
+diff --git a/packages/coding-agent/src/ui/tools/tool-command.tsx b/packages/coding-agent/src/ui/tools/tool-command.tsx
+--- a/packages/coding-agent/src/ui/tools/tool-command.tsx
++++ b/packages/coding-agent/src/ui/tools/tool-command.tsx
+@@ -13,21 +13,14 @@ import { sanitizeText } from "@oh-my-pi/pi-utils";
+ import type { JSXNode } from "@oh-my-pi/pi-tui";
+ import { replaceTabs } from "@oh-my-pi/pi-tui/text/width";
+ import type { TspSpan, TspText } from "@oh-my-pi/pi-wire";
++import type { QueuedToolCommandArgs, ToolCommandRenderDispatch } from "../../tools/details/tool-commands";
+ import type { ToolPresenter, ToolResult, ToolView, ToolViewState } from "./contract";
+ import { defaultPresenter } from "./default";
+ import { type LegacyToolRenderer, legacyParts, legacyView, type ToolRenderPart } from "./legacy";
+ import { toolPresenter } from "./registry";
+ 
+ /** One tool command invocation inside a bash run, as the bash result records it. */
+-export interface ToolCommandDispatch {
+-	readonly tool: string;
+-	readonly mode: "help" | "execute";
+-	/** Exit status of this invocation. */
+-	readonly exitCode: number;
+-	readonly args?: Record<string, unknown>;
+-	/** Details the wrapped tool returned. */
+-	readonly inner?: unknown;
+-}
++export type ToolCommandDispatch = Readonly<ToolCommandRenderDispatch>;
+ 
+ /** What the host knows about a mounted tool. */
+ export interface ToolCommandMounted {
+@@ -52,12 +45,13 @@ export interface ToolCommandInput {
+ /** Terminal-only facts of a tool command card (`term`). */
+ export interface ToolCommandTerm {
+ 	readonly look: "tool-command";
+-	readonly mode: "help" | "legacy" | "view";
++	readonly mode: "help" | "legacy" | "view" | "queued";
+ 	readonly exitCode: number;
+ 	/** The look of the wrapped view (`view` mode). */
+ 	readonly inner?: string;
+ 	/** The command's label (`server/tool`, the mounted tool's label). */
+ 	readonly commandLabel: string;
++	readonly queuedLabel?: string;
+ 	readonly args?: unknown;
+ 	/** What a mounted tool's render hooks drew (`legacy` mode). */
+ 	readonly parts?: readonly ToolRenderPart[];
+@@ -86,18 +80,46 @@ function innerResult(input: ToolCommandInput): ToolResult {
+ 	};
+ }
+ 
++/** Optional view for a validated command that has not entered execution */
++export function queuedToolCommand(input: ToolCommandInput, state: ToolViewState): ToolView | undefined {
++	const { dispatch } = input;
++	if (!dispatch.queued || !dispatch.args) return undefined;
++	const presenter = toolPresenter("tool-command:queued") as ToolPresenter<QueuedToolCommandArgs> | undefined;
++	const label = toolCommandLabel(dispatch.tool, input.resolveMounted?.(dispatch.tool));
++	const view = presenter?.call?.({ label, args: dispatch.args }, { ...state, executionStarted: false });
++	if (!view) return undefined;
++	return {
++		...view,
++		tone: "pending",
++		term: {
++			look: "tool-command",
++			mode: "queued",
++			exitCode: 0,
++			commandLabel: label,
++			queuedLabel: plain(view.head?.title) ?? plain(view.label),
++		} satisfies ToolCommandTerm,
++	};
++}
++
+ /** The view of one invocation. */
+ export function toolCommandView(input: ToolCommandInput, state: ToolViewState): ToolView {
+ 	const { dispatch } = input;
+ 	const mounted = input.resolveMounted?.(dispatch.tool);
+ 	const label = toolCommandLabel(dispatch.tool, mounted);
+-	const isError = dispatch.exitCode !== 0;
++	const isError = !dispatch.queued && dispatch.exitCode !== 0;
+ 	const term = {
+ 		look: "tool-command",
+ 		exitCode: dispatch.exitCode,
+ 		commandLabel: label,
+ 		args: dispatch.args ?? {},
+ 	} as const;
++	if (dispatch.queued && dispatch.args) {
++		return queuedToolCommand(input, state) ?? {
++			head: { title: label, note: "Queued" },
++			tone: "pending",
++			term: { ...term, mode: "queued" } satisfies ToolCommandTerm,
++		};
++	}
+ 	if (dispatch.mode === "help") {
+ 		return {
+ 			head: { title: label, target: "--help", targetKind: "text", ...(isError ? { exit: dispatch.exitCode } : {}) },
+@@ -169,7 +191,7 @@ function nestedHead(view: ToolView, label: string, dispatch: ToolCommandDispatch
+ 		if (!detail) continue;
+ 		spans.push({ t: " " }, { t: detail, s: "muted" });
+ 	}
+-	const exit = head?.exit ?? (dispatch.exitCode !== 0 ? dispatch.exitCode : undefined);
++	const exit = head?.exit ?? (!dispatch.queued && dispatch.exitCode !== 0 ? dispatch.exitCode : undefined);
+ 	if (exit) spans.push({ t: " " }, { t: `exit ${exit}`, s: "error" });
+ 	const note = plain(head?.note);
+ 	if (note) spans.push({ t: " " }, { t: note, s: "muted" });

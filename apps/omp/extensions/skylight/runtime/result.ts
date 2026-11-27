@@ -2,7 +2,7 @@ import { isRecord } from "@ai/values/value/value";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { AgentToolResult } from "@oh-my-pi/pi-coding-agent";
 import { buildMCPToolResult } from "@oh-my-pi/pi-coding-agent/mcp/tool-bridge";
-import type { MCPToolDetails } from "@oh-my-pi/pi-tui/tools/mcp";
+import type { MCPToolDetails } from "@oh-my-pi/pi-coding-agent/tools/details/mcp";
 
 const MCP_SERVER_NAME = "farstep-sky";
 

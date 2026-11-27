@@ -5,7 +5,7 @@
   "devDependencies": {
     "@nodelib/fs.walk": "3.0.1",
     "@optique/core": "1.4.0",
-    "effect": "4.1.5",
+    "effect": "4.1.6",
     "oxc-parser": "0.160.0",
     "oxc-resolver": "11.24.2"
   }

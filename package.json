@@ -6,18 +6,18 @@
     "@optique/valibot": "1.4.0",
     "valibot": "1.5.0",
     "vscode-jsonrpc": "10.0.1",
-    "effect": "4.1.5",
+    "effect": "4.1.6",
     "@ai/values": "workspace:*",
     "@ai/runtime": "workspace:*",
     "@ai/toolkit": "workspace:*",
     "diff": "9.0.0",
     "atomically": "2.1.1",
-    "@oh-my-pi/pi-utils": "19.1.1"
+    "@oh-my-pi/pi-utils": "19.2.1"
   },
   "devDependencies": {
     "@actions/core": "3.0.1",
     "@actions/exec": "3.0.0",
-    "@biomejs/biome": "2.6.8",
+    "@biomejs/biome": "2.6.9",
     "@types/bun": "catalog:",
     "farstep": "workspace:*",
     "knip": "6.48.0",
@@ -26,11 +26,11 @@
     "vite": "catalog:"
   },
   "patchedDependencies": {
-    "@oh-my-pi/pi-coding-agent@19.1.1": "apps/omp/runtime/npm/agent/agent.patch",
-    "@oh-my-pi/pi-tui@19.1.1": "apps/omp/runtime/npm/tui/tui.patch"
+    "@oh-my-pi/pi-coding-agent@19.2.1": "apps/omp/runtime/npm/agent/agent.patch",
+    "@oh-my-pi/pi-tui@19.2.1": "apps/omp/runtime/npm/tui/tui.patch"
   },
   "overrides": {
-    "puppeteer-core": "25.18.1"
+    "puppeteer-core": "25.19.0"
   },
   "private": true,
   "packageManager": "bun@1.4.5",
@@ -45,7 +45,7 @@
     ],
     "catalog": {
       "@types/bun": "1.4.5",
-      "typescript": "7.1.0-dev.20261123.1",
+      "typescript": "7.1.0-dev.20261125.1",
       "vite": "8.3.8"
     }
   },

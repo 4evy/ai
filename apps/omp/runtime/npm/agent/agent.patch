@@ -58,15 +58,24 @@ diff --git a/dist/types/extensibility/extensions/runner.d.ts b/dist/types/extens
 diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensibility/extensions/types.d.ts
 --- a/dist/types/extensibility/extensions/types.d.ts
 +++ b/dist/types/extensibility/extensions/types.d.ts
-@@ -36,6 +36,7 @@
+@@ -43,6 +43,7 @@
  import type { LocalProtocolOptions } from "../../internal-urls/local-protocol.js";
  import type { LoopLimitConfig } from "../../modes/loop-limit.js";
  import type { MemoryRuntimeContext } from "../../memory-backend/index.js";
 +import type { MCPManagerApi } from "../../mcp/manager.js";
- import type { CustomEditor } from "@oh-my-pi/pi-tui/prompt/custom-editor";
- import type { Theme } from "@oh-my-pi/pi-tui/theme";
- import type { NativeToolView } from "@oh-my-pi/pi-tui/tools/renderer";
-@@ -595,6 +596,8 @@
+ import type { AsyncJobSnapshot, SendUserMessageOptions } from "../../session/agent-session.js";
+ import type { EphemeralTurnOptions, EphemeralTurnResult } from "../../session/agent-session-types.js";
+ import type { CompactMode } from "../../session/compact-modes.js";
+@@ -307,6 +308,8 @@
+     pasteToEditor(text: string): void;
+     /** Get the current text from the core input editor. */
+     getEditorText(): string;
++    /** Labels of the actual attachment, skill and model chips in the current draft */
++    getEditorTokens?(): readonly string[];
+     /** Show a multi-line editor for text editing. */
+     editor(title: string, prefill?: string, dialogOptions?: ExtensionUIDialogOptions, editorOptions?: {
+         promptStyle?: boolean;
+@@ -626,6 +629,8 @@
      sessionManager: ReadonlySessionManager;
      /** Model registry for API key resolution */
      modelRegistry: ModelRegistry;
@@ -75,7 +84,16 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
      /** Calling session's `local://` root mapping for external tool bridges. */
      localProtocolOptions?: LocalProtocolOptions;
      /** Current model (may be undefined) */
-@@ -1685,8 +1688,13 @@
+@@ -870,6 +875,8 @@
+     execute(toolCallId: string, params: Static<TParams>, signal: AbortSignal | undefined, onUpdate: AgentToolUpdateCallback<TDetails> | undefined, ctx: ExtensionContext): Promise<AgentToolResult<TDetails>>;
+     /** Called on session lifecycle events - use to reconstruct state or cleanup resources */
+     onSession?: (event: ToolSessionEvent, ctx: ExtensionContext) => void | Promise<void>;
++    /** Semantic transcript view for the registered tool, shared by both terminals */
++    presenter?: import("../../ui/tools/contract.js").ToolPresenter<Static<TParams>, TDetails>;
+     /**
+      * Custom rendering for tool call display: pi-tui nodes (drawn in the terminal and in Tern) or a
+      * rows object (drawn in the terminal; Tern shows the generic tool card). `undefined` draws
+@@ -1718,8 +1725,13 @@
      setActiveTools(toolNames: string[]): Promise<void>;
      /** Get available slash commands in the current session. */
      getCommands(): SlashCommandInfo[];
@@ -91,7 +109,7 @@ diff --git a/dist/types/extensibility/extensions/types.d.ts b/dist/types/extensi
      /** Get current thinking level. */
      getThinkingLevel(): ThinkingLevel | undefined;
      /** Set thinking level for the current session. */
-@@ -1897,7 +1905,7 @@
+@@ -1932,7 +1944,7 @@
  export type GetAllToolsHandler = () => ToolInfo[];
  export type GetCommandsHandler = () => SlashCommandInfo[];
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
@@ -235,16 +253,16 @@ diff --git a/dist/types/mcp/manager.d.ts b/dist/types/mcp/manager.d.ts
 diff --git a/dist/types/mcp/tool-bridge.d.ts b/dist/types/mcp/tool-bridge.d.ts
 --- a/dist/types/mcp/tool-bridge.d.ts
 +++ b/dist/types/mcp/tool-bridge.d.ts
-@@ -9,7 +9,7 @@
- import type { CustomTool, CustomToolContext, CustomToolResult, RenderResultOptions } from "../extensibility/custom-tools/types.js";
- import type { Theme } from "@oh-my-pi/pi-tui/theme";
+@@ -8,7 +8,7 @@
+ import type { TSchema } from "@oh-my-pi/pi-ai";
+ import type { CustomTool, CustomToolContext, CustomToolResult } from "../extensibility/custom-tools/types.js";
  import { formatApprovalArguments } from "../tools/approval.js";
 -import type { MCPAuthChallenge, MCPServerConnection, MCPToolDefinition } from "./types.js";
 +import type { MCPAuthChallenge, MCPServerConnection, MCPToolCallResult, MCPToolDefinition } from "./types.js";
  /** Options of an {@link MCPReconnect}. */
  export interface MCPReconnectOptions {
      /** Authorize first: the server answered the call with this challenge. */
-@@ -30,6 +30,9 @@
+@@ -29,6 +29,9 @@
   */
  export type MCPToolCallObserver = (toolCallId: string) => () => Promise<void>;
  export declare function isRetriableConnectionError(error: unknown): boolean;
@@ -257,7 +275,7 @@ diff --git a/dist/types/mcp/tool-bridge.d.ts b/dist/types/mcp/tool-bridge.d.ts
 diff --git a/dist/types/mcp/types.d.ts b/dist/types/mcp/types.d.ts
 --- a/dist/types/mcp/types.d.ts
 +++ b/dist/types/mcp/types.d.ts
-@@ -50,6 +50,10 @@
+@@ -51,6 +51,10 @@
  interface MCPServerConfigBase {
      /** Whether this server is enabled (default: true) */
      enabled?: boolean;
@@ -283,7 +301,7 @@ diff --git a/dist/types/modes/components/extensions/mcp-runtime.d.ts b/dist/type
 diff --git a/dist/types/session/agent-session-types.d.ts b/dist/types/session/agent-session-types.d.ts
 --- a/dist/types/session/agent-session-types.d.ts
 +++ b/dist/types/session/agent-session-types.d.ts
-@@ -410,6 +410,8 @@
+@@ -423,6 +423,8 @@
      advisorConfigWarnings?: string[];
      /** Disconnect the MCP manager owned by this session during disposal. */
      disconnectOwnedMcpManager?: () => Promise<void>;
@@ -295,25 +313,25 @@ diff --git a/dist/types/session/agent-session-types.d.ts b/dist/types/session/ag
 diff --git a/dist/types/session/agent-session.d.ts b/dist/types/session/agent-session.d.ts
 --- a/dist/types/session/agent-session.d.ts
 +++ b/dist/types/session/agent-session.d.ts
-@@ -1332,6 +1332,7 @@
+@@ -1339,6 +1339,7 @@
      /** Selects a model for this session without updating persisted model settings. */
      setModelTemporary(model: Model, thinkingLevel?: ConfiguredThinkingLevel, options?: {
          ephemeral?: boolean;
 +        recordUsage?: boolean;
      }): Promise<void>;
-     /** Cycles the scoped model set, or all available models when no scope exists. */
-     cycleModel(direction?: "forward" | "backward"): Promise<ModelCycleResult | undefined>;
+     /** Apply an agent URL change using the same session-only controls as the model and effort pickers. */
+     applyAgentModelChange(change: AgentModelChange): Promise<AgentModelSelectionState>;
 diff --git a/dist/types/session/model-controls.d.ts b/dist/types/session/model-controls.d.ts
 --- a/dist/types/session/model-controls.d.ts
 +++ b/dist/types/session/model-controls.d.ts
-@@ -106,6 +106,7 @@
-     setModelTemporary(model: Model, thinkingLevel?: ConfiguredThinkingLevel, options?: {
+@@ -110,6 +110,7 @@
          ephemeral?: boolean;
          prewalk?: boolean;
+         metadataResolved?: boolean;
 +        recordUsage?: boolean;
      }, selection?: "explicit" | "automatic", isCurrent?: () => boolean): Promise<boolean>;
-     /**
-      * Cycle to next/previous model.
+     /** Select the first usable configured model for an authorized agent kind. */
+     selectAgentModel(change: AgentKindModelChange, isCurrent: () => boolean): Promise<void>;
 diff --git a/dist/types/ssh/endpoint.d.ts b/dist/types/ssh/endpoint.d.ts
 new file mode 100644
 --- /dev/null
@@ -355,7 +373,7 @@ diff --git a/dist/types/thread/services/mcp-remote.d.ts b/dist/types/thread/serv
 +++ b/dist/types/thread/services/mcp-remote.d.ts
 @@ -7,8 +7,8 @@
  import type { TSchema } from "@oh-my-pi/pi-ai";
- import type { MCPToolDetails } from "@oh-my-pi/pi-tui/tools/mcp";
+ import type { MCPToolDetails } from "../../tools/details/mcp.js";
  import type { CustomTool } from "../../extensibility/custom-tools/types.js";
 -import type { MCPManagerApi, MCPToolScope } from "../../mcp/manager.js";
 -import type { MCPRequestOptions, MCPResource, MCPResourceReadResult, MCPResourceTemplate } from "../../mcp/types.js";
@@ -416,6 +434,27 @@ new file mode 100644
 @@ -0,0 +1,2 @@
 +import type { BrowserLaunchAdapter } from "@oh-my-pi/pi-coding-agent/tools/browser/launch-adapter";
 +export declare const browserLaunchAdapter: BrowserLaunchAdapter | undefined;
+diff --git a/dist/types/tools/details/tool-commands.d.ts b/dist/types/tools/details/tool-commands.d.ts
+--- a/dist/types/tools/details/tool-commands.d.ts
++++ b/dist/types/tools/details/tool-commands.d.ts
+@@ -1,4 +1,9 @@
+ import type { ToolTier } from "@oh-my-pi/pi-agent-core";
++/** Validated args handed to the optional queued tool command presenter */
++export interface QueuedToolCommandArgs {
++    label: string;
++    args: Record<string, unknown>;
++}
+ /** One tool command invocation inside a bash run, as recorded on the bash result. */
+ export interface ToolCommandRenderDispatch {
+     tool: string;
+@@ -6,6 +11,7 @@
+     /** Exit status of this invocation, independent of the outer shell status. */
+     exitCode: number;
+     args?: Record<string, unknown>;
++    queued?: true;
+     tier?: ToolTier;
+     readOnlyHint?: true;
+     /** Details object returned by the wrapped tool. */
 diff --git a/dist/types/tools/tool-commands.d.ts b/dist/types/tools/tool-commands.d.ts
 --- a/dist/types/tools/tool-commands.d.ts
 +++ b/dist/types/tools/tool-commands.d.ts
@@ -437,6 +476,1497 @@ diff --git a/dist/types/tools/tool-commands.d.ts b/dist/types/tools/tool-command
      result: AgentToolResult<unknown>;
      dispatch: ToolCommandDispatch;
  }>;
+diff --git a/dist/types/ui/composer/composer.d.ts b/dist/types/ui/composer/composer.d.ts
+--- a/dist/types/ui/composer/composer.d.ts
++++ b/dist/types/ui/composer/composer.d.ts
+@@ -250,6 +250,8 @@
+     }): void;
+     /** The draft with every atom (chip, token) replaced by what it stands for. */
+     expandedText(): string;
++    /** Labels of atoms still present in the draft, without their private payloads */
++    tokenLabels(): string[];
+     /**
+      * Replace the draft with restored `text` (a dequeued or detached draft), turning image markers
+      * and tokens ({@link setAtomizer}) back into chips. Pending images stay as they are.
+diff --git a/dist/types/ui/dock/live-hud.d.ts b/dist/types/ui/dock/live-hud.d.ts
+new file mode 100644
+--- /dev/null
++++ b/dist/types/ui/dock/live-hud.d.ts
+@@ -0,0 +1,32 @@
++import type { ObservableSession } from "@oh-my-pi/pi-coding-agent/task/session-observer-registry";
++import type { TodoPhase } from "@oh-my-pi/pi-coding-agent/tools/details/todo";
++import { type Accessor, type JSXNode } from "@oh-my-pi/pi-tui";
++export interface LiveHudAgents {
++    readonly sessions: readonly ObservableSession[];
++    readonly agentsMode: "off" | "collapsed" | "full";
++    readonly agentsExpanded: boolean;
++    readonly agentsHubKey: string;
++}
++/** Host snapshots for presentation only, never session mutation */
++export interface LiveHudState extends LiveHudAgents {
++    readonly phases: readonly TodoPhase[];
++    readonly activeDescriptions: readonly string[];
++    readonly todoHidden: boolean;
++    readonly todoExpanded: boolean;
++}
++export interface LiveHudPresentation {
++    readonly todo?: JSXNode;
++    readonly checklist?: JSXNode;
++    /** Null suppresses the stock list when the agents share the todo row */
++    readonly subagents?: Exclude<JSXNode, undefined>;
++}
++/** Undefined results retain the host's stock presentation */
++export interface LiveHudRenderer {
++    readonly showWorkingTitle?: boolean;
++    readonly compactTodoInStatus?: boolean;
++    render(state: LiveHudState): LiveHudPresentation | undefined;
++}
++export declare const getLiveHudRenderer: Accessor<LiveHudRenderer | undefined>;
++export declare function setLiveHudRenderer(next: LiveHudRenderer | undefined): void;
++export declare const getLiveHudTodoDescriptions: Accessor<readonly string[]>;
++export declare function setLiveHudTodoDescriptions(descriptions: readonly string[]): void;
+diff --git a/dist/types/ui/status/presentation.d.ts b/dist/types/ui/status/presentation.d.ts
+new file mode 100644
+--- /dev/null
++++ b/dist/types/ui/status/presentation.d.ts
+@@ -0,0 +1,15 @@
++import type { StatusFacts } from "@oh-my-pi/pi-coding-agent/ui/status/facts";
++import type { Billing } from "@oh-my-pi/pi-coding-agent/ui/status/format";
++import type { SegView } from "@oh-my-pi/pi-coding-agent/ui/status/segments";
++import type { SymbolSet } from "@oh-my-pi/pi-tui/theme/contract";
++export type BillingSummaryPresentation = Billing;
++/** Optional presentation policy, leaving accounting and layout with the host */
++export interface StatusLinePresentation {
++    thinkingLevelLabel?: (level: string) => string;
++    billingSummary?: (options: BillingSummaryPresentation, symbols: SymbolSet, availableWidth?: number) => string | undefined;
++    usage?: (facts: StatusFacts, symbols: SymbolSet) => SegView | null;
++    context?: (facts: StatusFacts, symbols: SymbolSet, accent?: string) => SegView;
++    subagents?: (count: number) => SegView | null;
++}
++export declare function setStatusLinePresentation(policy: StatusLinePresentation | undefined): void;
++export declare function getStatusLinePresentation(): StatusLinePresentation | undefined;
+diff --git a/dist/types/ui/styles/tools/code-cell.d.ts b/dist/types/ui/styles/tools/code-cell.d.ts
+--- a/dist/types/ui/styles/tools/code-cell.d.ts
++++ b/dist/types/ui/styles/tools/code-cell.d.ts
+@@ -13,9 +13,14 @@
+     readonly status?: CellStatus;
+     readonly duration?: number;
+     readonly output?: string;
++    /** Already styled output rows with their own preview cap */
++    readonly outputRows?: readonly string[];
+     readonly outputMaxLines?: number;
++    /** Maximum wrapped source rows when collapsed */
+     readonly codeMaxLines?: number;
+-    /** Show the last `codeMaxLines` rows (the streaming edge) under an `… N earlier lines` marker. */
++    /** Stable display cell used to reuse source rows across clock ticks */
++    readonly sourceKey?: object;
++    /** Follow the streaming edge instead of showing the first source rows */
+     readonly codeTail?: boolean;
+     readonly expanded: boolean;
+     /** Lead the head with the language icon. */
+@@ -36,8 +41,10 @@
+ };
+ /** A cell's output section lines: the head `outputMaxLines` lines (all when expanded) and a hidden-line note. */
+ export declare function cellOutputLines(theme: Theme, output: string | undefined, expanded: boolean, maxLines: number): string[];
+-/** The source rows of a code cell at the frame's inner width. */
+-export declare function codeCellLines(cx: PaintContext, cell: CodeCell, width: number): string[];
++/** Wrap and bound a source preview; a minified line cannot fill the viewport */
++export declare function sourcePreview(theme: Theme, lines: readonly string[], limit: number, width: number, tail: boolean, hidden?: number, pad?: string): string[];
++/** The source rows of a code cell at the frame's inner width */
++export declare function codeCellLines(cx: PaintContext, cell: CodeCell, width: number): readonly string[];
+ /** A framed code cell at `width`. */
+ export declare function codeCellRows(cx: PaintContext, cell: CodeCell, width: number): string[];
+ /** A framed Markdown cell at `width`: the rendered rows (cut to `contentMaxLines` collapsed) and the output. */
+diff --git a/dist/types/ui/styles/tools/eval.d.ts b/dist/types/ui/styles/tools/eval.d.ts
+--- a/dist/types/ui/styles/tools/eval.d.ts
++++ b/dist/types/ui/styles/tools/eval.d.ts
+@@ -1,1 +1,11 @@
++import type { Theme } from "@oh-my-pi/pi-tui/theme/contract";
++import { type EvalStatusEvent } from "../../../tools/details/eval.js";
++/** One status event as a line: icon, muted op, dim summary. */
++export declare function formatStatusEvent(event: EvalStatusEvent, theme: Theme): string;
++/** A status event's line plus, expanded, its listed items or preview. */
++export declare function formatStatusEventExpanded(event: EvalStatusEvent, theme: Theme): string[];
++type AgentEventStatus = "pending" | "running" | "completed" | "failed" | "aborted";
++export declare function agentEventStatus(value: unknown): AgentEventStatus;
++/** `agent()` progress rows under a cell. */
++export declare function renderAgentProgressEvents(events: readonly EvalStatusEvent[], theme: Theme, width: number, spinnerFrame?: number): string[];
+ export {};
+diff --git a/dist/types/ui/styles/tools/frame.d.ts b/dist/types/ui/styles/tools/frame.d.ts
+--- a/dist/types/ui/styles/tools/frame.d.ts
++++ b/dist/types/ui/styles/tools/frame.d.ts
+@@ -34,7 +34,7 @@
+     readonly band?: string;
+ }
+ /** An edge row: `left───` + ` text ` (cut to fit) + rule fill + `right`. */
+-export declare function edgeRow(theme: Theme, width: number, left: string, right: string, text: string | undefined, border?: string): string;
++export declare function edgeRow(theme: Theme, width: number, left: string, right: string, text: string | undefined, border?: string, decorate?: boolean): string;
+ /** A content row: `│ ` + row padded to the inner width + ` │`. */
+ export declare function frameRow(theme: Theme, width: number, row: string, border?: string): string;
+ /** The rows of a rounded frame: lines wrap at the inner width. */
+diff --git a/dist/types/ui/styles/tools/json-tree.d.ts b/dist/types/ui/styles/tools/json-tree.d.ts
+--- a/dist/types/ui/styles/tools/json-tree.d.ts
++++ b/dist/types/ui/styles/tools/json-tree.d.ts
+@@ -6,6 +6,11 @@
+     /** Longest scalar, in cells. */
+     readonly maxScalar: number;
+ }
++/** Optional label styling for JSON trees */
++export interface JsonTreePresentation {
++    keyColor(depth: number, color: string | undefined, native: boolean): string | undefined;
++}
++export declare function setJsonTreePresentation(policy: JsonTreePresentation | undefined): void;
+ /** Limits of an expanded tree. */
+ export declare const EXPANDED_TREE: JsonTreeLimits;
+ /** Limits of a collapsed tree. */
+diff --git a/dist/types/ui/tools/bash.d.ts b/dist/types/ui/tools/bash.d.ts
+--- a/dist/types/ui/tools/bash.d.ts
++++ b/dist/types/ui/tools/bash.d.ts
+@@ -1,6 +1,8 @@
++import type { JSXNode } from "@oh-my-pi/pi-tui";
+ import type { OutputMeta } from "../../tools/output-meta-format.js";
+ import type { ToolPresenter } from "./contract.js";
+ import { type ToolCommandDispatch, type ToolCommandResolver } from "./tool-command.js";
++import { type RunState } from "./run.js";
+ /** Shell result details the presenter reads. */
+ export interface BashDetails {
+     readonly meta?: OutputMeta;
+@@ -68,6 +70,8 @@
+     readonly previewLines?: number;
+     /** The whole call was one tool command, whose card stands for the output. */
+     readonly sole?: boolean;
++    readonly codeMaxLines?: number;
++    readonly stateLabel?: string;
+ }
+ /** How a shell-like tool's args map to a command line. */
+ export interface ShellConfig<TArgs> {
+@@ -77,7 +81,20 @@
+     readonly env?: (args: TArgs | undefined) => Record<string, unknown> | undefined;
+     /** Draw the status line in the frame's top edge. */
+     readonly header: boolean;
++    readonly presentation?: ShellRendererPolicy;
+ }
++/** Display choices shared by shell-like tools on both surfaces */
++export interface ShellRendererPolicy {
++    previewLines?: number;
++    codeMaxLines?: number;
++    shellPreviewLines?: number | false;
++    describeInput?: (source: string, language: string, role: string) => JSXNode;
++    serviceFacts?: (service: NonNullable<BashDetails["service"]>, expanded: boolean) => string[];
++    showTimeout?: (expanded: boolean) => boolean;
++    stateLabel?: (state: RunState | "queued") => string;
++}
++/** Apply display choices to existing and future shell presenters */
++export declare function setShellRendererPolicy(policy: ShellRendererPolicy | undefined): void;
+ /** A presenter for a shell-like tool. */
+ export declare function shellPresenter<TArgs>(config: ShellConfig<TArgs>): ToolPresenter<TArgs, BashDetails>;
+ /** Shell args of the `bash` tool. */
+diff --git a/dist/types/ui/tools/eval.d.ts b/dist/types/ui/tools/eval.d.ts
+--- a/dist/types/ui/tools/eval.d.ts
++++ b/dist/types/ui/tools/eval.d.ts
+@@ -8,7 +8,9 @@
+  *
+  * Terminal look: `eval` (`src/ui/styles/tools/eval.ts`), fed by {@link EvalTerm}.
+  */
+-import { type EvalCellResult, type EvalLanguage, type EvalStatusEvent, type EvalToolDetails, type EvalViewEntry } from "../../tools/details/eval.js";
++import type { JSXNode } from "@oh-my-pi/pi-tui";
++import type { Theme } from "@oh-my-pi/pi-tui/theme/contract";
++import { type EvalCellResult, type EvalLanguage, type EvalStatusEvent, type EvalToolDetails, type EvalViewEntry, type StatusEventLog } from "../../tools/details/eval.js";
+ import { type OutputMeta } from "../../tools/output-meta-format.js";
+ import type { ToolPresenter } from "./contract.js";
+ interface EvalCellArg {
+@@ -37,9 +39,28 @@
+     /** `agent()` progress snapshots, drawn as a tree under the cell. */
+     readonly agents?: readonly EvalStatusEvent[];
+ }
++/** Status history presentation shared by terminal and native eval views */
++export interface EvalStatusRenderer {
++    render(events: readonly EvalStatusEvent[], theme: Theme, expanded: boolean, elided?: number, width?: number, spinnerFrame?: number): string[];
++    describe(log: StatusEventLog, expanded: boolean): JSXNode;
++}
++/** Optional display choices for an eval presenter */
++export interface EvalRendererOptions {
++    previewLines?: number;
++    codeMaxLines?: number;
++    codeTail?: boolean;
++    expandErrors?: boolean;
++    structuredHead?: boolean;
++    hiddenRootKeys?: readonly string[];
++    describeInput?: (source: string, language: string, role: string) => JSXNode;
++    outputDisclosure?: (hidden: number, theme: Theme) => string;
++}
+ /** Terminal-only facts of an eval call (`term`). */
+ export interface EvalTerm {
+     readonly look: "eval";
++    readonly presentation?: EvalRendererOptions;
++    readonly statusRenderer?: EvalStatusRenderer;
++    readonly isError?: boolean;
+     readonly phase: "call" | "cells" | "output";
+     readonly cells: readonly EvalTermCell[];
+     /** The viewport context's expansion (over the block's), results only. */
+@@ -70,5 +91,7 @@
+     total?: number;
+     message?: string;
+ }, max?: number): string;
++/** Build an eval presenter with optional display and status history policies */
++export declare function createEvalRenderer(statusRenderer?: EvalStatusRenderer, presentation?: EvalRendererOptions): ToolPresenter<EvalArgs, EvalToolDetails>;
+ export declare const evalPresenter: ToolPresenter<EvalArgs, EvalToolDetails>;
+ export {};
+diff --git a/dist/types/ui/tools/tool-command.d.ts b/dist/types/ui/tools/tool-command.d.ts
+--- a/dist/types/ui/tools/tool-command.d.ts
++++ b/dist/types/ui/tools/tool-command.d.ts
+@@ -1,16 +1,9 @@
+ import type { JSXNode } from "@oh-my-pi/pi-tui";
++import type { ToolCommandRenderDispatch } from "../../tools/details/tool-commands.js";
+ import type { ToolPresenter, ToolView, ToolViewState } from "./contract.js";
+ import { type LegacyToolRenderer, type ToolRenderPart } from "./legacy.js";
+ /** One tool command invocation inside a bash run, as the bash result records it. */
+-export interface ToolCommandDispatch {
+-    readonly tool: string;
+-    readonly mode: "help" | "execute";
+-    /** Exit status of this invocation. */
+-    readonly exitCode: number;
+-    readonly args?: Record<string, unknown>;
+-    /** Details the wrapped tool returned. */
+-    readonly inner?: unknown;
+-}
++export type ToolCommandDispatch = Readonly<ToolCommandRenderDispatch>;
+ /** What the host knows about a mounted tool. */
+ export interface ToolCommandMounted {
+     readonly label?: string;
+@@ -31,18 +24,21 @@
+ /** Terminal-only facts of a tool command card (`term`). */
+ export interface ToolCommandTerm {
+     readonly look: "tool-command";
+-    readonly mode: "help" | "legacy" | "view";
++    readonly mode: "help" | "legacy" | "view" | "queued";
+     readonly exitCode: number;
+     /** The look of the wrapped view (`view` mode). */
+     readonly inner?: string;
+     /** The command's label (`server/tool`, the mounted tool's label). */
+     readonly commandLabel: string;
++    readonly queuedLabel?: string;
+     readonly args?: unknown;
+     /** What a mounted tool's render hooks drew (`legacy` mode). */
+     readonly parts?: readonly ToolRenderPart[];
+ }
+ /** The command's label: the mounted tool's, else `server/tool` for MCP names, else the name. */
+ export declare function toolCommandLabel(name: string, mounted: ToolCommandMounted | undefined): string;
++/** Optional view for a validated command that has not entered execution */
++export declare function queuedToolCommand(input: ToolCommandInput, state: ToolViewState): ToolView | undefined;
+ /** The view of one invocation. */
+ export declare function toolCommandView(input: ToolCommandInput, state: ToolViewState): ToolView;
+ /** The nested card of one invocation inside a shell run. */
+diff --git a/package.json b/package.json
+--- a/package.json
++++ b/package.json
+@@ -1,588 +1,620 @@
+ {
+-	"name": "@oh-my-pi/pi-coding-agent",
+-	"version": "19.2.1",
+-	"description": "Coding agent CLI with read, bash, edit, write tools and session management",
+-	"keywords": [
+-		"agent",
+-		"ai",
+-		"cli",
+-		"coding-agent",
+-		"llm",
+-		"tui"
+-	],
+-	"homepage": "https://omp.sh",
+-	"bugs": {
+-		"url": "https://github.com/can1357/oh-my-pi/issues"
+-	},
+-	"license": "MIT",
+-	"author": {
+-		"name": "Stencil Labs, Inc.",
+-		"url": "https://stencil.so"
+-	},
+-	"contributors": [
+-		"Mario Zechner"
+-	],
+-	"repository": {
+-		"type": "git",
+-		"url": "git+https://github.com/can1357/oh-my-pi.git",
+-		"directory": "packages/coding-agent"
+-	},
+-	"bin": {
+-		"omp": "dist/cli.js"
+-	},
+-	"files": [
+-		"src",
+-		"!src/export/html/shell.html",
+-		"!src/export/html/template.css",
+-		"!src/export/html/template.js",
+-		"!src/export/html/share-loader.js",
+-		"dist/cli.js",
+-		"dist/docs-index.generated.txt",
+-		"dist/CHANGELOG-*.md",
+-		"dist/*.node",
+-		"dist/*.json-*.zst",
+-		"dist/perturbation-pool.json-*.txt",
+-		"scripts",
+-		"examples",
+-		"README.md",
+-		"CHANGELOG.md",
+-		"THIRD-PARTY-NOTICES.txt",
+-		"LICENSE",
+-		"dist/types"
+-	],
+-	"type": "module",
+-	"main": "./src/index.ts",
+-	"types": "./dist/types/index.d.ts",
+-	"exports": {
+-		".": {
+-			"types": "./dist/types/index.d.ts",
+-			"import": "./src/index.ts"
+-		},
+-		"./*": {
+-			"types": "./dist/types/*.d.ts",
+-			"import": "./src/*.ts"
+-		},
+-		"./async": {
+-			"types": "./dist/types/async/index.d.ts",
+-			"import": "./src/async/index.ts"
+-		},
+-		"./async/*": {
+-			"types": "./dist/types/async/*.d.ts",
+-			"import": "./src/async/*.ts"
+-		},
+-		"./autoresearch": {
+-			"types": "./dist/types/autoresearch/index.d.ts",
+-			"import": "./src/autoresearch/index.ts"
+-		},
+-		"./autoresearch/*": {
+-			"types": "./dist/types/autoresearch/*.d.ts",
+-			"import": "./src/autoresearch/*.ts"
+-		},
+-		"./autoresearch/tools/*": {
+-			"types": "./dist/types/autoresearch/tools/*.d.ts",
+-			"import": "./src/autoresearch/tools/*.ts"
+-		},
+-		"./capability": {
+-			"types": "./dist/types/capability/index.d.ts",
+-			"import": "./src/capability/index.ts"
+-		},
+-		"./capability/*": {
+-			"types": "./dist/types/capability/*.d.ts",
+-			"import": "./src/capability/*.ts"
+-		},
+-		"./cli/*": {
+-			"types": "./dist/types/cli/*.d.ts",
+-			"import": "./src/cli/*.ts"
+-		},
+-		"./cli/gallery-fixtures": {
+-			"types": "./dist/types/cli/gallery-fixtures/index.d.ts",
+-			"import": "./src/cli/gallery-fixtures/index.ts"
+-		},
+-		"./cli/gallery-fixtures/*": {
+-			"types": "./dist/types/cli/gallery-fixtures/*.d.ts",
+-			"import": "./src/cli/gallery-fixtures/*.ts"
+-		},
+-		"./cli/commands/*": {
+-			"types": "./dist/types/cli/commands/*.d.ts",
+-			"import": "./src/cli/commands/*.ts"
+-		},
+-		"./commands/*": {
+-			"types": "./dist/types/commands/*.d.ts",
+-			"import": "./src/commands/*.ts"
+-		},
+-		"./commit": {
+-			"types": "./dist/types/commit/index.d.ts",
+-			"import": "./src/commit/index.ts"
+-		},
+-		"./commit/*": {
+-			"types": "./dist/types/commit/*.d.ts",
+-			"import": "./src/commit/*.ts"
+-		},
+-		"./commit/agentic": {
+-			"types": "./dist/types/commit/agentic/index.d.ts",
+-			"import": "./src/commit/agentic/index.ts"
+-		},
+-		"./commit/agentic/*": {
+-			"types": "./dist/types/commit/agentic/*.d.ts",
+-			"import": "./src/commit/agentic/*.ts"
+-		},
+-		"./commit/agentic/tools": {
+-			"types": "./dist/types/commit/agentic/tools/index.d.ts",
+-			"import": "./src/commit/agentic/tools/index.ts"
+-		},
+-		"./commit/agentic/tools/*": {
+-			"types": "./dist/types/commit/agentic/tools/*.d.ts",
+-			"import": "./src/commit/agentic/tools/*.ts"
+-		},
+-		"./commit/analysis": {
+-			"types": "./dist/types/commit/analysis/index.d.ts",
+-			"import": "./src/commit/analysis/index.ts"
+-		},
+-		"./commit/analysis/*": {
+-			"types": "./dist/types/commit/analysis/*.d.ts",
+-			"import": "./src/commit/analysis/*.ts"
+-		},
+-		"./commit/changelog": {
+-			"types": "./dist/types/commit/changelog/index.d.ts",
+-			"import": "./src/commit/changelog/index.ts"
+-		},
+-		"./commit/changelog/*": {
+-			"types": "./dist/types/commit/changelog/*.d.ts",
+-			"import": "./src/commit/changelog/*.ts"
+-		},
+-		"./commit/conventional": {
+-			"types": "./dist/types/commit/conventional/index.d.ts",
+-			"import": "./src/commit/conventional/index.ts"
+-		},
+-		"./commit/conventional/*": {
+-			"types": "./dist/types/commit/conventional/*.d.ts",
+-			"import": "./src/commit/conventional/*.ts"
+-		},
+-		"./commit/git/*": {
+-			"types": "./dist/types/commit/git/*.d.ts",
+-			"import": "./src/commit/git/*.ts"
+-		},
+-		"./config/*": {
+-			"types": "./dist/types/config/*.d.ts",
+-			"import": "./src/config/*.ts"
+-		},
+-		"./dap": {
+-			"types": "./dist/types/dap/index.d.ts",
+-			"import": "./src/dap/index.ts"
+-		},
+-		"./dap/*": {
+-			"types": "./dist/types/dap/*.d.ts",
+-			"import": "./src/dap/*.ts"
+-		},
+-		"./debug": {
+-			"types": "./dist/types/debug/index.d.ts",
+-			"import": "./src/debug/index.tsx"
+-		},
+-		"./debug/*": {
+-			"types": "./dist/types/debug/*.d.ts",
+-			"import": "./src/debug/*.ts"
+-		},
+-		"./discovery": {
+-			"types": "./dist/types/discovery/index.d.ts",
+-			"import": "./src/discovery/index.ts"
+-		},
+-		"./discovery/*": {
+-			"types": "./dist/types/discovery/*.d.ts",
+-			"import": "./src/discovery/*.ts"
+-		},
+-		"./edit": {
+-			"types": "./dist/types/edit/index.d.ts",
+-			"import": "./src/edit/index.ts"
+-		},
+-		"./edit/*": {
+-			"types": "./dist/types/edit/*.d.ts",
+-			"import": "./src/edit/*.ts"
+-		},
+-		"./exa": {
+-			"types": "./dist/types/exa/index.d.ts",
+-			"import": "./src/exa/index.ts"
+-		},
+-		"./exa/*": {
+-			"types": "./dist/types/exa/*.d.ts",
+-			"import": "./src/exa/*.ts"
+-		},
+-		"./exec/*": {
+-			"types": "./dist/types/exec/*.d.ts",
+-			"import": "./src/exec/*.ts"
+-		},
+-		"./export/*": {
+-			"types": "./dist/types/export/*.d.ts",
+-			"import": "./src/export/*.ts"
+-		},
+-		"./export/html": {
+-			"types": "./dist/types/export/html/index.d.ts",
+-			"import": "./src/export/html/index.ts"
+-		},
+-		"./export/html/*": {
+-			"types": "./dist/types/export/html/*.d.ts",
+-			"import": "./src/export/html/*.ts"
+-		},
+-		"./extensibility/*": {
+-			"types": "./dist/types/extensibility/*.d.ts",
+-			"import": "./src/extensibility/*.ts"
+-		},
+-		"./extensibility/custom-commands": {
+-			"types": "./dist/types/extensibility/custom-commands/index.d.ts",
+-			"import": "./src/extensibility/custom-commands/index.ts"
+-		},
+-		"./extensibility/custom-commands/*": {
+-			"types": "./dist/types/extensibility/custom-commands/*.d.ts",
+-			"import": "./src/extensibility/custom-commands/*.ts"
+-		},
+-		"./extensibility/custom-commands/bundled/ci-green": {
+-			"types": "./dist/types/extensibility/custom-commands/bundled/ci-green/index.d.ts",
+-			"import": "./src/extensibility/custom-commands/bundled/ci-green/index.ts"
+-		},
+-		"./extensibility/custom-commands/bundled/review": {
+-			"types": "./dist/types/extensibility/custom-commands/bundled/review/index.d.ts",
+-			"import": "./src/extensibility/custom-commands/bundled/review/index.ts"
+-		},
+-		"./extensibility/custom-commands/bundled/annotate": {
+-			"types": "./dist/types/extensibility/custom-commands/bundled/annotate/index.d.ts",
+-			"import": "./src/extensibility/custom-commands/bundled/annotate/index.ts"
+-		},
+-		"./extensibility/custom-tools": {
+-			"types": "./dist/types/extensibility/custom-tools/index.d.ts",
+-			"import": "./src/extensibility/custom-tools/index.ts"
+-		},
+-		"./extensibility/custom-tools/*": {
+-			"types": "./dist/types/extensibility/custom-tools/*.d.ts",
+-			"import": "./src/extensibility/custom-tools/*.ts"
+-		},
+-		"./extensibility/extensions": {
+-			"types": "./dist/types/extensibility/extensions/index.d.ts",
+-			"import": "./src/extensibility/extensions/index.ts"
+-		},
+-		"./extensibility/extensions/*": {
+-			"types": "./dist/types/extensibility/extensions/*.d.ts",
+-			"import": "./src/extensibility/extensions/*.ts"
+-		},
+-		"./extensibility/hooks": {
+-			"types": "./dist/types/extensibility/hooks/index.d.ts",
+-			"import": "./src/extensibility/hooks/index.ts"
+-		},
+-		"./extensibility/hooks/*": {
+-			"types": "./dist/types/extensibility/hooks/*.d.ts",
+-			"import": "./src/extensibility/hooks/*.ts"
+-		},
+-		"./extensibility/plugins": {
+-			"types": "./dist/types/extensibility/plugins/index.d.ts",
+-			"import": "./src/extensibility/plugins/index.ts"
+-		},
+-		"./extensibility/plugins/*": {
+-			"types": "./dist/types/extensibility/plugins/*.d.ts",
+-			"import": "./src/extensibility/plugins/*.ts"
+-		},
+-		"./extensibility/plugins/marketplace": {
+-			"types": "./dist/types/extensibility/plugins/marketplace/index.d.ts",
+-			"import": "./src/extensibility/plugins/marketplace/index.ts"
+-		},
+-		"./extensibility/plugins/marketplace/*": {
+-			"types": "./dist/types/extensibility/plugins/marketplace/*.d.ts",
+-			"import": "./src/extensibility/plugins/marketplace/*.ts"
+-		},
+-		"./disasm": {
+-			"types": "./dist/types/disasm/index.d.ts",
+-			"import": "./src/disasm/index.ts"
+-		},
+-		"./disasm/*": {
+-			"types": "./dist/types/disasm/*.d.ts",
+-			"import": "./src/disasm/*.ts"
+-		},
+-		"./ghidra": {
+-			"types": "./dist/types/ghidra/index.d.ts",
+-			"import": "./src/ghidra/index.ts"
+-		},
+-		"./ghidra/*": {
+-			"types": "./dist/types/ghidra/*.d.ts",
+-			"import": "./src/ghidra/*.ts"
+-		},
+-		"./binja": {
+-			"types": "./dist/types/binja/index.d.ts",
+-			"import": "./src/binja/index.ts"
+-		},
+-		"./binja/*": {
+-			"types": "./dist/types/binja/*.d.ts",
+-			"import": "./src/binja/*.ts"
+-		},
+-		"./ida": {
+-			"types": "./dist/types/ida/index.d.ts",
+-			"import": "./src/ida/index.ts"
+-		},
+-		"./ida/*": {
+-			"types": "./dist/types/ida/*.d.ts",
+-			"import": "./src/ida/*.ts"
+-		},
+-		"./internal-urls": {
+-			"types": "./dist/types/internal-urls/index.d.ts",
+-			"import": "./src/internal-urls/index.ts"
+-		},
+-		"./internal-urls/*": {
+-			"types": "./dist/types/internal-urls/*.d.ts",
+-			"import": "./src/internal-urls/*.ts"
+-		},
+-		"./eval": {
+-			"types": "./dist/types/eval/index.d.ts",
+-			"import": "./src/eval/index.ts"
+-		},
+-		"./if-bench": {
+-			"types": "./dist/types/if-bench/index.d.ts",
+-			"import": "./src/if-bench/index.ts"
+-		},
+-		"./if-bench/*": {
+-			"types": "./dist/types/if-bench/*.d.ts",
+-			"import": "./src/if-bench/*.ts"
+-		},
+-		"./eval/js/*": {
+-			"types": "./dist/types/eval/js/*.d.ts",
+-			"import": "./src/eval/js/*.ts"
+-		},
+-		"./eval/py/*": {
+-			"types": "./dist/types/eval/py/*.d.ts",
+-			"import": "./src/eval/py/*.ts"
+-		},
+-		"./lsp": {
+-			"types": "./dist/types/lsp/index.d.ts",
+-			"import": "./src/lsp/index.ts"
+-		},
+-		"./lsp/*": {
+-			"types": "./dist/types/lsp/*.d.ts",
+-			"import": "./src/lsp/*.ts"
+-		},
+-		"./lsp/clients": {
+-			"types": "./dist/types/lsp/clients/index.d.ts",
+-			"import": "./src/lsp/clients/index.ts"
+-		},
+-		"./lsp/clients/*": {
+-			"types": "./dist/types/lsp/clients/*.d.ts",
+-			"import": "./src/lsp/clients/*.ts"
+-		},
+-		"./judgment": {
+-			"types": "./dist/types/judgment/index.d.ts",
+-			"import": "./src/judgment/index.ts"
+-		},
+-		"./markit": {
+-			"types": "./dist/types/markit/index.d.ts",
+-			"import": "./src/markit/index.ts"
+-		},
+-		"./markit/*": {
+-			"types": "./dist/types/markit/*.d.ts",
+-			"import": "./src/markit/*.ts"
+-		},
+-		"./mcp": {
+-			"types": "./dist/types/mcp/index.d.ts",
+-			"import": "./src/mcp/index.ts"
+-		},
+-		"./mcp/*": {
+-			"types": "./dist/types/mcp/*.d.ts",
+-			"import": "./src/mcp/*.ts"
+-		},
+-		"./mcp/host/*": {
+-			"types": "./dist/types/mcp/host/*.d.ts",
+-			"import": "./src/mcp/host/*.ts"
+-		},
+-		"./memories": {
+-			"types": "./dist/types/memories/index.d.ts",
+-			"import": "./src/memories/index.ts"
+-		},
+-		"./memories/*": {
+-			"types": "./dist/types/memories/*.d.ts",
+-			"import": "./src/memories/*.ts"
+-		},
+-		"./memory-backend": {
+-			"types": "./dist/types/memory-backend/index.d.ts",
+-			"import": "./src/memory-backend/index.ts"
+-		},
+-		"./memory-backend/*": {
+-			"types": "./dist/types/memory-backend/*.d.ts",
+-			"import": "./src/memory-backend/*.ts"
+-		},
+-		"./hindsight": {
+-			"types": "./dist/types/hindsight/index.d.ts",
+-			"import": "./src/hindsight/index.ts"
+-		},
+-		"./hindsight/*": {
+-			"types": "./dist/types/hindsight/*.d.ts",
+-			"import": "./src/hindsight/*.ts"
+-		},
+-		"./modes": {
+-			"types": "./dist/types/modes/index.d.ts",
+-			"import": "./src/modes/index.ts"
+-		},
+-		"./modes/*": {
+-			"types": "./dist/types/modes/*.d.ts",
+-			"import": "./src/modes/*.ts"
+-		},
+-		"./modes/acp": {
+-			"types": "./dist/types/modes/acp/index.d.ts",
+-			"import": "./src/modes/acp/index.ts"
+-		},
+-		"./modes/acp/*": {
+-			"types": "./dist/types/modes/acp/*.d.ts",
+-			"import": "./src/modes/acp/*.ts"
+-		},
+-		"./modes/components/*": {
+-			"types": "./dist/types/modes/components/*.d.ts",
+-			"import": "./src/modes/components/*.ts"
+-		},
+-		"./modes/components/extensions/*": {
+-			"types": "./dist/types/modes/components/extensions/*.d.ts",
+-			"import": "./src/modes/components/extensions/*.ts"
+-		},
+-		"./modes/controllers/*": {
+-			"types": "./dist/types/modes/controllers/*.d.ts",
+-			"import": "./src/modes/controllers/*.ts"
+-		},
+-		"./modes/rpc/*": {
+-			"types": "./dist/types/modes/rpc/*.d.ts",
+-			"import": "./src/modes/rpc/*.ts"
+-		},
+-		"./modes/utils/*": {
+-			"types": "./dist/types/modes/utils/*.d.ts",
+-			"import": "./src/modes/utils/*.ts"
+-		},
+-		"./plan-mode/*": {
+-			"types": "./dist/types/plan-mode/*.d.ts",
+-			"import": "./src/plan-mode/*.ts"
+-		},
+-		"./registry/*": {
+-			"types": "./dist/types/registry/*.d.ts",
+-			"import": "./src/registry/*.ts"
+-		},
+-		"./secrets": {
+-			"types": "./dist/types/secrets/index.d.ts",
+-			"import": "./src/secrets/index.ts"
+-		},
+-		"./secrets/*": {
+-			"types": "./dist/types/secrets/*.d.ts",
+-			"import": "./src/secrets/*.ts"
+-		},
+-		"./session/*": {
+-			"types": "./dist/types/session/*.d.ts",
+-			"import": "./src/session/*.ts"
+-		},
+-		"./slash-commands/*": {
+-			"types": "./dist/types/slash-commands/*.d.ts",
+-			"import": "./src/slash-commands/*.ts"
+-		},
+-		"./ssh/*": {
+-			"types": "./dist/types/ssh/*.d.ts",
+-			"import": "./src/ssh/*.ts"
+-		},
+-		"./stt": {
+-			"types": "./dist/types/stt/index.d.ts",
+-			"import": "./src/stt/index.ts"
+-		},
+-		"./stt/*": {
+-			"types": "./dist/types/stt/*.d.ts",
+-			"import": "./src/stt/*.ts"
+-		},
+-		"./task": {
+-			"types": "./dist/types/task/index.d.ts",
+-			"import": "./src/task/index.ts"
+-		},
+-		"./task/*": {
+-			"types": "./dist/types/task/*.d.ts",
+-			"import": "./src/task/*.ts"
+-		},
+-		"./tools": {
+-			"types": "./dist/types/tools/index.d.ts",
+-			"import": "./src/tools/index.ts"
+-		},
+-		"./tools/jfind": {
+-			"types": "./dist/types/tools/jfind/index.d.ts",
+-			"import": "./src/tools/jfind/index.ts"
+-		},
+-		"./tools/jfind/*": {
+-			"types": "./dist/types/tools/jfind/*.d.ts",
+-			"import": "./src/tools/jfind/*.ts"
+-		},
+-		"./tools/*": {
+-			"types": "./dist/types/tools/*.d.ts",
+-			"import": "./src/tools/*.ts"
+-		},
+-		"./utils/*": {
+-			"types": "./dist/types/utils/*.d.ts",
+-			"import": "./src/utils/*.ts"
+-		},
+-		"./web/*": {
+-			"types": "./dist/types/web/*.d.ts",
+-			"import": "./src/web/*.ts"
+-		},
+-		"./web/scrapers": {
+-			"types": "./dist/types/web/scrapers/index.d.ts",
+-			"import": "./src/web/scrapers/index.ts"
+-		},
+-		"./web/scrapers/*": {
+-			"types": "./dist/types/web/scrapers/*.d.ts",
+-			"import": "./src/web/scrapers/*.ts"
+-		},
+-		"./web/search": {
+-			"types": "./dist/types/web/search/index.d.ts",
+-			"import": "./src/web/search/index.ts"
+-		},
+-		"./web/search/*": {
+-			"types": "./dist/types/web/search/*.d.ts",
+-			"import": "./src/web/search/*.ts"
+-		},
+-		"./web/search/providers/*": {
+-			"types": "./dist/types/web/search/providers/*.d.ts",
+-			"import": "./src/web/search/providers/*.ts"
+-		},
+-		"./prompts/*": "./src/prompts/*.md",
+-		"./*.js": "./src/*.ts"
+-	},
+-	"scripts": {
+-		"build": "bun scripts/build-binary.ts",
+-		"check": "oxlint . && oxfmt --check --no-error-on-unmatched-pattern 'src/**/*.{ts,tsx}' '{test,bench,examples,scripts}/**/*.ts' '*.ts' && bun run check:types",
+-		"check:types": "bun check --no-script -p tsconfig.json",
+-		"lint": "oxlint .",
+-		"test": "bun ../../scripts/ci-test-ts.ts coding-agent-heavy --full",
+-		"fix": "oxlint --fix --fix-suggestions . && bun run fmt",
+-		"fmt": "oxfmt --no-error-on-unmatched-pattern 'src/**/*.{ts,tsx}' '{test,bench,examples,scripts}/**/*.ts' '*.ts' && bun run format-prompts",
+-		"format-prompts": "bun scripts/format-prompts.ts",
+-		"gen:export-viewer": "bun --cwd=../collab-web run gen:export-viewer",
+-		"gen:bundle": "bun scripts/bundle-dist.ts",
+-		"gen:rpc": "bun scripts/gen-rpc/index.ts",
+-		"prepack": "bun run gen:export-viewer && bun run gen:bundle",
+-		"bench:guard": "bun scripts/bench-guard.ts"
+-	},
+-	"dependencies": {
+-		"@babel/parser": "^7.29.7",
+-		"@oh-my-pi/omp-stats": "19.2.1",
+-		"@oh-my-pi/omptype": "19.2.1",
+-		"@oh-my-pi/pi-agent-core": "19.2.1",
+-		"@oh-my-pi/pi-ai": "19.2.1",
+-		"@oh-my-pi/pi-catalog": "19.2.1",
+-		"@oh-my-pi/pi-mnemopi": "19.2.1",
+-		"@oh-my-pi/pi-natives": "19.2.1",
+-		"@oh-my-pi/pi-tui": "19.2.1",
+-		"@oh-my-pi/pi-utils": "19.2.1",
+-		"@oh-my-pi/pi-wire": "19.2.1",
+-		"@oh-my-pi/snapcompact": "19.2.1",
+-		"@opentelemetry/api": "^1.9.1",
+-		"@opentelemetry/api-logs": "^0.220.0",
+-		"@opentelemetry/context-async-hooks": "2.9.0",
+-		"@opentelemetry/exporter-logs-otlp-proto": "^0.220.0",
+-		"@opentelemetry/exporter-metrics-otlp-proto": "^0.220.0",
+-		"@opentelemetry/exporter-trace-otlp-proto": "^0.220.0",
+-		"@opentelemetry/resources": "2.9.0",
+-		"@opentelemetry/sdk-logs": "^0.220.0",
+-		"@opentelemetry/sdk-metrics": "2.9.0",
+-		"@opentelemetry/sdk-trace-base": "2.9.0",
+-		"@opentelemetry/sdk-trace-node": "2.9.0",
+-		"axe-core": "4.13.0",
+-		"puppeteer-core": "25.3.0"
+-	},
+-	"devDependencies": {
+-		"@types/bun": "^1.3.14"
+-	},
+-	"engines": {
+-		"bun": ">=1.4.4"
+-	}
++  "name": "@oh-my-pi/pi-coding-agent",
++  "version": "19.2.1",
++  "description": "Coding agent CLI with read, bash, edit, write tools and session management",
++  "keywords": [
++    "agent",
++    "ai",
++    "cli",
++    "coding-agent",
++    "llm",
++    "tui"
++  ],
++  "homepage": "https://omp.sh",
++  "bugs": {
++    "url": "https://github.com/can1357/oh-my-pi/issues"
++  },
++  "license": "MIT",
++  "author": {
++    "name": "Stencil Labs, Inc.",
++    "url": "https://stencil.so"
++  },
++  "contributors": [
++    "Mario Zechner"
++  ],
++  "repository": {
++    "type": "git",
++    "url": "git+https://github.com/can1357/oh-my-pi.git",
++    "directory": "packages/coding-agent"
++  },
++  "bin": {
++    "omp": "dist/cli.js"
++  },
++  "files": [
++    "src",
++    "!src/export/html/shell.html",
++    "!src/export/html/template.css",
++    "!src/export/html/template.js",
++    "!src/export/html/share-loader.js",
++    "dist/cli.js",
++    "dist/docs-index.generated.txt",
++    "dist/CHANGELOG-*.md",
++    "dist/*.node",
++    "dist/*.json-*.zst",
++    "dist/perturbation-pool.json-*.txt",
++    "scripts",
++    "examples",
++    "README.md",
++    "CHANGELOG.md",
++    "THIRD-PARTY-NOTICES.txt",
++    "LICENSE",
++    "dist/types"
++  ],
++  "type": "module",
++  "main": "./src/index.ts",
++  "types": "./dist/types/index.d.ts",
++  "exports": {
++    ".": {
++      "types": "./dist/types/index.d.ts",
++      "import": "./src/index.ts"
++    },
++    "./*": {
++      "types": "./dist/types/*.d.ts",
++      "import": "./src/*.ts"
++    },
++    "./async": {
++      "types": "./dist/types/async/index.d.ts",
++      "import": "./src/async/index.ts"
++    },
++    "./async/*": {
++      "types": "./dist/types/async/*.d.ts",
++      "import": "./src/async/*.ts"
++    },
++    "./autoresearch": {
++      "types": "./dist/types/autoresearch/index.d.ts",
++      "import": "./src/autoresearch/index.ts"
++    },
++    "./autoresearch/*": {
++      "types": "./dist/types/autoresearch/*.d.ts",
++      "import": "./src/autoresearch/*.ts"
++    },
++    "./autoresearch/tools/*": {
++      "types": "./dist/types/autoresearch/tools/*.d.ts",
++      "import": "./src/autoresearch/tools/*.ts"
++    },
++    "./capability": {
++      "types": "./dist/types/capability/index.d.ts",
++      "import": "./src/capability/index.ts"
++    },
++    "./capability/*": {
++      "types": "./dist/types/capability/*.d.ts",
++      "import": "./src/capability/*.ts"
++    },
++    "./cli/*": {
++      "types": "./dist/types/cli/*.d.ts",
++      "import": "./src/cli/*.ts"
++    },
++    "./cli/gallery-fixtures": {
++      "types": "./dist/types/cli/gallery-fixtures/index.d.ts",
++      "import": "./src/cli/gallery-fixtures/index.ts"
++    },
++    "./cli/gallery-fixtures/*": {
++      "types": "./dist/types/cli/gallery-fixtures/*.d.ts",
++      "import": "./src/cli/gallery-fixtures/*.ts"
++    },
++    "./cli/commands/*": {
++      "types": "./dist/types/cli/commands/*.d.ts",
++      "import": "./src/cli/commands/*.ts"
++    },
++    "./commands/*": {
++      "types": "./dist/types/commands/*.d.ts",
++      "import": "./src/commands/*.ts"
++    },
++    "./commit": {
++      "types": "./dist/types/commit/index.d.ts",
++      "import": "./src/commit/index.ts"
++    },
++    "./commit/*": {
++      "types": "./dist/types/commit/*.d.ts",
++      "import": "./src/commit/*.ts"
++    },
++    "./commit/agentic": {
++      "types": "./dist/types/commit/agentic/index.d.ts",
++      "import": "./src/commit/agentic/index.ts"
++    },
++    "./commit/agentic/*": {
++      "types": "./dist/types/commit/agentic/*.d.ts",
++      "import": "./src/commit/agentic/*.ts"
++    },
++    "./commit/agentic/tools": {
++      "types": "./dist/types/commit/agentic/tools/index.d.ts",
++      "import": "./src/commit/agentic/tools/index.ts"
++    },
++    "./commit/agentic/tools/*": {
++      "types": "./dist/types/commit/agentic/tools/*.d.ts",
++      "import": "./src/commit/agentic/tools/*.ts"
++    },
++    "./commit/analysis": {
++      "types": "./dist/types/commit/analysis/index.d.ts",
++      "import": "./src/commit/analysis/index.ts"
++    },
++    "./commit/analysis/*": {
++      "types": "./dist/types/commit/analysis/*.d.ts",
++      "import": "./src/commit/analysis/*.ts"
++    },
++    "./commit/changelog": {
++      "types": "./dist/types/commit/changelog/index.d.ts",
++      "import": "./src/commit/changelog/index.ts"
++    },
++    "./commit/changelog/*": {
++      "types": "./dist/types/commit/changelog/*.d.ts",
++      "import": "./src/commit/changelog/*.ts"
++    },
++    "./commit/conventional": {
++      "types": "./dist/types/commit/conventional/index.d.ts",
++      "import": "./src/commit/conventional/index.ts"
++    },
++    "./commit/conventional/*": {
++      "types": "./dist/types/commit/conventional/*.d.ts",
++      "import": "./src/commit/conventional/*.ts"
++    },
++    "./commit/git/*": {
++      "types": "./dist/types/commit/git/*.d.ts",
++      "import": "./src/commit/git/*.ts"
++    },
++    "./config/*": {
++      "types": "./dist/types/config/*.d.ts",
++      "import": "./src/config/*.ts"
++    },
++    "./dap": {
++      "types": "./dist/types/dap/index.d.ts",
++      "import": "./src/dap/index.ts"
++    },
++    "./dap/*": {
++      "types": "./dist/types/dap/*.d.ts",
++      "import": "./src/dap/*.ts"
++    },
++    "./debug": {
++      "types": "./dist/types/debug/index.d.ts",
++      "import": "./src/debug/index.tsx"
++    },
++    "./debug/*": {
++      "types": "./dist/types/debug/*.d.ts",
++      "import": "./src/debug/*.ts"
++    },
++    "./discovery": {
++      "types": "./dist/types/discovery/index.d.ts",
++      "import": "./src/discovery/index.ts"
++    },
++    "./discovery/*": {
++      "types": "./dist/types/discovery/*.d.ts",
++      "import": "./src/discovery/*.ts"
++    },
++    "./edit": {
++      "types": "./dist/types/edit/index.d.ts",
++      "import": "./src/edit/index.ts"
++    },
++    "./edit/*": {
++      "types": "./dist/types/edit/*.d.ts",
++      "import": "./src/edit/*.ts"
++    },
++    "./exa": {
++      "types": "./dist/types/exa/index.d.ts",
++      "import": "./src/exa/index.ts"
++    },
++    "./exa/*": {
++      "types": "./dist/types/exa/*.d.ts",
++      "import": "./src/exa/*.ts"
++    },
++    "./exec/*": {
++      "types": "./dist/types/exec/*.d.ts",
++      "import": "./src/exec/*.ts"
++    },
++    "./export/*": {
++      "types": "./dist/types/export/*.d.ts",
++      "import": "./src/export/*.ts"
++    },
++    "./export/html": {
++      "types": "./dist/types/export/html/index.d.ts",
++      "import": "./src/export/html/index.ts"
++    },
++    "./export/html/*": {
++      "types": "./dist/types/export/html/*.d.ts",
++      "import": "./src/export/html/*.ts"
++    },
++    "./extensibility/*": {
++      "types": "./dist/types/extensibility/*.d.ts",
++      "import": "./src/extensibility/*.ts"
++    },
++    "./extensibility/custom-commands": {
++      "types": "./dist/types/extensibility/custom-commands/index.d.ts",
++      "import": "./src/extensibility/custom-commands/index.ts"
++    },
++    "./extensibility/custom-commands/*": {
++      "types": "./dist/types/extensibility/custom-commands/*.d.ts",
++      "import": "./src/extensibility/custom-commands/*.ts"
++    },
++    "./extensibility/custom-commands/bundled/ci-green": {
++      "types": "./dist/types/extensibility/custom-commands/bundled/ci-green/index.d.ts",
++      "import": "./src/extensibility/custom-commands/bundled/ci-green/index.ts"
++    },
++    "./extensibility/custom-commands/bundled/review": {
++      "types": "./dist/types/extensibility/custom-commands/bundled/review/index.d.ts",
++      "import": "./src/extensibility/custom-commands/bundled/review/index.ts"
++    },
++    "./extensibility/custom-commands/bundled/annotate": {
++      "types": "./dist/types/extensibility/custom-commands/bundled/annotate/index.d.ts",
++      "import": "./src/extensibility/custom-commands/bundled/annotate/index.ts"
++    },
++    "./extensibility/custom-tools": {
++      "types": "./dist/types/extensibility/custom-tools/index.d.ts",
++      "import": "./src/extensibility/custom-tools/index.ts"
++    },
++    "./extensibility/custom-tools/*": {
++      "types": "./dist/types/extensibility/custom-tools/*.d.ts",
++      "import": "./src/extensibility/custom-tools/*.ts"
++    },
++    "./extensibility/extensions": {
++      "types": "./dist/types/extensibility/extensions/index.d.ts",
++      "import": "./src/extensibility/extensions/index.ts"
++    },
++    "./extensibility/extensions/*": {
++      "types": "./dist/types/extensibility/extensions/*.d.ts",
++      "import": "./src/extensibility/extensions/*.ts"
++    },
++    "./extensibility/hooks": {
++      "types": "./dist/types/extensibility/hooks/index.d.ts",
++      "import": "./src/extensibility/hooks/index.ts"
++    },
++    "./extensibility/hooks/*": {
++      "types": "./dist/types/extensibility/hooks/*.d.ts",
++      "import": "./src/extensibility/hooks/*.ts"
++    },
++    "./extensibility/plugins": {
++      "types": "./dist/types/extensibility/plugins/index.d.ts",
++      "import": "./src/extensibility/plugins/index.ts"
++    },
++    "./extensibility/plugins/*": {
++      "types": "./dist/types/extensibility/plugins/*.d.ts",
++      "import": "./src/extensibility/plugins/*.ts"
++    },
++    "./extensibility/plugins/marketplace": {
++      "types": "./dist/types/extensibility/plugins/marketplace/index.d.ts",
++      "import": "./src/extensibility/plugins/marketplace/index.ts"
++    },
++    "./extensibility/plugins/marketplace/*": {
++      "types": "./dist/types/extensibility/plugins/marketplace/*.d.ts",
++      "import": "./src/extensibility/plugins/marketplace/*.ts"
++    },
++    "./disasm": {
++      "types": "./dist/types/disasm/index.d.ts",
++      "import": "./src/disasm/index.ts"
++    },
++    "./disasm/*": {
++      "types": "./dist/types/disasm/*.d.ts",
++      "import": "./src/disasm/*.ts"
++    },
++    "./ghidra": {
++      "types": "./dist/types/ghidra/index.d.ts",
++      "import": "./src/ghidra/index.ts"
++    },
++    "./ghidra/*": {
++      "types": "./dist/types/ghidra/*.d.ts",
++      "import": "./src/ghidra/*.ts"
++    },
++    "./binja": {
++      "types": "./dist/types/binja/index.d.ts",
++      "import": "./src/binja/index.ts"
++    },
++    "./binja/*": {
++      "types": "./dist/types/binja/*.d.ts",
++      "import": "./src/binja/*.ts"
++    },
++    "./ida": {
++      "types": "./dist/types/ida/index.d.ts",
++      "import": "./src/ida/index.ts"
++    },
++    "./ida/*": {
++      "types": "./dist/types/ida/*.d.ts",
++      "import": "./src/ida/*.ts"
++    },
++    "./internal-urls": {
++      "types": "./dist/types/internal-urls/index.d.ts",
++      "import": "./src/internal-urls/index.ts"
++    },
++    "./internal-urls/*": {
++      "types": "./dist/types/internal-urls/*.d.ts",
++      "import": "./src/internal-urls/*.ts"
++    },
++    "./eval": {
++      "types": "./dist/types/eval/index.d.ts",
++      "import": "./src/eval/index.ts"
++    },
++    "./if-bench": {
++      "types": "./dist/types/if-bench/index.d.ts",
++      "import": "./src/if-bench/index.ts"
++    },
++    "./if-bench/*": {
++      "types": "./dist/types/if-bench/*.d.ts",
++      "import": "./src/if-bench/*.ts"
++    },
++    "./eval/js/*": {
++      "types": "./dist/types/eval/js/*.d.ts",
++      "import": "./src/eval/js/*.ts"
++    },
++    "./eval/py/*": {
++      "types": "./dist/types/eval/py/*.d.ts",
++      "import": "./src/eval/py/*.ts"
++    },
++    "./lsp": {
++      "types": "./dist/types/lsp/index.d.ts",
++      "import": "./src/lsp/index.ts"
++    },
++    "./lsp/*": {
++      "types": "./dist/types/lsp/*.d.ts",
++      "import": "./src/lsp/*.ts"
++    },
++    "./lsp/clients": {
++      "types": "./dist/types/lsp/clients/index.d.ts",
++      "import": "./src/lsp/clients/index.ts"
++    },
++    "./lsp/clients/*": {
++      "types": "./dist/types/lsp/clients/*.d.ts",
++      "import": "./src/lsp/clients/*.ts"
++    },
++    "./judgment": {
++      "types": "./dist/types/judgment/index.d.ts",
++      "import": "./src/judgment/index.ts"
++    },
++    "./markit": {
++      "types": "./dist/types/markit/index.d.ts",
++      "import": "./src/markit/index.ts"
++    },
++    "./markit/*": {
++      "types": "./dist/types/markit/*.d.ts",
++      "import": "./src/markit/*.ts"
++    },
++    "./mcp": {
++      "types": "./dist/types/mcp/index.d.ts",
++      "import": "./src/mcp/index.ts"
++    },
++    "./mcp/*": {
++      "types": "./dist/types/mcp/*.d.ts",
++      "import": "./src/mcp/*.ts"
++    },
++    "./mcp/host/*": {
++      "types": "./dist/types/mcp/host/*.d.ts",
++      "import": "./src/mcp/host/*.ts"
++    },
++    "./memories": {
++      "types": "./dist/types/memories/index.d.ts",
++      "import": "./src/memories/index.ts"
++    },
++    "./memories/*": {
++      "types": "./dist/types/memories/*.d.ts",
++      "import": "./src/memories/*.ts"
++    },
++    "./memory-backend": {
++      "types": "./dist/types/memory-backend/index.d.ts",
++      "import": "./src/memory-backend/index.ts"
++    },
++    "./memory-backend/*": {
++      "types": "./dist/types/memory-backend/*.d.ts",
++      "import": "./src/memory-backend/*.ts"
++    },
++    "./hindsight": {
++      "types": "./dist/types/hindsight/index.d.ts",
++      "import": "./src/hindsight/index.ts"
++    },
++    "./hindsight/*": {
++      "types": "./dist/types/hindsight/*.d.ts",
++      "import": "./src/hindsight/*.ts"
++    },
++    "./modes": {
++      "types": "./dist/types/modes/index.d.ts",
++      "import": "./src/modes/index.ts"
++    },
++    "./modes/*": {
++      "types": "./dist/types/modes/*.d.ts",
++      "import": "./src/modes/*.ts"
++    },
++    "./modes/acp": {
++      "types": "./dist/types/modes/acp/index.d.ts",
++      "import": "./src/modes/acp/index.ts"
++    },
++    "./modes/acp/*": {
++      "types": "./dist/types/modes/acp/*.d.ts",
++      "import": "./src/modes/acp/*.ts"
++    },
++    "./modes/components/*": {
++      "types": "./dist/types/modes/components/*.d.ts",
++      "import": "./src/modes/components/*.ts"
++    },
++    "./modes/components/extensions/*": {
++      "types": "./dist/types/modes/components/extensions/*.d.ts",
++      "import": "./src/modes/components/extensions/*.ts"
++    },
++    "./modes/controllers/*": {
++      "types": "./dist/types/modes/controllers/*.d.ts",
++      "import": "./src/modes/controllers/*.ts"
++    },
++    "./modes/rpc/*": {
++      "types": "./dist/types/modes/rpc/*.d.ts",
++      "import": "./src/modes/rpc/*.ts"
++    },
++    "./modes/utils/*": {
++      "types": "./dist/types/modes/utils/*.d.ts",
++      "import": "./src/modes/utils/*.ts"
++    },
++    "./plan-mode/*": {
++      "types": "./dist/types/plan-mode/*.d.ts",
++      "import": "./src/plan-mode/*.ts"
++    },
++    "./registry/*": {
++      "types": "./dist/types/registry/*.d.ts",
++      "import": "./src/registry/*.ts"
++    },
++    "./secrets": {
++      "types": "./dist/types/secrets/index.d.ts",
++      "import": "./src/secrets/index.ts"
++    },
++    "./secrets/*": {
++      "types": "./dist/types/secrets/*.d.ts",
++      "import": "./src/secrets/*.ts"
++    },
++    "./session/*": {
++      "types": "./dist/types/session/*.d.ts",
++      "import": "./src/session/*.ts"
++    },
++    "./slash-commands/*": {
++      "types": "./dist/types/slash-commands/*.d.ts",
++      "import": "./src/slash-commands/*.ts"
++    },
++    "./ssh/*": {
++      "types": "./dist/types/ssh/*.d.ts",
++      "import": "./src/ssh/*.ts"
++    },
++    "./stt": {
++      "types": "./dist/types/stt/index.d.ts",
++      "import": "./src/stt/index.ts"
++    },
++    "./stt/*": {
++      "types": "./dist/types/stt/*.d.ts",
++      "import": "./src/stt/*.ts"
++    },
++    "./task": {
++      "types": "./dist/types/task/index.d.ts",
++      "import": "./src/task/index.ts"
++    },
++    "./task/*": {
++      "types": "./dist/types/task/*.d.ts",
++      "import": "./src/task/*.ts"
++    },
++    "./tools": {
++      "types": "./dist/types/tools/index.d.ts",
++      "import": "./src/tools/index.ts"
++    },
++    "./tools/jfind": {
++      "types": "./dist/types/tools/jfind/index.d.ts",
++      "import": "./src/tools/jfind/index.ts"
++    },
++    "./tools/jfind/*": {
++      "types": "./dist/types/tools/jfind/*.d.ts",
++      "import": "./src/tools/jfind/*.ts"
++    },
++    "./tools/*": {
++      "types": "./dist/types/tools/*.d.ts",
++      "import": "./src/tools/*.ts"
++    },
++    "./utils/*": {
++      "types": "./dist/types/utils/*.d.ts",
++      "import": "./src/utils/*.ts"
++    },
++    "./web/*": {
++      "types": "./dist/types/web/*.d.ts",
++      "import": "./src/web/*.ts"
++    },
++    "./web/scrapers": {
++      "types": "./dist/types/web/scrapers/index.d.ts",
++      "import": "./src/web/scrapers/index.ts"
++    },
++    "./web/scrapers/*": {
++      "types": "./dist/types/web/scrapers/*.d.ts",
++      "import": "./src/web/scrapers/*.ts"
++    },
++    "./web/search": {
++      "types": "./dist/types/web/search/index.d.ts",
++      "import": "./src/web/search/index.ts"
++    },
++    "./web/search/*": {
++      "types": "./dist/types/web/search/*.d.ts",
++      "import": "./src/web/search/*.ts"
++    },
++    "./web/search/providers/*": {
++      "types": "./dist/types/web/search/providers/*.d.ts",
++      "import": "./src/web/search/providers/*.ts"
++    },
++    "./prompts/*": "./src/prompts/*.md",
++    "./*.js": "./src/*.ts",
++    "./ui/tools/bash": {
++      "types": "./dist/types/ui/tools/bash.d.ts",
++      "import": "./src/ui/tools/bash.tsx"
++    },
++    "./ui/tools/default": {
++      "types": "./dist/types/ui/tools/default.d.ts",
++      "import": "./src/ui/tools/default.tsx"
++    },
++    "./ui/tools/edit": {
++      "types": "./dist/types/ui/tools/edit.d.ts",
++      "import": "./src/ui/tools/edit.tsx"
++    },
++    "./ui/tools/eval": {
++      "types": "./dist/types/ui/tools/eval.d.ts",
++      "import": "./src/ui/tools/eval.tsx"
++    },
++    "./ui/tools/mcp": {
++      "types": "./dist/types/ui/tools/mcp.d.ts",
++      "import": "./src/ui/tools/mcp.tsx"
++    },
++    "./ui/tools/read": {
++      "types": "./dist/types/ui/tools/read.d.ts",
++      "import": "./src/ui/tools/read.tsx"
++    },
++    "./ui/tools/todo": {
++      "types": "./dist/types/ui/tools/todo.d.ts",
++      "import": "./src/ui/tools/todo.tsx"
++    },
++    "./ui/tools/write": {
++      "types": "./dist/types/ui/tools/write.d.ts",
++      "import": "./src/ui/tools/write.tsx"
++    }
++  },
++  "scripts": {
++    "build": "bun scripts/build-binary.ts",
++    "check": "oxlint . && oxfmt --check --no-error-on-unmatched-pattern 'src/**/*.{ts,tsx}' '{test,bench,examples,scripts}/**/*.ts' '*.ts' && bun run check:types",
++    "check:types": "bun check --no-script -p tsconfig.json",
++    "lint": "oxlint .",
++    "test": "bun ../../scripts/ci-test-ts.ts coding-agent-heavy --full",
++    "fix": "oxlint --fix --fix-suggestions . && bun run fmt",
++    "fmt": "oxfmt --no-error-on-unmatched-pattern 'src/**/*.{ts,tsx}' '{test,bench,examples,scripts}/**/*.ts' '*.ts' && bun run format-prompts",
++    "format-prompts": "bun scripts/format-prompts.ts",
++    "gen:export-viewer": "bun --cwd=../collab-web run gen:export-viewer",
++    "gen:bundle": "bun scripts/bundle-dist.ts",
++    "gen:rpc": "bun scripts/gen-rpc/index.ts",
++    "prepack": "bun run gen:export-viewer && bun run gen:bundle",
++    "bench:guard": "bun scripts/bench-guard.ts"
++  },
++  "dependencies": {
++    "@babel/parser": "^7.29.7",
++    "@oh-my-pi/omp-stats": "19.2.1",
++    "@oh-my-pi/omptype": "19.2.1",
++    "@oh-my-pi/pi-agent-core": "19.2.1",
++    "@oh-my-pi/pi-ai": "19.2.1",
++    "@oh-my-pi/pi-catalog": "19.2.1",
++    "@oh-my-pi/pi-mnemopi": "19.2.1",
++    "@oh-my-pi/pi-natives": "19.2.1",
++    "@oh-my-pi/pi-tui": "19.2.1",
++    "@oh-my-pi/pi-utils": "19.2.1",
++    "@oh-my-pi/pi-wire": "19.2.1",
++    "@oh-my-pi/snapcompact": "19.2.1",
++    "@opentelemetry/api": "^1.9.1",
++    "@opentelemetry/api-logs": "^0.220.0",
++    "@opentelemetry/context-async-hooks": "2.9.0",
++    "@opentelemetry/exporter-logs-otlp-proto": "^0.220.0",
++    "@opentelemetry/exporter-metrics-otlp-proto": "^0.220.0",
++    "@opentelemetry/exporter-trace-otlp-proto": "^0.220.0",
++    "@opentelemetry/resources": "2.9.0",
++    "@opentelemetry/sdk-logs": "^0.220.0",
++    "@opentelemetry/sdk-metrics": "2.9.0",
++    "@opentelemetry/sdk-trace-base": "2.9.0",
++    "@opentelemetry/sdk-trace-node": "2.9.0",
++    "axe-core": "4.13.0",
++    "puppeteer-core": "25.3.0"
++  },
++  "devDependencies": {
++    "@types/bun": "^1.3.14"
++  },
++  "engines": {
++    "bun": ">=1.4.4"
++  }
+ }
 diff --git a/src/capability/mcp.ts b/src/capability/mcp.ts
 --- a/src/capability/mcp.ts
 +++ b/src/capability/mcp.ts
@@ -512,7 +2042,7 @@ diff --git a/src/config/mcp-schema.json b/src/config/mcp-schema.json
 diff --git a/src/discovery/builtin.ts b/src/discovery/builtin.ts
 --- a/src/discovery/builtin.ts
 +++ b/src/discovery/builtin.ts
-@@ -196,6 +196,8 @@
+@@ -197,6 +197,8 @@
  			result.push({
  				name: serverName,
  				enabled,
@@ -545,7 +2075,7 @@ diff --git a/src/discovery/mcp-json.ts b/src/discovery/mcp-json.ts
 diff --git a/src/discovery/omp-plugins.ts b/src/discovery/omp-plugins.ts
 --- a/src/discovery/omp-plugins.ts
 +++ b/src/discovery/omp-plugins.ts
-@@ -277,6 +277,8 @@
+@@ -263,6 +263,8 @@
  
  interface RawMcpServer {
  	enabled?: boolean;
@@ -554,7 +2084,7 @@ diff --git a/src/discovery/omp-plugins.ts b/src/discovery/omp-plugins.ts
  	timeout?: number;
  	requestIdFormat?: unknown;
  	instructions?: unknown;
-@@ -349,6 +351,8 @@
+@@ -335,6 +337,8 @@
  			items.push({
  				name: serverName,
  				...(cfg.enabled !== undefined && { enabled: cfg.enabled }),
@@ -620,7 +2150,7 @@ diff --git a/src/extensibility/extensions/compact-handler.ts b/src/extensibility
 diff --git a/src/extensibility/extensions/loader.ts b/src/extensibility/extensions/loader.ts
 --- a/src/extensibility/extensions/loader.ts
 +++ b/src/extensibility/extensions/loader.ts
-@@ -434,8 +434,8 @@
+@@ -439,8 +439,8 @@
  		return this.runtime.getCommands();
  	}
  
@@ -634,7 +2164,7 @@ diff --git a/src/extensibility/extensions/loader.ts b/src/extensibility/extensio
 diff --git a/src/extensibility/extensions/runner.ts b/src/extensibility/extensions/runner.ts
 --- a/src/extensibility/extensions/runner.ts
 +++ b/src/extensibility/extensions/runner.ts
-@@ -612,6 +612,7 @@
+@@ -613,6 +613,7 @@
  });
  
  export class ExtensionRunner {
@@ -642,7 +2172,7 @@ diff --git a/src/extensibility/extensions/runner.ts b/src/extensibility/extensio
  	#uiContext: ExtensionUIContext;
  	#mode: ExtensionMode = "print";
  	#toolApprovalPreviewWaiter?: (toolCallId: string) => Promise<void>;
-@@ -1976,6 +1977,7 @@
+@@ -1971,6 +1972,7 @@
  			cwd: this.cwd,
  			sessionManager: this.sessionManager,
  			modelRegistry: this.modelRegistry,
@@ -653,15 +2183,25 @@ diff --git a/src/extensibility/extensions/runner.ts b/src/extensibility/extensio
 diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extensions/types.ts
 --- a/src/extensibility/extensions/types.ts
 +++ b/src/extensibility/extensions/types.ts
-@@ -93,6 +93,7 @@
+@@ -96,6 +96,7 @@
  import type { LocalProtocolOptions } from "../../internal-urls/local-protocol";
  import type { LoopLimitConfig } from "../../modes/loop-limit";
  import type { MemoryRuntimeContext } from "../../memory-backend";
 +import type { MCPManagerApi } from "../../mcp/manager";
- import type { CustomEditor } from "@oh-my-pi/pi-tui/prompt/custom-editor";
- import type { Theme } from "@oh-my-pi/pi-tui/theme";
- import type { NativeToolView } from "@oh-my-pi/pi-tui/tools/renderer";
-@@ -816,6 +817,8 @@
+ import type { AsyncJobSnapshot, SendUserMessageOptions } from "../../session/agent-session";
+ import type { EphemeralTurnOptions, EphemeralTurnResult } from "../../session/agent-session-types";
+ import type { CompactMode } from "../../session/compact-modes";
+@@ -497,6 +498,9 @@
+ 	/** Get the current text from the core input editor. */
+ 	getEditorText(): string;
+ 
++	/** Labels of the actual attachment, skill and model chips in the current draft */
++	getEditorTokens?(): readonly string[];
++
+ 	/** Show a multi-line editor for text editing. */
+ 	editor(
+ 		title: string,
+@@ -841,6 +845,8 @@
  	sessionManager: ReadonlySessionManager;
  	/** Model registry for API key resolution */
  	modelRegistry: ModelRegistry;
@@ -670,7 +2210,17 @@ diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extension
  	/** Calling session's `local://` root mapping for external tool bridges. */
  	localProtocolOptions?: LocalProtocolOptions;
  	/** Current model (may be undefined) */
-@@ -2234,8 +2237,11 @@
+@@ -1103,6 +1109,9 @@
+ 	/** Called on session lifecycle events - use to reconstruct state or cleanup resources */
+ 	onSession?: (event: ToolSessionEvent, ctx: ExtensionContext) => void | Promise<void>;
+ 
++	/** Semantic transcript view for the registered tool, shared by both terminals */
++	presenter?: import("../../ui/tools/contract").ToolPresenter<Static<TParams>, TDetails>;
++
+ 	/**
+ 	 * Custom rendering for tool call display: pi-tui nodes (drawn in the terminal and in Tern) or a
+ 	 * rows object (drawn in the terminal; Tern shows the generic tool card). `undefined` draws
+@@ -2257,8 +2266,11 @@
  	/** Get available slash commands in the current session. */
  	getCommands(): SlashCommandInfo[];
  
@@ -684,7 +2234,7 @@ diff --git a/src/extensibility/extensions/types.ts b/src/extensibility/extension
  
  	/** Get current thinking level. */
  	getThinkingLevel(): ThinkingLevel | undefined;
-@@ -2486,7 +2492,7 @@
+@@ -2511,7 +2523,7 @@
  
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
  
@@ -1590,7 +3140,7 @@ diff --git a/src/mcp/manager.ts b/src/mcp/manager.ts
 diff --git a/src/mcp/tool-bridge.ts b/src/mcp/tool-bridge.ts
 --- a/src/mcp/tool-bridge.ts
 +++ b/src/mcp/tool-bridge.ts
-@@ -347,6 +347,9 @@
+@@ -337,6 +337,9 @@
  	);
  }
  
@@ -1626,7 +3176,7 @@ diff --git a/src/modes/acp/acp-agent.ts b/src/modes/acp/acp-agent.ts
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
  import { parseSkillInvocation } from "../../extensibility/skills";
  import { PYTHON_KERNEL_CANCEL_BUDGET_MS } from "../../eval/py/kernel";
-@@ -3334,14 +3334,7 @@
+@@ -3336,14 +3336,7 @@
  				getAllTools: () => record.session.getAllToolInfos(),
  				setActiveTools: toolNames => record.session.setActiveToolsByName(toolNames),
  				getCommands: () => getSessionSlashCommands(record.session),
@@ -1665,15 +3215,23 @@ diff --git a/src/modes/components/extensions/mcp-runtime.ts b/src/modes/componen
 diff --git a/src/modes/controllers/extension-ui-controller.ts b/src/modes/controllers/extension-ui-controller.ts
 --- a/src/modes/controllers/extension-ui-controller.ts
 +++ b/src/modes/controllers/extension-ui-controller.ts
-@@ -27,6 +27,7 @@
+@@ -29,6 +29,7 @@
  	SendUserMessageHandler,
  	TerminalInputHandler,
  } from "../../extensibility/extensions";
 +import { runExtensionSetModel } from "../../extensibility/extensions/compact-handler";
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
- import { cfgExtensionAssistantTextRenderers } from "../../extensibility/settings";
- import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
-@@ -284,12 +285,7 @@
+ import { extensionLinkClicksAvailable } from "../../extensibility/extensions/link-clicks";
+ import type { ExtensionUiHost } from "../../extensibility/extensions/render-types";
+@@ -273,6 +274,7 @@
+ 				this.ctx.composer.insertText(text);
+ 			},
+ 			getEditorText: () => this.ctx.composer.text(),
++			getEditorTokens: () => this.ctx.composer.tokenLabels(),
+ 			editor: (title, prefill, dialogOptions, editorOptions) =>
+ 				this.showCollabAwareEditor(title, prefill, dialogOptions, editorOptions),
+ 			addAutocompleteProvider: factory => this.ctx.addAutocompleteProvider(factory),
+@@ -338,12 +340,7 @@
  			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
  			getAllTools: () => this.ctx.session.getAllToolInfos(),
  			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
@@ -1687,24 +3245,10 @@ diff --git a/src/modes/controllers/extension-ui-controller.ts b/src/modes/contro
  			getThinkingLevel: () => this.ctx.session.thinkingLevel,
  			setThinkingLevel: level => this.ctx.session.setThinkingLevel(level),
  			getServiceTiers: () => this.ctx.session.serviceTierByFamily,
-@@ -509,12 +505,7 @@
- 			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
- 			getAllTools: () => this.ctx.session.getAllToolInfos(),
- 			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
--			setModel: async model => {
--				const key = await this.ctx.session.modelRegistry.getApiKey(model);
--				if (!key) return false;
--				await this.ctx.session.setModel(model);
--				return true;
--			},
-+			setModel: (model, options) => runExtensionSetModel(this.ctx.session, model, options),
- 			getThinkingLevel: () => this.ctx.session.thinkingLevel,
- 			setThinkingLevel: (level, persist) => this.ctx.session.setThinkingLevel(level, persist),
- 			getServiceTiers: () => this.ctx.session.serviceTierByFamily,
 diff --git a/src/modes/controllers/mcp-command-controller.ts b/src/modes/controllers/mcp-command-controller.ts
 --- a/src/modes/controllers/mcp-command-controller.ts
 +++ b/src/modes/controllers/mcp-command-controller.ts
-@@ -916,7 +916,7 @@
+@@ -707,7 +707,7 @@
  	async #syncManagerConnection(name: string, config: MCPServerConfig): Promise<void> {
  		if (!this.ctx.mcpManager) return;
  		if (this.ctx.mcpManager.getConnectionStatus(name) !== "disconnected") return;
@@ -1713,7 +3257,7 @@ diff --git a/src/modes/controllers/mcp-command-controller.ts b/src/modes/control
  		if (this.ctx.mcpManager.getConnectionStatus(name) === "connected") {
  			await this.ctx.session.refreshMCPTools(this.ctx.mcpManager.getTools());
  		}
-@@ -1745,7 +1745,7 @@
+@@ -1583,7 +1583,7 @@
  		}
  
  		const source = sources[name];
@@ -1722,6 +3266,49 @@ diff --git a/src/modes/controllers/mcp-command-controller.ts b/src/modes/control
  		await this.ctx.session.refreshMCPTools(this.ctx.mcpManager.getTools());
  		this.#showMCPConnectionErrors(result.errors);
  	}
+diff --git a/src/modes/interactive/transcript.tsx b/src/modes/interactive/transcript.tsx
+--- a/src/modes/interactive/transcript.tsx
++++ b/src/modes/interactive/transcript.tsx
+@@ -429,11 +429,13 @@
+ 		// A same-named tool that is not the built-in (an extension's) without hooks draws the
+ 		// generic card, never the built-in's presenter.
+ 		const registered = toolPresenter(spec.name);
+-		const presenter = renderer
+-			? legacyPresenter(renderer, registered ?? defaultPresenter)
+-			: !builtIn && registered
+-				? defaultPresenter
+-				: undefined;
++		const presenter =
++			(builtIn ? undefined : extensionPresenter(spec.tool)) ??
++			(renderer
++				? legacyPresenter(renderer, registered ?? defaultPresenter)
++				: !builtIn && registered
++					? defaultPresenter
++					: undefined);
+ 		const call = new ToolCall({
+ 			id: spec.id,
+ 			name: spec.name,
+@@ -761,6 +763,11 @@
+ 	return isRecord(details) && Array.isArray(details.phases);
+ }
+ 
++/** Presentation follows this session's tool definition, not the global registry */
++function extensionPresenter(tool: unknown): import("../../ui/tools/contract").ToolPresenter | undefined {
++	return (tool as { presenter?: import("../../ui/tools/contract").ToolPresenter } | undefined)?.presenter;
++}
++
+ /** An extension tool's render hooks, when it has any. */
+ function legacyRenderer(tool: AgentTool | undefined): LegacyToolRenderer | undefined {
+ 	const hooks = tool as (AgentTool & Partial<LegacyToolRenderer>) | undefined;
+@@ -784,7 +791,7 @@
+ 		const mounted = resolve(name) as (Partial<LegacyToolRenderer> & { label?: string }) | undefined;
+ 		if (!mounted) return undefined;
+ 		const legacy = mounted.renderCall || mounted.renderResult ? legacyRenderer(mounted as AgentTool) : undefined;
+-		const presenter = toolPresenter(name);
++		const presenter = extensionPresenter(mounted) ?? toolPresenter(name);
+ 		return {
+ 			...(mounted.label ? { label: mounted.label } : {}),
+ 			...(presenter ? { presenter } : {}),
 diff --git a/src/modes/runtime-init.ts b/src/modes/runtime-init.ts
 --- a/src/modes/runtime-init.ts
 +++ b/src/modes/runtime-init.ts
@@ -1745,7 +3332,7 @@ diff --git a/src/sdk.ts b/src/sdk.ts
  		// A dialog waits for the user, not the agent: the session lets the display sleep while one is open.
  		const trackUserWait: UserWaitTracker = dialog => (hasSession ? session.waitForUser(dialog) : dialog());
  		extensionRunner.setUserWaitTracker(trackUserWait);
-@@ -5589,6 +5590,7 @@
+@@ -5632,6 +5633,7 @@
  				hostMcpServerInstructions = source;
  			},
  			disconnectOwnedMcpManager: ownedMcpManager ? () => ownedMcpManager.disconnectAll() : undefined,
@@ -1756,7 +3343,7 @@ diff --git a/src/sdk.ts b/src/sdk.ts
 diff --git a/src/session/agent-session-types.ts b/src/session/agent-session-types.ts
 --- a/src/session/agent-session-types.ts
 +++ b/src/session/agent-session-types.ts
-@@ -437,6 +437,8 @@
+@@ -454,6 +454,8 @@
  	advisorConfigWarnings?: string[];
  	/** Disconnect the MCP manager owned by this session during disposal. */
  	disconnectOwnedMcpManager?: () => Promise<void>;
@@ -1768,7 +3355,7 @@ diff --git a/src/session/agent-session-types.ts b/src/session/agent-session-type
 diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
 --- a/src/session/agent-session.ts
 +++ b/src/session/agent-session.ts
-@@ -1179,6 +1179,8 @@
+@@ -1191,6 +1191,8 @@
  	/** Settles when the open run ends or is abandoned; see {@link waitForRunEnd}. */
  	#runEnded: PromiseWithResolvers<void> | undefined;
  	#runCheckScheduled = false;
@@ -1777,15 +3364,15 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  	/** In-flight settle-callback flushes; the stranded-message drain after each may still start a loop. */
  	#settleCallbackFlushes = 0;
  	#commandMetadataChangedListeners: CommandMetadataChangedListener[] = [];
-@@ -1393,6 +1395,7 @@
+@@ -1403,6 +1405,7 @@
+ 	#onSseEvent: SimpleStreamOptions["onSseEvent"] | undefined;
  	#sideStreamFn: StreamFn;
- 	#convertToLlm: (messages: AgentMessage[]) => Message[] | Promise<Message[]>;
  	#disconnectOwnedMcpManager: (() => Promise<void>) | undefined;
 +	#disconnectMcpAtAgentEnd: (() => Promise<void>) | undefined;
  	#reloadOwnedMcpServers: (() => Promise<MCPLoadResult | undefined>) | undefined;
  	#projectScopeRefresher: (() => Promise<void>) | undefined;
  	#projectScopeRefresh: Promise<void> = Promise.resolve();
-@@ -1961,7 +1964,9 @@
+@@ -1969,7 +1972,9 @@
  		// advertise one yield schema while the runtime enforces the other, so join
  		// the transition before building the turn from a consistent contract.
  		void this.whenWorkPoolYieldSettled()
@@ -1796,7 +3383,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  				// Synchronous ownership check, atomic with the dispatch below:
  				// agent.prompt() claims streaming with no await in between, and the
  				// yield contract above mutates synchronously, so no install can
-@@ -2635,6 +2640,8 @@
+@@ -2679,6 +2684,8 @@
  			// either settles, so an async result cannot inject a prompt ahead of it.
  			isStreaming: () => this.isStreaming || this.isSessionTransitioning || this.#pendingAgentContinueCount > 0,
  			injectIdle: async delivered => {
@@ -1805,7 +3392,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  				const first = delivered[0];
  				if (!first) return;
  				// A background job may have made a prelude's first call: its guide rides the job's delivery.
-@@ -2823,6 +2830,7 @@
+@@ -2867,6 +2874,7 @@
  			skillsReloadable: config.skillsReloadable,
  		});
  		this.#disconnectOwnedMcpManager = config.disconnectOwnedMcpManager;
@@ -1813,7 +3400,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  		this.#reloadOwnedMcpServers = config.reloadOwnedMcpServers;
  		const ttsrHost: TtsrCoordinatorHost = {
  			agent: this.agent,
-@@ -4010,6 +4018,7 @@
+@@ -4060,6 +4068,7 @@
  	async #admitSubmission<T>(work: () => Promise<T>): Promise<T> {
  		this.#admittedSubmissionCount++;
  		try {
@@ -1821,7 +3408,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  			if (this.hasPendingDeferredExtensions) await this.loadDeferredExtensions();
  			return await this.#inLogContext(work);
  		} finally {
-@@ -5766,6 +5775,7 @@
+@@ -5815,6 +5824,7 @@
  		onStart?: () => void,
  	): Promise<AgentContinueOutcome> {
  		try {
@@ -1829,7 +3416,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  			// During an automatic-retry saga the primary model's selector cooldown
  			// can expire while a chain-tail fallback is still mid-backoff. Restoring
  			// the primary then would reset the retry budget and re-enter a model
-@@ -6291,7 +6301,7 @@
+@@ -6342,7 +6352,7 @@
  	 * without writing) therefore ends it here.
  	 */
  	#checkRun(): void {
@@ -1838,7 +3425,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  		if (this.isStreaming || this.#postPromptTasks.size > 0 || this.#abortUnwinds.size > 0) return;
  		if (this.#admittedSubmissionCount > 0 || this.#settleCallbackFlushes > 0) return;
  		// Transitions and `/compact` detach the agent while they abort and rebuild; the
-@@ -6317,16 +6327,57 @@
+@@ -6368,16 +6378,57 @@
  			return;
  		}
  		const end = this.#loopEnd;
@@ -1903,7 +3490,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  	/** Whether the latest model turn ended on its own with an answer: no error, abort, or stop mid-tool-use. */
  	#lastTurnSettledCleanly(): boolean {
  		const last = this.getLastAssistantMessage();
-@@ -7055,7 +7106,7 @@
+@@ -7106,7 +7157,7 @@
  	beginDispose(): void {
  		this.#isDisposed = true;
  		for (const dispose of this.#disposers.splice(0)) dispose();
@@ -1912,7 +3499,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  		this.#modelDiscoveryAbortController.abort();
  		this.#queuedMessageDrainBlocked = false;
  		this.#usagePreflightReadyForNextModelCall = false;
-@@ -7200,7 +7251,7 @@
+@@ -7251,7 +7302,7 @@
  		try {
  			await withTimeout(
  				this.#disconnectOwnedMcpManager(),
@@ -1921,7 +3508,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  				"Timed out disconnecting owned MCP manager during dispose",
  			);
  		} catch (error) {
-@@ -7222,6 +7273,7 @@
+@@ -7273,6 +7324,7 @@
  
  	async #doDispose(options: AgentSessionDisposeOptions = {}): Promise<void> {
  		this.beginDispose();
@@ -1929,7 +3516,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  		// Stop cache warming before the drain windows below: an armed tick firing
  		// mid-dispose would issue a paid warm request and persist usage into the
  		// closing session writer.
-@@ -9996,6 +10048,10 @@
+@@ -10032,6 +10084,10 @@
  		const setupAbort = new AbortController();
  		this.#promptSetupAbortController = setupAbort;
  		try {
@@ -1940,7 +3527,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  			options?.onPromptAdmitted?.();
  			await this.#recovery.maybeRestoreRetryFallbackPrimary();
  			// Auto-prewalk: return from the previous task's handoff before the usage preflight checks the model,
-@@ -11270,6 +11326,8 @@
+@@ -11257,6 +11313,8 @@
  		const setupAbort = new AbortController();
  		this.#promptSetupAbortController = setupAbort;
  		try {
@@ -1949,7 +3536,7 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
  			if (!(await this.#runUsageAwarePreflightForNextModelCall())) return false;
  			const acceptTerminalEmptyStop = options?.acceptTerminalEmptyStop === true;
  			if (acceptTerminalEmptyStop) {
-@@ -13247,7 +13305,7 @@
+@@ -13264,7 +13322,7 @@
  	async setModelTemporary(
  		model: Model,
  		thinkingLevel?: ConfiguredThinkingLevel,
@@ -1961,17 +3548,16 @@ diff --git a/src/session/agent-session.ts b/src/session/agent-session.ts
 diff --git a/src/session/model-controls.ts b/src/session/model-controls.ts
 --- a/src/session/model-controls.ts
 +++ b/src/session/model-controls.ts
-@@ -341,7 +341,8 @@
+@@ -350,7 +350,7 @@
  	async setModelTemporary(
  		model: Model,
  		thinkingLevel?: ConfiguredThinkingLevel,
--		options?: { ephemeral?: boolean; prewalk?: boolean },
-+		// Records model usage by default, including ephemeral switches
-+		options?: { ephemeral?: boolean; prewalk?: boolean; recordUsage?: boolean },
+-		options?: { ephemeral?: boolean; prewalk?: boolean; metadataResolved?: boolean },
++		options?: { ephemeral?: boolean; prewalk?: boolean; metadataResolved?: boolean; recordUsage?: boolean },
  		selection: "explicit" | "automatic" = "explicit",
  		isCurrent?: () => boolean,
  	): Promise<boolean> {
-@@ -368,7 +369,10 @@
+@@ -380,7 +380,10 @@
  						? EPHEMERAL_MODEL_CHANGE_ROLE
  						: TEMPORARY_MODEL_CHANGE_ROLE,
  			);
@@ -2334,18 +3920,24 @@ diff --git a/src/thread/services/integrations.ts b/src/thread/services/integrati
 diff --git a/src/thread/services/mcp-remote.ts b/src/thread/services/mcp-remote.ts
 --- a/src/thread/services/mcp-remote.ts
 +++ b/src/thread/services/mcp-remote.ts
-@@ -7,8 +7,8 @@
+@@ -7,8 +7,14 @@
  import type { TSchema } from "@oh-my-pi/pi-ai";
- import type { MCPToolDetails } from "@oh-my-pi/pi-tui/tools/mcp";
+ import type { MCPToolDetails } from "../../tools/details/mcp";
  import type { CustomTool } from "../../extensibility/custom-tools/types";
 -import type { MCPManagerApi, MCPToolScope } from "../../mcp/manager";
 -import type { MCPRequestOptions, MCPResource, MCPResourceReadResult, MCPResourceTemplate } from "../../mcp/types";
 +import type { MCPConnectionStatus, MCPManagerApi, MCPToolScope } from "../../mcp/manager";
-+import type { MCPRequestOptions, MCPResource, MCPResourceReadResult, MCPResourceTemplate, MCPServerConfig } from "../../mcp/types";
++import type {
++	MCPRequestOptions,
++	MCPResource,
++	MCPResourceReadResult,
++	MCPResourceTemplate,
++	MCPServerConfig,
++} from "../../mcp/types";
  import type { RemoteObject, RpcMethod } from "../rpc";
  
  /** Remote-object kind of a main-thread `MCPManager`. */
-@@ -36,6 +36,10 @@
+@@ -36,6 +42,10 @@
  	onToolsChanged: RpcMethod<[listener: () => void], () => void>;
  	onNotification: RpcMethod<[listener: McpNotificationListener], () => void>;
  	connectedServers: RpcMethod<[], string[]>;
@@ -2356,7 +3948,7 @@ diff --git a/src/thread/services/mcp-remote.ts b/src/thread/services/mcp-remote.
  	serverResources: RpcMethod<
  		[name: string],
  		{ resources: MCPResource[]; templates: MCPResourceTemplate[] } | undefined
-@@ -92,6 +96,22 @@
+@@ -92,6 +102,22 @@
  		return this.#remote.callSync("connectedServers");
  	}
  
@@ -2382,7 +3974,7 @@ diff --git a/src/thread/services/mcp-remote.ts b/src/thread/services/mcp-remote.
 diff --git a/src/tools/bash.ts b/src/tools/bash.ts
 --- a/src/tools/bash.ts
 +++ b/src/tools/bash.ts
-@@ -773,7 +773,7 @@
+@@ -787,7 +787,7 @@
  	progress(dispatch: ToolCommandDispatch, index: number): void {
  		if (this.#finished.has(index)) return;
  		const current = this.#records[index];
@@ -2391,30 +3983,30 @@ diff --git a/src/tools/bash.ts b/src/tools/bash.ts
  	}
  
  	/** Records so far, in invocation order. */
-@@ -1088,6 +1088,10 @@
- 	): ShellCommands | undefined {
- 		if (names.length === 0) return undefined;
+@@ -1105,6 +1105,10 @@
+ 		const o2ctl = this.#launchEnabled && !names.includes(O2CTL_COMMAND);
+ 		if (names.length === 0 && !o2ctl) return undefined;
  		const { recorder, onChange } = options;
 +		const onProgress = (dispatch: ToolCommandDispatch, index: number) => {
 +			recorder.progress(dispatch, index);
 +			onChange?.();
 +		};
+ 		const tools = createToolCommandHandler({
+ 			session: this.session,
+ 			toolCallId: options.toolCallId,
+@@ -1114,10 +1118,8 @@
+ 				recorder.finish(dispatch, index);
+ 				onChange?.();
+ 			},
+-			onProgress: (dispatch, index) => {
+-				recorder.progress(dispatch, index);
+-				onChange?.();
+-			},
++			onQueued: onChange ? onProgress : undefined,
++			onProgress,
+ 		});
  		return {
- 			names: [...names],
- 			handler: createToolCommandHandler({
-@@ -1099,10 +1103,8 @@
- 					recorder.finish(dispatch, index);
- 					onChange?.();
- 				},
--				onProgress: (dispatch, index) => {
--					recorder.progress(dispatch, index);
--					onChange?.();
--				},
-+				onQueued: onChange ? onProgress : undefined,
-+				onProgress,
- 			}),
- 		};
- 	}
+ 			names: o2ctl ? [...names, O2CTL_COMMAND] : [...names],
 diff --git a/src/tools/browser/launch-adapter.ts b/src/tools/browser/launch-adapter.ts
 new file mode 100644
 --- /dev/null
@@ -2486,7 +4078,7 @@ new file mode 100644
 +  BrowserLaunchOptions,
 +  BrowserLaunchSpec,
 +} from "@oh-my-pi/pi-coding-agent/tools/browser/launch-adapter";
-+import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
++import { ToolError } from "@oh-my-pi/pi-coding-agent/tools/tool-errors";
 +import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
 +
 +/** Keep upstream launch options intact and adapt only headed Linux launches */
@@ -2597,6 +4189,29 @@ new file mode 100644
 +    if (!isEnoent(error)) throw error;
 +  }
 +}
+diff --git a/src/tools/details/tool-commands.ts b/src/tools/details/tool-commands.ts
+--- a/src/tools/details/tool-commands.ts
++++ b/src/tools/details/tool-commands.ts
+@@ -1,5 +1,11 @@
+ import type { ToolTier } from "@oh-my-pi/pi-agent-core";
+ 
++/** Validated args handed to the optional queued tool command presenter */
++export interface QueuedToolCommandArgs {
++	label: string;
++	args: Record<string, unknown>;
++}
++
+ /** One tool command invocation inside a bash run, as recorded on the bash result. */
+ export interface ToolCommandRenderDispatch {
+ 	tool: string;
+@@ -7,6 +13,7 @@
+ 	/** Exit status of this invocation, independent of the outer shell status. */
+ 	exitCode: number;
+ 	args?: Record<string, unknown>;
++	queued?: true;
+ 	tier?: ToolTier;
+ 	readOnlyHint?: true;
+ 	/** Details object returned by the wrapped tool. */
 diff --git a/src/tools/tool-commands.ts b/src/tools/tool-commands.ts
 --- a/src/tools/tool-commands.ts
 +++ b/src/tools/tool-commands.ts
@@ -2625,3 +4240,1401 @@ diff --git a/src/tools/tool-commands.ts b/src/tools/tool-commands.ts
  		const result = await executable.execute(toolCallId, validated, signal, innerOnUpdate, executionContext);
  		return { result, dispatch: { ...dispatch, exitCode: result.isError ? 1 : 0, inner: result.details } };
  	} catch (error) {
+diff --git a/src/ui/composer/composer.tsx b/src/ui/composer/composer.tsx
+--- a/src/ui/composer/composer.tsx
++++ b/src/ui/composer/composer.tsx
+@@ -629,6 +629,11 @@
+ 		return expandAtoms(this.#text(), this.#atoms());
+ 	}
+ 
++	/** Labels of atoms still present in the draft, without their private payloads */
++	tokenLabels(): string[] {
++		return atomRanges(this.#text(), this.#atoms()).map(({ atom }) => atom.label);
++	}
++
+ 	/**
+ 	 * Replace the draft with restored `text` (a dequeued or detached draft), turning image markers
+ 	 * and tokens ({@link setAtomizer}) back into chips. Pending images stay as they are.
+diff --git a/src/ui/dock/live-hud.ts b/src/ui/dock/live-hud.ts
+new file mode 100644
+--- /dev/null
++++ b/src/ui/dock/live-hud.ts
+@@ -0,0 +1,55 @@
++import type { ObservableSession } from "@oh-my-pi/pi-coding-agent/task/session-observer-registry";
++import type { TodoPhase } from "@oh-my-pi/pi-coding-agent/tools/details/todo";
++import { type Accessor, type JSXNode, signal } from "@oh-my-pi/pi-tui";
++
++export interface LiveHudAgents {
++  readonly sessions: readonly ObservableSession[];
++  readonly agentsMode: "off" | "collapsed" | "full";
++  readonly agentsExpanded: boolean;
++  readonly agentsHubKey: string;
++}
++
++/** Host snapshots for presentation only, never session mutation */
++export interface LiveHudState extends LiveHudAgents {
++  readonly phases: readonly TodoPhase[];
++  readonly activeDescriptions: readonly string[];
++  readonly todoHidden: boolean;
++  readonly todoExpanded: boolean;
++}
++
++export interface LiveHudPresentation {
++  readonly todo?: JSXNode;
++  readonly checklist?: JSXNode;
++  /** Null suppresses the stock list when the agents share the todo row */
++  readonly subagents?: Exclude<JSXNode, undefined>;
++}
++
++/** Undefined results retain the host's stock presentation */
++export interface LiveHudRenderer {
++  readonly showWorkingTitle?: boolean;
++  readonly compactTodoInStatus?: boolean;
++  render(state: LiveHudState): LiveHudPresentation | undefined;
++}
++
++const renderer = signal<LiveHudRenderer | undefined>(undefined);
++
++export const getLiveHudRenderer: Accessor<LiveHudRenderer | undefined> = renderer;
++
++export function setLiveHudRenderer(next: LiveHudRenderer | undefined): void {
++  renderer.set(next);
++}
++
++const activeDescriptions = signal<readonly string[]>([]);
++
++export const getLiveHudTodoDescriptions: Accessor<readonly string[]> =
++  activeDescriptions;
++
++export function setLiveHudTodoDescriptions(descriptions: readonly string[]): void {
++  const current = activeDescriptions.peek();
++  if (
++    current.length === descriptions.length &&
++    current.every((text, i) => text === descriptions[i])
++  )
++    return;
++  activeDescriptions.set(descriptions);
++}
+diff --git a/src/ui/status/presentation.ts b/src/ui/status/presentation.ts
+new file mode 100644
+--- /dev/null
++++ b/src/ui/status/presentation.ts
+@@ -0,0 +1,31 @@
++import type { StatusFacts } from "@oh-my-pi/pi-coding-agent/ui/status/facts";
++import type { Billing } from "@oh-my-pi/pi-coding-agent/ui/status/format";
++import type { SegView } from "@oh-my-pi/pi-coding-agent/ui/status/segments";
++import type { SymbolSet } from "@oh-my-pi/pi-tui/theme/contract";
++
++export type BillingSummaryPresentation = Billing;
++
++/** Optional presentation policy, leaving accounting and layout with the host */
++export interface StatusLinePresentation {
++  thinkingLevelLabel?: (level: string) => string;
++  billingSummary?: (
++    options: BillingSummaryPresentation,
++    symbols: SymbolSet,
++    availableWidth?: number,
++  ) => string | undefined;
++  usage?: (facts: StatusFacts, symbols: SymbolSet) => SegView | null;
++  context?: (facts: StatusFacts, symbols: SymbolSet, accent?: string) => SegView;
++  subagents?: (count: number) => SegView | null;
++}
++
++let presentation: StatusLinePresentation | undefined;
++
++export function setStatusLinePresentation(
++  policy: StatusLinePresentation | undefined,
++): void {
++  presentation = policy;
++}
++
++export function getStatusLinePresentation(): StatusLinePresentation | undefined {
++  return presentation;
++}
+diff --git a/src/ui/styles/composer/shapes.ts b/src/ui/styles/composer/shapes.ts
+--- a/src/ui/styles/composer/shapes.ts
++++ b/src/ui/styles/composer/shapes.ts
+@@ -262,7 +262,7 @@
+ 	sideBorders: false,
+ 	paddingX: 1,
+ 	sideWidth: paddingX => paddingX,
+-	top: fullRule,
++	top: cx => cx.theme.renderRule?.(cx.box.horizontal, cx.width) ?? fullRule(cx),
+ 	row: cx => [" ".repeat(cx.paddingX) + cx.gutter + cx.text + cx.pad],
+ 	bottom: fullRule,
+ };
+diff --git a/src/ui/styles/messages/divider.ts b/src/ui/styles/messages/divider.ts
+--- a/src/ui/styles/messages/divider.ts
++++ b/src/ui/styles/messages/divider.ts
+@@ -31,7 +31,9 @@
+ 	const rule = Math.min(term.ruleWidth ?? 10, cx.width - visibleWidth(label) - 1);
+ 	// A label that runs past the width is cut there either way: rows never exceed it.
+ 	if (rule < 1) return truncate(painted, cx.width);
+-	return `${theme.fg(term.ruleColor ?? "dim", theme.symbols.box.horizontal.repeat(rule))} ${painted}`;
++	const line = theme.symbols.box.horizontal;
++	const decoration = term.ruleColor === undefined ? theme.renderRule?.(line, rule) : undefined;
++	return `${decoration ?? theme.fg(term.ruleColor ?? "dim", line.repeat(rule))} ${painted}`;
+ }
+ 
+ function paintDivider(node: UiNode, cx: PaintContext): Block {
+diff --git a/src/ui/styles/tools/bash.ts b/src/ui/styles/tools/bash.ts
+--- a/src/ui/styles/tools/bash.ts
++++ b/src/ui/styles/tools/bash.ts
+@@ -16,10 +16,10 @@
+ import type { Theme } from "@oh-my-pi/pi-tui/theme/contract";
+ import type { ShellVizPresentation } from "@oh-my-pi/pi-wire";
+ import type { BashStat, BashTerm } from "../../tools/bash";
++import { sourcePreview } from "./code-cell";
+ import { resultPictures, withoutDrawnPlaceholders } from "./file-common";
+ import {
+ 	bracketed,
+-	capLines,
+ 	frameInner,
+ 	frameRows,
+ 	PREVIEW_WINDOW_ROWS,
+@@ -93,7 +93,11 @@
+ 			commandPrefix && command.startsWith(`${commandPrefix} `) ? command.slice(commandPrefix.length + 1) : command;
+ 		lines = commandLines(theme, body, commandPrefix);
+ 	}
+-	const inputRows = expanded ? lines : capLines(theme, lines, PREVIEW_WINDOW_ROWS);
++	const inputRows = expanded
++		? lines
++		: sourcePreview(
++				theme, lines, term.codeMaxLines ?? PREVIEW_WINDOW_ROWS, frameInner(width), term.codeMaxLines === undefined,
++			);
+ 	const outcome = term.outcome;
+ 	const title = typeof props.title === "string" ? props.title : "";
+ 	let header: string | undefined;
+@@ -103,9 +107,15 @@
+ 			: outcome === "success"
+ 				? theme.fg("accent", theme.symbols.symbol("tool.bash"))
+ 				: statusIcon(cx, outcome === "running" ? "pending" : outcome === "warning" ? "warning" : "error");
+-		const line: StatusLine = { glyph, title, ...(term.intent ? { description: term.intent } : {}) };
++		const line: StatusLine = {
++			glyph,
++			title: term.stateLabel ? `${term.stateLabel}${theme.symbols.symbol("sep.dot")}${title}` : title,
++			...(term.intent ? { description: term.intent } : {}),
++		};
+ 		header = statusLine(theme, line);
+-	} else if (term.intent) header = statusLine(theme, { title: term.intent, titleColor: "muted" });
++	} else if (term.intent || term.stateLabel) {
++		header = statusLine(theme, { title: term.intent ?? term.stateLabel!, titleColor: "muted", ...(term.intent && term.stateLabel ? { meta: [term.stateLabel] } : {}) });
++	}
+ 
+ 	if (!term.result) {
+ 		// A call sealed while running keeps the time it ran.
+diff --git a/src/ui/styles/tools/code-cell.ts b/src/ui/styles/tools/code-cell.ts
+--- a/src/ui/styles/tools/code-cell.ts
++++ b/src/ui/styles/tools/code-cell.ts
+@@ -5,9 +5,10 @@
+  * Shared by the read and eval looks.
+  */
+ import { formatDuration } from "@oh-my-pi/pi-utils";
++import { LRUCache } from "@oh-my-pi/pi-utils/lru";
+ import type { PaintContext } from "@oh-my-pi/pi-tui/term/paint";
+ import { highlightCode } from "@oh-my-pi/pi-tui/text/highlight";
+-import { replaceTabs } from "@oh-my-pi/pi-tui/text/width";
++import { replaceTabs, truncate, wrap } from "@oh-my-pi/pi-tui/text/width";
+ import type { Theme } from "@oh-my-pi/pi-tui/theme/contract";
+ import { expandHint, frameInner, frameRows, hangingWrap, statusIcon } from "./frame";
+ 
+@@ -25,9 +26,14 @@
+ 	readonly status?: CellStatus;
+ 	readonly duration?: number;
+ 	readonly output?: string;
++	/** Already styled output rows with their own preview cap */
++	readonly outputRows?: readonly string[];
+ 	readonly outputMaxLines?: number;
++	/** Maximum wrapped source rows when collapsed */
+ 	readonly codeMaxLines?: number;
+-	/** Show the last `codeMaxLines` rows (the streaming edge) under an `… N earlier lines` marker. */
++	/** Stable display cell used to reuse source rows across clock ticks */
++	readonly sourceKey?: object;
++	/** Follow the streaming edge instead of showing the first source rows */
+ 	readonly codeTail?: boolean;
+ 	readonly expanded: boolean;
+ 	/** Lead the head with the language icon. */
+@@ -122,14 +128,82 @@
+ 	return [...shown, theme.fg("dim", `${moreLines(hidden)} ${expandHint(theme)}`)];
+ }
+ 
+-/** The source rows of a code cell at the frame's inner width. */
+-export function codeCellLines(cx: PaintContext, cell: CodeCell, width: number): string[] {
++/** Wrap and bound a source preview; a minified line cannot fill the viewport */
++export function sourcePreview(
++	theme: Theme,
++	lines: readonly string[],
++	limit: number,
++	width: number,
++	tail: boolean,
++	hidden = 0,
++	pad = "",
++): string[] {
++	width = Math.max(1, width);
++	const shown: string[] = [];
++	let clipped = false;
++	for (let i = 0; i < lines.length; i++) {
++		const row = lines[tail ? lines.length - i - 1 : i]!;
++		const available = limit - shown.length;
++		if (available <= 0) {
++			clipped = true;
++			break;
++		}
++		const wrapped = row ? wrap(row, width) : [""];
++		clipped ||= wrapped.length > available;
++		if (tail) {
++			for (let j = wrapped.length - 1; j >= Math.max(0, wrapped.length - available); j--) shown.push(wrapped[j]!);
++		} else {
++			for (let j = 0; j < Math.min(wrapped.length, available); j++) shown.push(wrapped[j]!);
++		}
++		if (clipped) break;
++	}
++	if (tail) shown.reverse();
++	if (clipped || hidden > 0) {
++		const label = clipped ? (tail ? "Earlier source" : "More source") : tail ? `… ${hidden} earlier ${hidden === 1 ? "line" : "lines"}` : moreLines(hidden);
++		const marker = truncate(theme.fg("dim", pad + label) + " " + expandHint(theme), width);
++		if (tail) shown.unshift(marker);
++		else shown.push(marker);
++	}
++	return shown;
++}
++
++interface CellSourceMemo {
++	readonly theme: Theme;
++	readonly width: number;
++	readonly cell: Pick<CodeCell, "code" | "language" | "expanded" | "codeMaxLines" | "codeTail" | "codeStartLine" | "codeLineNumbers">;
++	readonly rows: readonly string[];
++}
++
++const sourceMemos = new LRUCache<object, CellSourceMemo>({
++	max: 128,
++	maxSize: 1024 * 1024,
++	sizeCalculation: memo => memo.rows.reduce((size, row) => size + row.length, memo.cell.code.length + 1),
++});
++
++/** The source rows of a code cell at the frame's inner width */
++export function codeCellLines(cx: PaintContext, cell: CodeCell, width: number): readonly string[] {
+ 	const theme = cx.theme;
++	const key = cell.sourceKey;
++	const memo = key && sourceMemos.get(key);
++	if (memo?.theme === theme && memo.width === width && memo.cell.expanded === cell.expanded &&
++		memo.cell.code === cell.code && memo.cell.language === cell.language &&
++		memo.cell.codeMaxLines === cell.codeMaxLines && memo.cell.codeTail === cell.codeTail &&
++		memo.cell.codeStartLine === cell.codeStartLine && memo.cell.codeLineNumbers === cell.codeLineNumbers
++	) return memo.rows;
++	const rows = renderCellSource(theme, cell, width);
++	if (key) {
++		const { code, language, expanded, codeMaxLines, codeTail, codeStartLine, codeLineNumbers } = cell;
++		sourceMemos.set(key, { theme, width, cell: { code, language, expanded, codeMaxLines, codeTail, codeStartLine, codeLineNumbers }, rows });
++	}
++	return rows;
++}
++
++function renderCellSource(theme: Theme, cell: CodeCell, width: number): string[] {
+ 	const codeMax = cell.codeMaxLines ?? 12;
+ 	const raw = terminalLines(replaceTabs(cell.code ?? ""));
+ 	const shownCount = cell.expanded ? raw.length : Math.min(raw.length, codeMax);
+ 	const hidden = raw.length - shownCount;
+-	const tail = cell.codeTail === true && !cell.expanded && hidden > 0;
++	const tail = cell.codeTail === true && !cell.expanded;
+ 	const start = tail ? raw.length - shownCount : 0;
+ 	const code = highlightCode(raw.slice(start, start + shownCount).join("\n"), cell.language, theme);
+ 	let numbers: readonly (number | null)[] | undefined;
+@@ -150,19 +224,14 @@
+ 			lines.push(...hangingWrap(theme.fg("dim", `${label} `), " ".repeat(gutter + 1), code[i]!, frameInner(width)));
+ 		}
+ 	} else lines.push(...code);
+-	if (hidden > 0) {
+-		const pad = gutter > 0 ? " ".repeat(gutter + 1) : "";
+-		const hint = cell.expanded ? "" : ` ${expandHint(theme)}`;
+-		if (tail) lines.unshift(theme.fg("dim", `${pad}… ${hidden} earlier ${hidden === 1 ? "line" : "lines"}${hint}`));
+-		else lines.push(theme.fg("dim", `${pad}${moreLines(hidden)}${hint}`));
+-	}
+-	return lines;
++	if (cell.expanded) return lines;
++	return sourcePreview(theme, lines, codeMax, frameInner(width), tail, hidden, gutter > 0 ? " ".repeat(gutter + 1) : "");
+ }
+ 
+ /** A framed code cell at `width`. */
+ export function codeCellRows(cx: PaintContext, cell: CodeCell, width: number): string[] {
+ 	const theme = cx.theme;
+-	const output = cellOutputLines(theme, cell.output, cell.expanded, cell.outputMaxLines ?? 6);
++	const output = cell.outputRows ?? cellOutputLines(theme, cell.output, cell.expanded, cell.outputMaxLines ?? 6);
+ 	const sections: { label?: string; lines: readonly string[] }[] = [{ lines: codeCellLines(cx, cell, width) }];
+ 	if (output.length > 0) sections.push({ label: theme.fg("toolTitle", "Output"), lines: output });
+ 	return frameRows(theme, width, { head: cellHead(cx, cell), sections, ...cellFrame(cell.status) });
+diff --git a/src/ui/styles/tools/eval.ts b/src/ui/styles/tools/eval.ts
+--- a/src/ui/styles/tools/eval.ts
++++ b/src/ui/styles/tools/eval.ts
+@@ -16,12 +16,13 @@
+ import { replaceTabs, truncate, visibleWidth, wrap } from "@oh-my-pi/pi-tui/text/width";
+ import type { Theme } from "@oh-my-pi/pi-tui/theme/contract";
+ import { formatDuration, formatNumber, sanitizeText } from "@oh-my-pi/pi-utils";
++import { LRUCache } from "@oh-my-pi/pi-utils/lru";
+ import { type EvalStatusEvent, splitEvalOutput } from "../../../tools/details/eval";
+ import { formatArtifactErrorNotice, formatTruncationMetaNotice } from "../../../tools/output-meta-format";
+ import { FEED_MODEL_BADGE_WIDTH, isFeedModelBadgeEnabled, shortenPath } from "../../../utils/render-utils";
+ import { expandKeyLabel } from "../../keys/hints";
+ import { feedModel } from "../../tools/agent-common";
+-import { type EvalTerm, type EvalTermCell, formatMcpProgress, highlightLanguage, mcpProgress } from "../../tools/eval";
++import { type EvalRendererOptions, type EvalTerm, type EvalTermCell, formatMcpProgress, highlightLanguage, mcpProgress } from "../../tools/eval";
+ import { styledModelBadge } from "./agent-common";
+ import { resultPictures, withoutDrawnPlaceholders } from "./file-common";
+ import { codeCellRows } from "./code-cell";
+@@ -70,7 +71,7 @@
+ }
+ 
+ /** One status event as a line: icon, muted op, dim summary. */
+-function statusEventLine(theme: Theme, event: EvalStatusEvent): string {
++export function formatStatusEvent(event: EvalStatusEvent, theme: Theme): string {
+ 	const { op, ...data } = event;
+ 	const icon = theme.fg("muted", theme.symbols.symbol(OP_ICONS[op] ?? "icon.file"));
+ 	if (data.error) return `${icon} ${theme.fg("warning", op)}: ${theme.fg("dim", String(data.error))}`;
+@@ -166,8 +167,8 @@
+ }
+ 
+ /** A status event's line plus, expanded, its listed items or preview. */
+-function statusEventLines(theme: Theme, event: EvalStatusEvent): string[] {
+-	const lines = [statusEventLine(theme, event)];
++export function formatStatusEventExpanded(event: EvalStatusEvent, theme: Theme): string[] {
++	const lines = [formatStatusEvent(event, theme)];
+ 	const { op, ...data } = event;
+ 	const items = (value: unknown, format: (item: unknown) => string, max = 5): void => {
+ 		const list = Array.isArray(value) ? value : [];
+@@ -232,10 +233,10 @@
+ 		const last = i === visible.length - 1;
+ 		const branch = theme.fg("dim", last ? tree.last : tree.branch);
+ 		if (!expanded) {
+-			rows.push(`${branch} ${statusEventLine(theme, event)}`);
++			rows.push(`${branch} ${formatStatusEvent(event, theme)}`);
+ 			return;
+ 		}
+-		const lines = statusEventLines(theme, event);
++		const lines = formatStatusEventExpanded(event, theme);
+ 		rows.push(`${branch} ${lines[0]}`);
+ 		const cont = theme.fg("dim", last ? "   " : `${tree.vertical}  `);
+ 		for (const line of lines.slice(1)) rows.push(`${cont}${line}`);
+@@ -243,20 +244,51 @@
+ 	return rows;
+ }
+ 
+-/** Wrap rows at `width` and keep the last `limit` visual rows; the skipped count. */
+-function visualTail(lines: readonly string[], limit: number, width: number): { rows: string[]; skipped: number } {
++/** Count the wrapped rows while retaining only the requested preview edge */
++function visualWindow(
++	lines: readonly string[], limit: number, width: number, head = false,
++): { rows: string[]; skipped: number } {
+ 	const rows: string[] = [];
++	let count = 0;
+ 	for (const line of lines) {
+ 		const wrapped = wrap(line, Math.max(1, width));
+-		rows.push(...(wrapped.length > 0 ? wrapped : [""]));
++		for (const row of wrapped.length > 0 ? wrapped : [""]) {
++			if (limit > 0 && (!head || count < limit)) rows[count % limit] = row;
++			count++;
++		}
+ 	}
+-	if (rows.length <= limit) return { rows, skipped: 0 };
+-	return {
+-		rows: rows.slice(rows.length - limit),
+-		skipped: rows.length - limit,
+-	};
++	if (head || count <= limit || limit <= 0) return { rows, skipped: Math.max(0, count - limit) };
++	const at = count % limit;
++	return { rows: at ? [...rows.slice(at), ...rows.slice(0, at)] : rows, skipped: count - limit };
+ }
+ 
++interface CellOutputMemo {
++	readonly theme: Theme;
++	readonly width: number;
++	readonly expanded: boolean;
++	readonly previewLines: number;
++	readonly presentation?: EvalRendererOptions;
++	readonly output: { rows: string[]; hidden: number };
++}
++
++const cellOutputs = new LRUCache<EvalTermCell, CellOutputMemo>({
++	max: 128,
++	maxSize: 2 * 1024 * 1024,
++	sizeCalculation: (memo, cell) => memo.output.rows.reduce((size, row) => size + row.length, (cell.output?.length ?? 0) + 1),
++});
++
++function renderCellOutput(
++	theme: Theme, cell: EvalTermCell, expanded: boolean, previewLines: number, width: number,
++	presentation?: EvalRendererOptions,
++): { rows: string[]; hidden: number } {
++	const memo = cellOutputs.get(cell);
++	if (memo?.theme === theme && memo.width === width && memo.expanded === expanded &&
++		memo.previewLines === previewLines && memo.presentation === presentation) return memo.output;
++	const output = renderCellOutput(theme, cell, expanded, previewLines, width, presentation);
++	cellOutputs.set(cell, { theme, width, expanded, previewLines, presentation, output });
++	return output;
++}
++
+ /** A cell's output rows (text in the output or error color, views as trees / Markdown), tail-capped while collapsed. */
+ function cellOutputRows(
+ 	theme: Theme,
+@@ -264,10 +296,12 @@
+ 	expanded: boolean,
+ 	previewLines: number,
+ 	width: number,
++	presentation: EvalRendererOptions | undefined,
+ ): { rows: string[]; hidden: number } {
+ 	const output = cell.output;
+ 	if (!output) return { rows: [], hidden: 0 };
+ 	const inner = frameInner(width);
++	const full = expanded || (cell.status === "error" && presentation?.expandErrors === true);
+ 	const style = (line: string): string =>
+ 		theme.fg(cell.status === "error" ? "error" : "toolOutput", replaceTabs(line));
+ 	const parts = splitEvalOutput(
+@@ -283,36 +317,43 @@
+ 			}
+ 			const view = part.view;
+ 			if (view.kind === "json") {
+-				const tree = jsonTreeRows(theme, view.value, expanded ? EXPANDED_TREE : COLLAPSED_TREE);
++				const tree = jsonTreeRows(theme, view.value, full ? EXPANDED_TREE : COLLAPSED_TREE, presentation?.hiddenRootKeys);
+ 				lines.push(...tree.rows);
+ 				if (tree.truncated) lines.push(theme.fg("dim", "…"));
+ 			} else if (view.kind === "markdown") lines.push(...renderMarkdown(view.text, inner, { theme }));
+ 		}
+ 	} else for (const line of output.split("\n")) lines.push(style(line));
+-	if (expanded) return { rows: lines, hidden: 0 };
+-	const tail = visualTail(lines, previewLines, inner);
++	if (full) return { rows: lines, hidden: 0 };
++	const head = cell.status !== "error" && presentation?.structuredHead && parts.some(part => part.kind === "view" && part.view.kind === "json");
++	const tail = visualWindow(lines, previewLines, inner, head);
+ 	return { rows: tail.rows, hidden: tail.skipped };
+ }
+ 
+-/** The spinner (or the still running glyph) in the accent color. */
+-function runningGlyph(cx: PaintContext): string {
+-	const theme = cx.theme;
+-	if (cx.reduceMotion) return theme.fg("accent", theme.symbols.symbol("status.running"));
+-	const frames = theme.symbols.spinnerFrames;
+-	return theme.fg("accent", frames[Math.floor(cx.now() / SPINNER_INTERVAL_MS) % frames.length]!);
++type AgentEventStatus = "pending" | "running" | "completed" | "failed" | "aborted";
++
++export function agentEventStatus(value: unknown): AgentEventStatus {
++	switch (value) {
++		case "pending":
++		case "completed":
++		case "failed":
++		case "aborted":
++			return value;
++		default:
++			return "running";
++	}
+ }
+ 
+ /** `agent()` progress rows under a cell. */
+-function agentRows(cx: PaintContext, events: readonly EvalStatusEvent[], width: number): string[] {
+-	const theme = cx.theme;
++export function renderAgentProgressEvents(
++	events: readonly EvalStatusEvent[], theme: Theme, width: number, spinnerFrame?: number,
++): string[] {
+ 	const symbol = (key: string): string => theme.symbols.symbol(key);
+ 	const rows: string[] = [];
+ 	events.forEach((event, i) => {
+ 		const last = i === events.length - 1;
+ 		const prefix = theme.fg("dim", last ? symbol("tree.last") : symbol("tree.branch"));
+ 		const cont = last ? "   " : `${theme.fg("dim", symbol("tree.vertical"))}  `;
+-		const raw = typeof event.status === "string" ? event.status : "running";
+-		const status = ["pending", "running", "completed", "failed", "aborted"].includes(raw) ? raw : "running";
++		const status = agentEventStatus(event.status);
+ 		const text = (key: string): string | undefined => {
+ 			const value = event[key];
+ 			return typeof value === "string" && value.length > 0 ? value : undefined;
+@@ -325,7 +366,7 @@
+ 			status === "completed"
+ 				? theme.fg("accent", symbol("tool.eval"))
+ 				: status === "running"
+-					? runningGlyph(cx)
++					? theme.fg("accent", theme.symbols.spinnerFrames[spinnerFrame ?? -1] ?? symbol("status.running"))
+ 					: status === "failed"
+ 						? theme.fg("error", symbol("status.error"))
+ 						: status === "aborted"
+@@ -424,6 +465,10 @@
+ 	const width = cx.width;
+ 	const expanded = term.cellsExpanded ?? isExpanded(props);
+ 	const cells = term.cells;
++	const presentation = term.presentation;
++	const renderer = term.statusRenderer;
++	const frameCount = theme.symbols.spinnerFrames.length;
++	const spinnerFrame = !cx.reduceMotion && frameCount > 0 ? Math.floor(cx.now() / SPINNER_INTERVAL_MS) % frameCount : undefined;
+ 	if (term.phase === "call") {
+ 		if (cells.length === 0)
+ 			return {
+@@ -443,8 +488,9 @@
+ 						total: cells.length,
+ 						...(cell.title !== undefined ? { title: cell.title } : {}),
+ 						status: cx.reduceMotion ? "pending" : "running",
+-						codeTail: true,
+-						codeMaxLines: PREVIEW_WINDOW_ROWS,
++						sourceKey: cell,
++						codeTail: presentation?.codeTail ?? true,
++						codeMaxLines: presentation?.codeMaxLines ?? PREVIEW_WINDOW_ROWS,
+ 						expanded,
+ 					},
+ 					width,
+@@ -458,13 +504,17 @@
+ 	if (term.phase === "cells") {
+ 		const rows: string[] = [];
+ 		cells.forEach((cell, i) => {
+-			const status = statusRows(theme, cell.events ?? [], expanded, cell.elided);
+-			const output = cellOutputRows(theme, cell, expanded, previewLines, width);
++			const events = cell.events ?? [];
++			const status = renderer
++				? renderer.render(events, theme, expanded, cell.elided, frameInner(width), spinnerFrame)
++				: statusRows(theme, events, expanded, cell.elided);
++			const output = cellOutputRows(theme, cell, expanded, previewLines, width, presentation);
+ 			const lines = [...output.rows];
+ 			if (!expanded && output.hidden > 0)
+-				lines.push(theme.fg("dim", `… ${output.hidden} more lines (${expandKeyLabel(theme)} to expand)`));
++				lines.push(presentation?.outputDisclosure?.(output.hidden, theme) ??
++					theme.fg("dim", `… ${output.hidden} more lines (${expandKeyLabel(theme)} to expand)`));
+ 			if (status.length > 0) {
+-				if (lines.length > 0) lines.push(theme.fg("dim", "Status"));
++				if (!renderer && lines.length > 0) lines.push(theme.fg("dim", "Status"));
+ 				lines.push(...status);
+ 			}
+ 			rows.push(
+@@ -479,15 +529,16 @@
+ 						...(cell.title !== undefined ? { title: cell.title } : {}),
+ 						...(cell.status ? { status: cell.status } : {}),
+ 						...(cell.durationMs !== undefined ? { duration: cell.durationMs } : {}),
+-						...(lines.length > 0 ? { output: lines.join("\n"), outputMaxLines: lines.length } : {}),
+-						codeTail: true,
+-						codeMaxLines: PREVIEW_WINDOW_ROWS,
++						outputRows: lines,
++						sourceKey: cell,
++						codeTail: presentation?.codeTail ?? true,
++						codeMaxLines: presentation?.codeMaxLines ?? PREVIEW_WINDOW_ROWS,
+ 						expanded,
+ 					},
+ 					width,
+ 				),
+ 			);
+-			if (cell.agents && cell.agents.length > 0) rows.push(...agentRows(cx, cell.agents, width));
++			if (!renderer && cell.agents?.length) rows.push(...renderAgentProgressEvents(cell.agents, theme, width, spinnerFrame));
+ 			if (i < cells.length - 1) rows.push("");
+ 		});
+ 		return { rows: [...rows, ...imagePlaceholderRows(node, cx), ...notes] };
+@@ -497,17 +548,20 @@
+ 		props.term?.imageLinks,
+ 		resultPictures(node, cx).length,
+ 	).trimEnd();
+-	const status = statusRows(theme, term.events ?? [], expanded, term.elided);
+-	const statusBlock = status.length > 0 ? [theme.fg("dim", "Status"), ...status] : [];
++	const events = term.events ?? [];
++	const status = renderer
++		? renderer.render(events, theme, expanded, term.elided, width, spinnerFrame)
++		: statusRows(theme, events, expanded, term.elided);
++	const statusBlock = !renderer && status.length > 0 ? [theme.fg("dim", "Status"), ...status] : status;
+ 	if (!output && status.length === 0) return { rows: notes.length > 0 ? wrap(notes.join("\n"), width) : [] };
+-	if (!output || expanded) {
++	if (!output || expanded || (term.isError && presentation?.expandErrors)) {
+ 		const styled = output ? output.split("\n").map(line => theme.fg("toolOutput", line)) : [];
+ 		return {
+ 			rows: wrap([...styled, ...statusBlock, ...notes].join("\n"), width),
+ 		};
+ 	}
+ 	const styled = output.split("\n").map(line => theme.fg("toolOutput", line));
+-	const tail = visualTail(["", ...styled], previewLines, width);
++	const tail = visualWindow(["", ...styled], previewLines, width);
+ 	const rows: string[] = [];
+ 	if (tail.skipped > 0) {
+ 		rows.push(
+diff --git a/src/ui/styles/tools/frame.ts b/src/ui/styles/tools/frame.ts
+--- a/src/ui/styles/tools/frame.ts
++++ b/src/ui/styles/tools/frame.ts
+@@ -54,17 +54,21 @@
+ 	right: string,
+ 	text: string | undefined,
+ 	border = "dim",
++	decorate = true,
+ ): string {
+ 	const line = theme.symbols.box.horizontal;
+-	const lead = `${left}${line.repeat(LEAD)}`;
+-	const leadWidth = visibleWidth(lead);
++	const leftWidth = visibleWidth(left);
+ 	const rightWidth = visibleWidth(right);
+-	if (!text) {
+-		return `${theme.fg(border, lead)}${theme.fg(border, line.repeat(Math.max(0, width - leadWidth - rightWidth)))}${theme.fg(border, right)}`;
+-	}
+-	const label = truncate(` ${text} `, Math.max(0, width - leadWidth - rightWidth));
+-	const fill = Math.max(0, width - leadWidth - visibleWidth(label) - rightWidth);
+-	return `${theme.fg(border, lead)}${label}${theme.fg(border, line.repeat(fill))}${theme.fg(border, right)}`;
++	const ribbon = decorate && (border === "dim" || border === "borderMuted" || border === "border");
++	const rule = (count: number, offset: number) =>
++		(ribbon ? theme.renderRule?.(line, count, offset, width) : undefined) ?? theme.fg(border, line.repeat(count));
++	const room = Math.max(0, width - leftWidth - rightWidth);
++	const start = theme.fg(border, left);
++	const end = theme.fg(border, right);
++	if (!text || room <= LEAD) return `${start}${rule(room, leftWidth)}${end}`;
++	const label = truncate(` ${text} `, room - LEAD);
++	const offset = leftWidth + LEAD + visibleWidth(label);
++	return `${start}${rule(LEAD, leftWidth)}${label}${rule(Math.max(0, width - offset - rightWidth), offset)}${end}`;
+ }
+ 
+ /** A content row: `│ ` + row padded to the inner width + ` │`. */
+@@ -115,7 +119,7 @@
+ 		visibleWidth(` ${foot} `) <= width - visibleWidth(`${box.bottomLeft}${box.horizontal.repeat(LEAD)}`) - 1;
+ 	if (foot !== undefined && !footFits)
+ 		for (const wrapped of wrap(foot, Math.max(1, inner))) push(frameRow(theme, width, wrapped, border));
+-	push(edgeRow(theme, width, box.bottomLeft, box.bottomRight, footFits ? foot : undefined, border));
++	push(edgeRow(theme, width, box.bottomLeft, box.bottomRight, footFits ? foot : undefined, border, false));
+ 	if (rowTags) rowTags.push(...tags);
+ 	return rows.map((row, index) =>
+ 		fillRow(
+diff --git a/src/ui/styles/tools/json-tree.ts b/src/ui/styles/tools/json-tree.ts
+--- a/src/ui/styles/tools/json-tree.ts
++++ b/src/ui/styles/tools/json-tree.ts
+@@ -22,6 +22,17 @@
+ 	readonly maxScalar: number;
+ }
+ 
++/** Optional label styling for JSON trees */
++export interface JsonTreePresentation {
++	keyColor(depth: number, color: string | undefined, native: boolean): string | undefined;
++}
++
++let jsonTreePresentation: JsonTreePresentation | undefined;
++
++export function setJsonTreePresentation(policy: JsonTreePresentation | undefined): void {
++	jsonTreePresentation = policy;
++}
++
+ /** Limits of an expanded tree. */
+ export const EXPANDED_TREE: JsonTreeLimits = { maxDepth: 6, maxLines: 200, maxScalar: 2000 };
+ /** Limits of a collapsed tree. */
+@@ -95,11 +106,15 @@
+ 	const rows: string[] = [];
+ 	let truncated = false;
+ 	const entriesOf = (container: unknown, root: boolean): [string, unknown, string][] => {
+-		if (Array.isArray(container)) return container.map((entry, i) => [String(i), entry, "dim"]);
++		// One lookahead preserves the last-branch glyph without copying the whole input
++		const limit = limits.maxLines - rows.length + 1;
++		if (Array.isArray(container))
++			return Array.from({ length: Math.min(limit, container.length) }, (_, i) => [String(i), container[i], "dim"]);
+ 		const out: [string, unknown, string][] = [];
+ 		for (const key in container as Record<string, unknown>) {
+-			if (root && hidden.includes(key)) continue;
++			if (!Object.hasOwn(container as object, key) || (root && hidden.includes(key))) continue;
+ 			out.push([key, (container as Record<string, unknown>)[key], "muted"]);
++			if (out.length >= limit) break;
+ 		}
+ 		return out;
+ 	};
+@@ -111,11 +126,12 @@
+ 	const entryRows = (
+ 		key: string,
+ 		keyColor: string,
++		depth: number,
+ 		entry: unknown,
+ 		first: string,
+ 		continuation: string,
+ 	): { rows: string[]; container: boolean } => {
+-		const label = theme.fg(keyColor, key);
++		const label = theme.fg(jsonTreePresentation?.keyColor(depth, keyColor, false) ?? keyColor, key);
+ 		if (entry !== null && typeof entry === "object") {
+ 			const inline = inlineValue(theme, entry);
+ 			if (inline !== undefined) return { rows: [`${first}${label}: ${inline}`], container: false };
+@@ -142,6 +158,14 @@
+ 			container: false,
+ 		};
+ 	};
++	const append = (lines: readonly string[]): void => {
++		const room = limits.maxLines - rows.length;
++		if (lines.length <= room) rows.push(...lines);
++		else {
++			for (let i = 0; i < room; i++) rows.push(lines[i]!);
++			truncated = true;
++		}
++	};
+ 	const lastBranch = theme.fg("dim", theme.symbols.symbol("tree.last"));
+ 	const branch = theme.fg("dim", theme.symbols.symbol("tree.branch"));
+ 	const hook = theme.symbols.symbol("tree.hook");
+@@ -164,8 +188,8 @@
+ 			const last = i === entries.length - 1;
+ 			// The rails of open ancestors stay unstyled.
+ 			const below = `${gutter}${last ? "   " : `${vertical}  `}`;
+-			const row = entryRows(key, keyColor, entry, `${gutter}${last ? lastBranch : branch} `, below);
+-			rows.push(...row.rows);
++			const row = entryRows(key, keyColor, depth, entry, `${gutter}${last ? lastBranch : branch} `, below);
++			append(row.rows);
+ 			if (row.container) walk(entry as object, depth + 1, below);
+ 		});
+ 	};
+@@ -183,8 +207,8 @@
+ 			return;
+ 		}
+ 		const lead = i === 0 ? `${theme.fg("dim", hook)} ` : hookPad;
+-		const row = entryRows(key, keyColor, entry, `${lead}${theme.fg("dim", bullet)} `, gutter);
+-		rows.push(...row.rows);
++		const row = entryRows(key, keyColor, 1, entry, `${lead}${theme.fg("dim", bullet)} `, gutter);
++		append(row.rows);
+ 		if (row.container) walk(entry as object, 2, gutter);
+ 	});
+ 	return { rows, truncated };
+diff --git a/src/ui/styles/tools/tool-command.ts b/src/ui/styles/tools/tool-command.ts
+--- a/src/ui/styles/tools/tool-command.ts
++++ b/src/ui/styles/tools/tool-command.ts
+@@ -16,7 +16,7 @@
+ import type { ToolCommandTerm } from "../../tools/tool-command";
+ import { defaultCardRows, tint } from "./default";
+ import { legacyPartRows } from "./legacy";
+-import { statusGlyph, statusIcon, statusLine } from "./frame";
++import { frameInner, frameRows, statusGlyph, statusIcon, statusLine } from "./frame";
+ import { defineToolLook, isExpanded, toolLook, toolProps } from "./look";
+ 
+ /** The `--help` row. */
+@@ -30,11 +30,23 @@
+ 	return truncate(line, width);
+ }
+ 
++function queuedRows(cx: PaintContext, term: ToolCommandTerm, children: readonly UiNode[], width: number): string[] {
++	const lines: string[] = [];
++	const inner = Math.max(1, frameInner(width));
++	for (const child of children) lines.push(...cx.paint(child, inner).rows);
++	return frameRows(cx.theme, width, {
++		head: statusLine(cx.theme, { glyph: statusIcon(cx, "pending"), title: term.queuedLabel ?? term.commandLabel }),
++		sections: [{ lines }],
++		bg: "toolPendingBg",
++	});
++}
++
+ /** A nested tool command card inside a shell run, at `width`. */
+ export function toolCommandRows(node: UiNode, cx: PaintContext, width: number, expanded: boolean): string[] {
+ 	const term = (node.props() as { term?: ToolCommandTerm & { tone?: string } }).term;
+ 	if (!term) return [];
+ 	if (term.mode === "help") return [helpRow(cx, term, width)];
++	if (term.mode === "queued") return queuedRows(cx, term, node.children().slice(1), width);
+ 	if (term.mode === "legacy") return legacyPartRows(cx, term.parts ?? [], width);
+ 	const inner = term.inner && term.inner !== "default" ? toolLook(term.inner) : undefined;
+ 	// The wrapped tool's look at the nested card's width (getters keep reading the paint environment).
+@@ -60,6 +72,7 @@
+ 	const term = props.term as ToolCommandTerm | undefined;
+ 	if (!term) return { rows: [] };
+ 	if (term.mode === "help") return { rows: [helpRow(cx, term, cx.width)] };
++	if (term.mode === "queued") return { rows: queuedRows(cx, term, node.children(), cx.width) };
+ 	if (term.mode === "legacy") return { rows: legacyPartRows(cx, term.parts ?? [], cx.width) };
+ 	const inner = term.inner && term.inner !== "default" ? toolLook(term.inner) : undefined;
+ 	if (inner) return inner.paint(node, cx);
+diff --git a/src/ui/tools/bash.tsx b/src/ui/tools/bash.tsx
+--- a/src/ui/tools/bash.tsx
++++ b/src/ui/tools/bash.tsx
+@@ -16,7 +16,7 @@
+ import { resultText } from "./default";
+ import type { ToolHead, ToolPresenter, ToolResult, ToolView, ToolViewState } from "./contract";
+ import { registerToolPresenter } from "./registry";
+-import { type ToolCommandDispatch, ToolCommandNode, type ToolCommandResolver } from "./tool-command";
++import { queuedToolCommand, type ToolCommandDispatch, ToolCommandNode, type ToolCommandResolver } from "./tool-command";
+ import {
+ 	displayWorkdir,
+ 	formatMinimized,
+@@ -128,6 +128,8 @@
+ 	readonly previewLines?: number;
+ 	/** The whole call was one tool command, whose card stands for the output. */
+ 	readonly sole?: boolean;
++	readonly codeMaxLines?: number;
++	readonly stateLabel?: string;
+ }
+ 
+ /** How a shell-like tool's args map to a command line. */
+@@ -138,8 +140,27 @@
+ 	readonly env?: (args: TArgs | undefined) => Record<string, unknown> | undefined;
+ 	/** Draw the status line in the frame's top edge. */
+ 	readonly header: boolean;
++	readonly presentation?: ShellRendererPolicy;
+ }
+ 
++/** Display choices shared by shell-like tools on both surfaces */
++export interface ShellRendererPolicy {
++	previewLines?: number;
++	codeMaxLines?: number;
++	shellPreviewLines?: number | false;
++	describeInput?: (source: string, language: string, role: string) => JSXNode;
++	serviceFacts?: (service: NonNullable<BashDetails["service"]>, expanded: boolean) => string[];
++	showTimeout?: (expanded: boolean) => boolean;
++	stateLabel?: (state: RunState | "queued") => string;
++}
++
++let shellRendererPolicy: ShellRendererPolicy | undefined;
++
++/** Apply display choices to existing and future shell presenters */
++export function setShellRendererPolicy(policy: ShellRendererPolicy | undefined): void {
++	shellRendererPolicy = policy;
++}
++
+ /** Collapsed output rows of a shell result. */
+ const DEFAULT_PREVIEW_LINES = 10;
+ 
+@@ -259,8 +280,9 @@
+ 	isPartial: boolean,
+ 	cancelled: boolean,
+ ): RunState {
+-	if (cancelled) return "cancelled";
++	if (cancelled || details?.async?.state === "cancelled") return "cancelled";
+ 	if (details?.async?.state === "running") return "background";
++	if (details?.async?.state === "failed") return "failed";
+ 	if (isPartial) return "running";
+ 	if (details?.timedOut === true) return "timed-out";
+ 	if (isError || (details?.exitCode !== undefined && details.exitCode !== 0)) return "failed";
+@@ -301,11 +323,15 @@
+ 	contextTimeout: number | undefined,
+ 	artifactId: string | undefined,
+ 	isError: boolean,
++	expanded: boolean,
++	policy: ShellRendererPolicy | undefined,
+ ): BashStat[] {
+ 	const stats: BashStat[] = [];
+ 	if (details?.async?.state === "running") stats.push({ icon: "icon.job", text: details.async.jobId });
+ 	const service = details?.service;
+-	if (service) {
++	if (service && policy?.serviceFacts) {
++		for (const text of policy.serviceFacts(service, expanded)) stats.push({ text });
++	} else if (service) {
+ 		stats.push({ icon: "icon.server", text: service.name });
+ 		stats.push({ icon: serviceStateIcon(service.state), text: service.state });
+ 		stats.push(
+@@ -317,8 +343,9 @@
+ 		);
+ 		if (service.pid !== undefined) stats.push({ icon: "icon.pid", iconSeparator: "", text: String(service.pid) });
+ 	}
+-	const timeoutDisabled = details?.timeoutDisabled === true || contextTimeout === 0;
+-	const timeoutSeconds = timeoutDisabled ? undefined : (details?.timeoutSeconds ?? contextTimeout);
++	const showTimeout = policy?.showTimeout?.(expanded) ?? true;
++	const timeoutDisabled = showTimeout && (details?.timeoutDisabled === true || contextTimeout === 0);
++	const timeoutSeconds = timeoutDisabled || !showTimeout ? undefined : (details?.timeoutSeconds ?? contextTimeout);
+ 	let timeoutLabel: string | undefined;
+ 	if (timeoutDisabled) timeoutLabel = "disabled";
+ 	else if (typeof timeoutSeconds === "number") {
+@@ -347,11 +374,17 @@
+ }
+ 
+ /** The run box's quiet foot facts. */
+-function footFacts(details: BashDetails | undefined, artifactId: string | undefined): string[] {
++function footFacts(
++	details: BashDetails | undefined,
++	artifactId: string | undefined,
++	expanded: boolean,
++	policy: ShellRendererPolicy | undefined,
++): string[] {
+ 	const facts: string[] = [];
+ 	if (details?.async?.state === "running") facts.push(`Job ${details.async.jobId}`);
+ 	const service = details?.service;
+-	if (service) {
++	if (service && policy?.serviceFacts) facts.push(...policy.serviceFacts(service, expanded));
++	else if (service) {
+ 		facts.push(`Service ${service.name}`, service.state);
+ 		facts.push(service.ready ? "ready" : service.timedOut ? "ready timed out" : "not ready");
+ 		if (service.pid !== undefined) facts.push(`PID ${service.pid}`);
+@@ -394,6 +427,7 @@
+ 	readonly liveOrigin: boolean;
+ 	readonly stream?: boolean;
+ 	readonly cwd?: string;
++	readonly previewLines?: number | false;
+ }): JSXNode {
+ 	const step = props.context.shellStep;
+ 	const onEvent = props.context.shellEvent;
+@@ -407,7 +441,7 @@
+ 			liveOrigin={props.liveOrigin}
+ 			stream={props.stream}
+ 			cwd={props.cwd}
+-			preview={{ lines: RUN_INPUT_PREVIEW_LINES }}
++			preview={props.previewLines === false ? undefined : { lines: props.previewLines ?? RUN_INPUT_PREVIEW_LINES }}
+ 			steps={step ? true : undefined}
+ 			focus={step?.focus}
+ 			{...(onEvent
+@@ -434,10 +468,14 @@
+ 			details?.cwd !== undefined ? details.cdSeparator : undefined,
+ 		);
+ 	};
++	const describeInput = (command: string, policy: ShellRendererPolicy | undefined): JSXNode =>
++		policy?.describeInput?.(command, "bash", "omp.tool.bash.command") ??
++		<RunInput source={command} role="omp.tool.bash.command" lang="bash" wrap />;
+ 	return {
+ 		merge: true,
+ 		inline: true,
+ 		call(args, state): ToolView {
++			const policy = config.presentation ?? shellRendererPolicy;
+ 			const cmd = line(args);
+ 			const started = state.executionStarted;
+ 			const shell = state.renderContext as ShellContext | undefined;
+@@ -450,11 +488,12 @@
+ 							<ShellInput
+ 								context={shell!}
+ 								presentation={presentation}
++								previewLines={policy?.shellPreviewLines}
+ 								liveOrigin={state.executionStarted}
+ 								stream={!state.argsComplete && state.cancelled !== true}
+ 							/>
+ 						) : (
+-							<RunInput source={cmd.text} role="omp.tool.bash.command" lang="bash" wrap />
++							describeInput(cmd.text, policy)
+ 						)}
+ 						{started && <RunFoot state={state.cancelled ? "cancelled" : "running"} elapsedMs={state.elapsedMs} />}
+ 					</RunBox>
+@@ -465,14 +504,17 @@
+ 					look: "bash",
+ 					prefix: cmd.prefix,
+ 					header: config.header,
++					codeMaxLines: policy?.codeMaxLines,
++					stateLabel: policy?.stateLabel?.(state.cancelled ? "cancelled" : started ? "running" : "queued"),
+ 					...(callIntent(args) ? { intent: callIntent(args) } : {}),
+ 				} satisfies BashTerm,
+ 			};
+ 		},
+ 		result(result: ToolResult<BashDetails>, state: ToolViewState, args?: TArgs): ToolView {
++			const policy = config.presentation ?? shellRendererPolicy;
+ 			const details = result.details;
+ 			const context = state.renderContext as BashRenderContext | undefined;
+-			const isError = result.isError === true;
++			const isError = result.isError === true || (details?.exitCode !== undefined && details.exitCode !== 0);
+ 			const isPartial = state.isPartial;
+ 			const raw = context?.output ?? resultText(result);
+ 			const stripped = stripNotices(raw, details);
+@@ -480,7 +522,7 @@
+ 			const expanded = context?.expanded ?? state.expanded;
+ 			const showingFull = expanded && context?.isFullOutput === true;
+ 			const cmd = line(args);
+-			const previewLines = context?.previewLines ?? DEFAULT_PREVIEW_LINES;
++			const previewLines = policy?.previewLines ?? context?.previewLines ?? DEFAULT_PREVIEW_LINES;
+ 			const shell = state.renderContext as ShellContext | undefined;
+ 			const presentation = shell?.shellPresentation;
+ 			const runStateValue = runState(details, isError, isPartial, state.cancelled === true);
+@@ -493,7 +535,13 @@
+ 			const dispatches = details?.toolCommands ?? [];
+ 			const only = dispatches.length === 1 ? dispatches[0] : undefined;
+ 			const sole = only?.mode === "execute" && isSoleInvocation(config.command(args), only.tool);
++			if (sole && only.queued && isPartial && !state.cancelled) {
++				const queued = queuedToolCommand({ dispatch: only, resolveMounted: context?.resolveToolCommandMounted }, state);
++				if (queued) return queued;
++			}
++			const showInnerOutput = sole && !only.queued;
+ 			const commandNodes = dispatches.map((dispatch, index) => {
++				if (dispatch.queued) return undefined;
+ 				const running = isPartial && index === dispatches.length - 1;
+ 				const nested: ToolViewState = {
+ 					expanded,
+@@ -505,7 +553,7 @@
+ 				return (
+ 					<ToolCommandNode
+ 						nodeKey={`tool-command-${index}`}
+-						input={{ dispatch, ...(sole ? { output } : {}), resolveMounted: context?.resolveToolCommandMounted }}
++						input={{ dispatch, ...(showInnerOutput ? { output } : {}), resolveMounted: context?.resolveToolCommandMounted }}
+ 						state={nested}
+ 					/>
+ 				);
+@@ -516,33 +564,33 @@
+ 						<ShellInput
+ 							context={shell!}
+ 							presentation={presentation}
++							previewLines={policy?.shellPreviewLines}
+ 							liveOrigin={state.executionStarted}
+ 							cwd={displayWorkdir(config.cwd?.(args))}
+ 						/>
+ 					) : (
+-						<RunInput source={cmd.text} role="omp.tool.bash.command" lang="bash" wrap />
++						describeInput(cmd.text, policy)
+ 					)}
+ 					{commandNodes}
+-					{!sole && output.trim().length > 0 && (
++					{!showInnerOutput && output.trim().length > 0 && (
+ 						<RunOutput output={output} role="omp.tool.bash.output" previewLines={previewLines} />
+ 					)}
+ 					<RunFoot
+ 						state={runStateValue}
+ 						exitCode={details?.exitCode}
+ 						elapsedMs={elapsedMs}
+-						facts={footFacts(details, stripped.artifactId)}
++						facts={footFacts(details, stripped.artifactId, expanded, policy)}
+ 						meta={meta ? { ...meta, truncation: showingFull ? undefined : meta.truncation } : undefined}
+ 					/>
+ 				</RunBox>
+ 			);
+-			const timedOut = details?.timedOut === true;
+ 			const warning = outputNotices(
+ 				meta ? { ...meta, truncation: showingFull ? undefined : meta.truncation } : undefined,
+ 			).join(". ");
+ 			return {
+ 				head: shellHead(config.title(args), cmd.text, callIntent(args), details, !isPartial),
+ 				body,
+-				...(runStateValue === "timed-out" ? { tone: "warning" as const } : {}),
++				...(runStateValue === "timed-out" ? { tone: "warning" as const } : runStateValue === "failed" ? { tone: "error" as const } : {}),
+ 				preview: "children",
+ 				inline: true,
+ 				term: {
+@@ -551,12 +599,20 @@
+ 					header: config.header,
+ 					...(callIntent(args) ? { intent: callIntent(args) } : {}),
+ 					result: true,
+-					outcome: isPartial ? "running" : isError ? (timedOut ? "warning" : "error") : "success",
+-					stats: footerStats(details, context?.timeout, stripped.artifactId, isError),
++					outcome: runStateValue === "timed-out"
++						? "warning"
++						: runStateValue === "failed"
++							? "error"
++							: runStateValue === "running" || runStateValue === "background"
++								? "running"
++								: "success",
++					stats: footerStats(details, context?.timeout, stripped.artifactId, isError, expanded, policy),
++					codeMaxLines: policy?.codeMaxLines,
++					stateLabel: policy?.stateLabel?.(runStateValue),
+ 					liveClock: isPartial && details?.wallTimeMs === undefined,
+ 					...(warning ? { warning } : {}),
+ 					previewLines,
+-					...(sole ? { sole } : {}),
++					...(showInnerOutput ? { sole: true } : {}),
+ 				} satisfies BashTerm,
+ 			};
+ 		},
+diff --git a/src/ui/tools/eval.tsx b/src/ui/tools/eval.tsx
+--- a/src/ui/tools/eval.tsx
++++ b/src/ui/tools/eval.tsx
+@@ -10,6 +10,7 @@
+  */
+ 
+ import type { JSXNode } from "@oh-my-pi/pi-tui";
++import type { Theme } from "@oh-my-pi/pi-tui/theme/contract";
+ import { replaceTabs, truncate } from "@oh-my-pi/pi-tui/text/width";
+ import { sanitizeText } from "@oh-my-pi/pi-utils";
+ import type { TspSpan } from "@oh-my-pi/pi-wire";
+@@ -68,9 +69,37 @@
+ 	readonly agents?: readonly EvalStatusEvent[];
+ }
+ 
++/** Status history presentation shared by terminal and native eval views */
++export interface EvalStatusRenderer {
++	render(
++		events: readonly EvalStatusEvent[],
++		theme: Theme,
++		expanded: boolean,
++		elided?: number,
++		width?: number,
++		spinnerFrame?: number,
++	): string[];
++	describe(log: StatusEventLog, expanded: boolean): JSXNode;
++}
++
++/** Optional display choices for an eval presenter */
++export interface EvalRendererOptions {
++	previewLines?: number;
++	codeMaxLines?: number;
++	codeTail?: boolean;
++	expandErrors?: boolean;
++	structuredHead?: boolean;
++	hiddenRootKeys?: readonly string[];
++	describeInput?: (source: string, language: string, role: string) => JSXNode;
++	outputDisclosure?: (hidden: number, theme: Theme) => string;
++}
++
+ /** Terminal-only facts of an eval call (`term`). */
+ export interface EvalTerm {
+ 	readonly look: "eval";
++	readonly presentation?: EvalRendererOptions;
++	readonly statusRenderer?: EvalStatusRenderer;
++	readonly isError?: boolean;
+ 	readonly phase: "call" | "cells" | "output";
+ 	readonly cells: readonly EvalTermCell[];
+ 	/** The viewport context's expansion (over the block's), results only. */
+@@ -237,9 +266,14 @@
+ }
+ 
+ /** A cell's outputs in print order: text as a following terminal, views in place of their text. */
+-function outputNodes(output: string, views: readonly EvalViewEntry[] | undefined, previewLines: number): JSXNode[] {
+-	if (output.trim().length === 0) return [];
+-	return splitEvalOutput(output, views).map((part, i) => {
++function outputNodes(output: string, views: readonly EvalViewEntry[] | undefined, previewLines: number, isError: boolean, presentation?: EvalRendererOptions): JSXNode[] {
++	if (!output.trim()) return [];
++	const parts = splitEvalOutput(output, views);
++	const full = isError && presentation?.expandErrors === true;
++	const structured = !isError && presentation?.structuredHead && parts.some(part => part.kind === "view" && part.view.kind === "json");
++	const nodes = parts.map((part, i) => {
++		if (part.kind === "text" && (full || structured))
++			return <ansi key={i === 0 ? "output" : `output-${i}`} role="omp.tool.eval.output" text={part.text} />;
+ 		if (part.kind === "text")
+ 			return (
+ 				<RunOutput
+@@ -251,9 +285,16 @@
+ 			);
+ 		const view = part.view;
+ 		if (view.kind === "table") return <TableView view={view} nodeKey={`table-${i}`} />;
+-		if (view.kind === "json") return <json key={`json-${i}`} value={view.value as never} />;
++		if (view.kind === "json") {
++			const hidden = presentation?.hiddenRootKeys;
++			const value = hidden?.length && view.value !== null && typeof view.value === "object" && !Array.isArray(view.value)
++				? Object.fromEntries(Object.entries(view.value).filter(([key]) => !hidden.includes(key)))
++				: view.value;
++			return <json key={`json-${i}`} value={value as never} />;
++		}
+ 		return <md key={`markdown-${i}`} text={view.text} />;
+ 	});
++	return structured ? [<card key="output" variant="bare" preview={{ lines: previewLines }}>{nodes}</card>] : nodes;
+ }
+ 
+ function cellState(status: EvalCellResult["status"], cancelled: boolean): RunState | undefined {
+@@ -279,7 +320,7 @@
+ }
+ 
+ /** One cell as one run box; a failed cell tints its box. */
+-function CellBox(props: { readonly cell: CellRun; readonly index: number; readonly total: number }): JSXNode {
++function CellBox(props: { readonly cell: CellRun; readonly index: number; readonly total: number; readonly presentation?: EvalRendererOptions }): JSXNode {
+ 	const { cell, index, total } = props;
+ 	let caption: JSXNode;
+ 	if (total > 1) {
+@@ -292,6 +333,7 @@
+ 		<RunBox nodeKey={`cell-${index}`} tone={cell.foot?.state === "failed" ? "error" : undefined}>
+ 			{caption}
+ 			{cell.code.trim().length > 0 && (
++				props.presentation?.describeInput?.(cell.code, highlightLanguage(cell.language), "omp.tool.eval.input") ??
+ 				<RunInput
+ 					source={cell.code}
+ 					role="omp.tool.eval.input"
+@@ -326,7 +368,7 @@
+ 	};
+ }
+ 
+-function callView(args: EvalArgs, state: ToolViewState): ToolView {
++function callView(args: EvalArgs, state: ToolViewState, presentation?: EvalRendererOptions): ToolView {
+ 	const cells = argCells(args);
+ 	const startFoot: RunFootProps | undefined = state.executionStarted
+ 		? {
+@@ -345,24 +387,38 @@
+ 				cell={{ ...cell, ...(i === 0 && startFoot ? { foot: startFoot } : {}) }}
+ 				index={i}
+ 				total={cells.length}
++				presentation={presentation}
+ 			/>
+ 		)),
+ 		preview: "children",
+-		term: { look: "eval", phase: "call", cells } satisfies EvalTerm,
++		term: { look: "eval", phase: "call", cells, presentation } satisfies EvalTerm,
+ 	};
+ }
+ 
+-function resultView(result: ToolResult<EvalToolDetails>, state: ToolViewState, args?: EvalArgs): ToolView {
++function resultView(
++	result: ToolResult<EvalToolDetails>,
++	state: ToolViewState,
++	args: EvalArgs | undefined,
++	statusRenderer?: EvalStatusRenderer,
++	presentation?: EvalRendererOptions,
++): ToolView {
+ 	const details = result.details;
+ 	const context = state.renderContext as EvalRenderContext | undefined;
+ 	const cancelled = state.cancelled === true;
+ 	const expanded = context?.expanded ?? state.expanded;
+-	const previewLines = context?.previewLines ?? DEFAULT_PREVIEW_LINES;
++	const previewLines = presentation?.previewLines ?? context?.previewLines ?? DEFAULT_PREVIEW_LINES;
++	const isError = result.isError === true || details?.isError === true;
++	const status = (log: StatusEventLog): JSXNode => statusRenderer
++		? statusRenderer.describe(log, expanded)
++		: <StatusSection log={log} expanded={expanded} />;
+ 	const callFacts = {
+ 		facts: details?.notice ? [details.notice] : [],
+ 		meta: details?.meta,
+ 	};
+ 	const shared = {
++		presentation,
++		statusRenderer,
++		isError,
+ 		cellsExpanded: expanded,
+ 		previewLines,
+ 		...(typeof context?.timeout === "number" ? { timeout: context.timeout } : {}),
+@@ -374,6 +430,7 @@
+ 	if (cellResults && cellResults.length > 0) {
+ 		const languages = cellResults.map(cell => cell.language ?? details?.language ?? "python");
+ 		const states = cellResults.map(cell => cellState(cell.status, cancelled));
++		const codes = cellResults.map((cell, i) => formatEvalCodeForDisplay(cell.code, languages[i]!));
+ 		const factsIndex = states.findLastIndex(value => value !== undefined);
+ 		let earlierMs = 0;
+ 		const boxes = cellResults.map((cell, i) => {
+@@ -390,10 +447,10 @@
+ 				<CellBox
+ 					cell={{
+ 						language,
+-						code: formatEvalCodeForDisplay(cell.code, language),
++						code: codes[i]!,
+ 						...(cell.title !== undefined ? { title: cell.title } : {}),
+-						outputs: outputNodes(cell.output, cell.views, previewLines),
+-						status: <StatusSection log={cell} expanded={expanded} />,
++						outputs: outputNodes(cell.output, cell.views, previewLines, cell.status === "error", presentation),
++						status: status(cell),
+ 						...(cellStateValue
+ 							? {
+ 									foot: {
+@@ -407,21 +464,22 @@
+ 					}}
+ 					index={i}
+ 					total={cellResults.length}
++					presentation={presentation}
+ 				/>
+ 			);
+ 		});
+ 		const cells: EvalTermCell[] = cellResults.map((cell, i) => {
+ 			const events = cell.statusEvents ?? [];
+-			const agents = events.filter(event => event.op === "agent");
++			const agents = statusRenderer ? [] : events.filter(event => event.op === "agent");
+ 			return {
+ 				language: languages[i]!,
+-				code: formatEvalCodeForDisplay(cell.code, languages[i]!),
++				code: codes[i]!,
+ 				...(cell.title !== undefined ? { title: cell.title } : {}),
+ 				status: cell.status,
+ 				...(cell.durationMs !== undefined ? { durationMs: cell.durationMs } : {}),
+ 				output: cell.output,
+ 				...(cell.views ? { views: cell.views } : {}),
+-				events: agents.length > 0 ? events.filter(event => event.op !== "agent") : events,
++				events: !statusRenderer && agents.length > 0 ? events.filter(event => event.op !== "agent") : events,
+ 				...(cell.statusEventsElided ? { elided: cell.statusEventsElided } : {}),
+ 				agents,
+ 			};
+@@ -446,12 +504,12 @@
+ 		? "cancelled"
+ 		: state.isPartial
+ 			? "running"
+-			: result.isError
++			: isError
+ 				? "failed"
+ 				: "done";
+ 	const last: Omit<CellRun, "language" | "code" | "title"> = {
+-		outputs: outputNodes(output, undefined, previewLines),
+-		status: <StatusSection log={details ?? {}} expanded={expanded} />,
++		outputs: outputNodes(output, undefined, previewLines, isError, presentation),
++		status: status(details ?? {}),
+ 		foot: { state: runState, elapsedMs: state.elapsedMs, ...callFacts },
+ 	};
+ 	const runs: CellRun[] =
+@@ -465,7 +523,7 @@
+ 			calls.length,
+ 			details,
+ 		),
+-		body: runs.map((run, i) => <CellBox cell={run} index={i} total={runs.length} />),
++		body: runs.map((run, i) => <CellBox cell={run} index={i} total={runs.length} presentation={presentation} />),
+ 		preview: "children",
+ 		term: {
+ 			look: "eval",
+@@ -479,10 +537,18 @@
+ 	};
+ }
+ 
+-export const evalPresenter: ToolPresenter<EvalArgs, EvalToolDetails> = {
+-	merge: true,
+-	call: callView,
+-	result: resultView,
+-};
++/** Build an eval presenter with optional display and status history policies */
++export function createEvalRenderer(
++	statusRenderer?: EvalStatusRenderer,
++	presentation?: EvalRendererOptions,
++): ToolPresenter<EvalArgs, EvalToolDetails> {
++	return {
++		merge: true,
++		call: (args, state) => callView(args, state, presentation),
++		result: (result, state, args) => resultView(result, state, args, statusRenderer, presentation),
++	};
++}
+ 
++export const evalPresenter = createEvalRenderer();
++
+ registerToolPresenter("eval", evalPresenter);
+diff --git a/src/ui/tools/tool-command.tsx b/src/ui/tools/tool-command.tsx
+--- a/src/ui/tools/tool-command.tsx
++++ b/src/ui/tools/tool-command.tsx
+@@ -13,21 +13,14 @@
+ import type { JSXNode } from "@oh-my-pi/pi-tui";
+ import { replaceTabs } from "@oh-my-pi/pi-tui/text/width";
+ import type { TspSpan, TspText } from "@oh-my-pi/pi-wire";
++import type { QueuedToolCommandArgs, ToolCommandRenderDispatch } from "../../tools/details/tool-commands";
+ import type { ToolPresenter, ToolResult, ToolView, ToolViewState } from "./contract";
+ import { defaultPresenter } from "./default";
+ import { type LegacyToolRenderer, legacyParts, legacyView, type ToolRenderPart } from "./legacy";
+ import { toolPresenter } from "./registry";
+ 
+ /** One tool command invocation inside a bash run, as the bash result records it. */
+-export interface ToolCommandDispatch {
+-	readonly tool: string;
+-	readonly mode: "help" | "execute";
+-	/** Exit status of this invocation. */
+-	readonly exitCode: number;
+-	readonly args?: Record<string, unknown>;
+-	/** Details the wrapped tool returned. */
+-	readonly inner?: unknown;
+-}
++export type ToolCommandDispatch = Readonly<ToolCommandRenderDispatch>;
+ 
+ /** What the host knows about a mounted tool. */
+ export interface ToolCommandMounted {
+@@ -52,12 +45,13 @@
+ /** Terminal-only facts of a tool command card (`term`). */
+ export interface ToolCommandTerm {
+ 	readonly look: "tool-command";
+-	readonly mode: "help" | "legacy" | "view";
++	readonly mode: "help" | "legacy" | "view" | "queued";
+ 	readonly exitCode: number;
+ 	/** The look of the wrapped view (`view` mode). */
+ 	readonly inner?: string;
+ 	/** The command's label (`server/tool`, the mounted tool's label). */
+ 	readonly commandLabel: string;
++	readonly queuedLabel?: string;
+ 	readonly args?: unknown;
+ 	/** What a mounted tool's render hooks drew (`legacy` mode). */
+ 	readonly parts?: readonly ToolRenderPart[];
+@@ -86,18 +80,46 @@
+ 	};
+ }
+ 
++/** Optional view for a validated command that has not entered execution */
++export function queuedToolCommand(input: ToolCommandInput, state: ToolViewState): ToolView | undefined {
++	const { dispatch } = input;
++	if (!dispatch.queued || !dispatch.args) return undefined;
++	const presenter = toolPresenter("tool-command:queued") as ToolPresenter<QueuedToolCommandArgs> | undefined;
++	const label = toolCommandLabel(dispatch.tool, input.resolveMounted?.(dispatch.tool));
++	const view = presenter?.call?.({ label, args: dispatch.args }, { ...state, executionStarted: false });
++	if (!view) return undefined;
++	return {
++		...view,
++		tone: "pending",
++		term: {
++			look: "tool-command",
++			mode: "queued",
++			exitCode: 0,
++			commandLabel: label,
++			queuedLabel: plain(view.head?.title) ?? plain(view.label),
++		} satisfies ToolCommandTerm,
++	};
++}
++
+ /** The view of one invocation. */
+ export function toolCommandView(input: ToolCommandInput, state: ToolViewState): ToolView {
+ 	const { dispatch } = input;
+ 	const mounted = input.resolveMounted?.(dispatch.tool);
+ 	const label = toolCommandLabel(dispatch.tool, mounted);
+-	const isError = dispatch.exitCode !== 0;
++	const isError = !dispatch.queued && dispatch.exitCode !== 0;
+ 	const term = {
+ 		look: "tool-command",
+ 		exitCode: dispatch.exitCode,
+ 		commandLabel: label,
+ 		args: dispatch.args ?? {},
+ 	} as const;
++	if (dispatch.queued && dispatch.args) {
++		return queuedToolCommand(input, state) ?? {
++			head: { title: label, note: "Queued" },
++			tone: "pending",
++			term: { ...term, mode: "queued" } satisfies ToolCommandTerm,
++		};
++	}
+ 	if (dispatch.mode === "help") {
+ 		return {
+ 			head: { title: label, target: "--help", targetKind: "text", ...(isError ? { exit: dispatch.exitCode } : {}) },
+@@ -169,7 +191,7 @@
+ 		if (!detail) continue;
+ 		spans.push({ t: " " }, { t: detail, s: "muted" });
+ 	}
+-	const exit = head?.exit ?? (dispatch.exitCode !== 0 ? dispatch.exitCode : undefined);
++	const exit = head?.exit ?? (!dispatch.queued && dispatch.exitCode !== 0 ? dispatch.exitCode : undefined);
+ 	if (exit) spans.push({ t: " " }, { t: `exit ${exit}`, s: "error" });
+ 	const note = plain(head?.note);
+ 	if (note) spans.push({ t: " " }, { t: note, s: "muted" });

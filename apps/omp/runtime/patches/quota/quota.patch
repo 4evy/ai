@@ -1,226 +1,350 @@
-diff --git a/packages/tui/src/status-line/segments.ts b/packages/tui/src/status-line/segments.ts
---- a/packages/tui/src/status-line/segments.ts
-+++ b/packages/tui/src/status-line/segments.ts
-@@ -19,6 +19,7 @@
- import { summarizeLoopCondition } from "./loop";
- import { formatMetric } from "../components/metric";
- import { formatBillingSummary } from "./metrics";
+diff --git a/packages/coding-agent/src/ui/status/format.ts b/packages/coding-agent/src/ui/status/format.ts
+--- a/packages/coding-agent/src/ui/status/format.ts
++++ b/packages/coding-agent/src/ui/status/format.ts
+@@ -8,6 +8,7 @@
+ import { formatNumber, normalizePremiumRequests } from "@oh-my-pi/pi-utils";
+ import type { TspTone } from "@oh-my-pi/pi-wire";
+ import { shortenPath } from "../../utils/render-utils";
 +import { getStatusLinePresentation } from "./presentation";
- import { sanitizeInlineStatusText, sanitizeStatusText } from "../chrome/shared";
- import {
+ 
+ /** How full the context window reads. */
+ export type ContextLevel = "normal" | "warning" | "purple" | "error";
+@@ -72,7 +73,9 @@
+  * its unit printed once, subagent spend, the pricing period, premium requests
+  * and advisor spend. Undefined when there is nothing to bill.
+  */
+-export function billingSummary(billing: Billing, symbols: SymbolSet): string | undefined {
++export function billingSummary(billing: Billing, symbols: SymbolSet, availableWidth?: number): string | undefined {
++	const formatter = getStatusLinePresentation()?.billingSummary;
++	if (formatter) return formatter(billing, symbols, availableWidth);
+ 	const premium = normalizePremiumRequests(billing.premiumRequests);
+ 	const advisorCost = billing.advisor?.cost ?? 0;
+ 	const subagentCost = billing.subagentCost ?? 0;
+diff --git a/packages/coding-agent/src/ui/status/segments.ts b/packages/coding-agent/src/ui/status/segments.ts
+--- a/packages/coding-agent/src/ui/status/segments.ts
++++ b/packages/coding-agent/src/ui/status/segments.ts
+@@ -23,6 +23,7 @@
  	formatContextUsage,
-@@ -317,6 +318,10 @@
- 	const state = ctx.session.state;
- 	const opts = ctx.options.model ?? {};
- 	if (opts.showThinkingLevel === false || !state.model?.thinking) return "";
-+	const presentation = getStatusLinePresentation();
-+	if (!ctx.compactThinkingLevel && presentation?.thinkingLevelLabel) {
-+		return presentation.thinkingLevelLabel(thinkingLevelWord(ctx.session)!);
+ } from "./format";
+ import type { IconPiece, LookPiece, SegLook, TextPiece } from "./look";
++import { getStatusLinePresentation } from "./presentation";
+ 
+ /** Settings after the preset is applied. */
+ export interface EffectiveStatusSettings extends StatusLineSettings {
+@@ -195,9 +196,14 @@
+ 		pieces.push({ icon: "fast", s: look, space: "before" });
+ 		spans.push(span(` ${glyph(input, "icon.fast")}`, native));
+ 	}
+-	if (!compact && thinking.length > 0) pieces.push({ icon: "sep.dot", s: look, space: "none" }, ...thinking);
+ 	const level = showLevel ? thinkingWord(facts) : undefined;
+-	if (level !== undefined) spans.push(span(" · ", "dim"), span(level, thinkingToken(level)));
++	const effortLabel = level === undefined ? undefined : getStatusLinePresentation()?.thinkingLevelLabel?.(level);
++	if (!compact && thinking.length > 0) {
++		pieces.push({ icon: "sep.dot", s: look, space: "none" });
++		if (effortLabel === undefined) pieces.push(...thinking);
++		else pieces.push({ t: effortLabel, s: look });
 +	}
- 	if (ctx.session.isAutoThinking) {
- 		// Pending (no turn classified yet / classifying) shows a symbol-theme
- 		// question-box marker; once resolved it shows `<level>`.
-@@ -405,7 +410,11 @@
- 		if (advisor) spans.push(span(` ${advisor.icon}`, advisor.color));
- 		if (ctx.session.isFastModeActive() && theme.icon.fast) spans.push(span(` ${theme.icon.fast}`, token));
- 		const level = ctx.options.model?.showThinkingLevel === false ? undefined : thinkingLevelWord(ctx.session);
--		if (level !== undefined) spans.push(span(" · ", "dim"), span(level, thinkingLevelToken(level)));
-+		if (level !== undefined)
-+			spans.push(
-+				span(" · ", "dim"),
-+				span(getStatusLinePresentation()?.thinkingLevelLabel?.(level) ?? level, thinkingLevelToken(level)),
-+			);
- 		const slowModeLabel = ctx.session.getAnthropicSlowModeLabel?.();
- 		if (slowModeLabel) spans.push(span(`${theme.sep.dot}${slowModeLabel}`, "warning"));
- 		return segView(spans, "model", slowModeLabel ? "warning" : undefined);
-@@ -825,6 +834,7 @@
- 			usingSubscription,
- 			premiumRequests,
- 			fractionDigits: 2,
-+			availableWidth: ctx.width,
- 			pricingPeriod,
- 			advisor: advisorCost
- 				? { cost: advisorCost, usingSubscription: ctx.session.isAdvisorUsingSubscription?.() ?? false }
-diff --git a/packages/tui/src/status-line/component.ts b/packages/tui/src/status-line/component.ts
---- a/packages/tui/src/status-line/component.ts
-+++ b/packages/tui/src/status-line/component.ts
-@@ -2828,9 +2828,9 @@
- 		};
- 	}
++	if (level !== undefined) spans.push(span(" · ", "dim"), span(effortLabel ?? level, thinkingToken(level)));
+ 	if (facts.slowModeLabel) {
+ 		pieces.push({ icon: "sep.dot", s: "warning", space: "none" }, { t: facts.slowModeLabel, s: "warning" });
+ 		spans.push(span(`${glyph(input, "sep.dot")}${facts.slowModeLabel}`, "warning"));
+@@ -440,20 +446,29 @@
+ function costSeg(input: SegInput): SegView | null {
+ 	const { facts, symbols } = input;
+ 	const own = Math.max(0, facts.usage.cost - (facts.usage.subagentCost ?? 0));
+-	const text = billingSummary(
+-		{
+-			cost: own,
+-			subagentCost: Math.max(facts.subagentTreeCost ?? 0, facts.usage.subagentCost ?? 0),
+-			usingSubscription: facts.usingSubscription,
+-			premiumRequests: facts.usage.premiumRequests,
+-			digits: 2,
+-			pricingPeriod: facts.pricingPeriod,
+-			advisor: facts.advisorCost,
+-		},
+-		symbols,
+-	);
++	const billing = {
++		cost: own,
++		subagentCost: Math.max(facts.subagentTreeCost ?? 0, facts.usage.subagentCost ?? 0),
++		usingSubscription: facts.usingSubscription,
++		premiumRequests: facts.usage.premiumRequests,
++		digits: 2,
++		pricingPeriod: facts.pricingPeriod,
++		advisor: facts.advisorCost,
++	};
++	const text = billingSummary(billing, symbols);
+ 	if (!text) return null;
+-	return view(input, [span(text, "statusLineCost")], [{ t: text, s: "statusLineCost" }]);
++	const segment = view(input, [span(text, "statusLineCost")], [{ t: text, s: "statusLineCost" }]);
++	if (!billing.subagentCost || !getStatusLinePresentation()?.billingSummary) return segment;
++	return {
++		...segment,
++		look: {
++			...segment.look,
++			narrowPieces: width => {
++				const fitted = billingSummary(billing, symbols, width);
++				return fitted ? [{ t: fitted, s: "statusLineCost" }] : [];
++			},
++		},
++	};
+ }
  
--	#subagentBadgeText(): string | undefined {
--		if (this.#subagentCount === 0) return undefined;
--		return theme.fg("statusLineSubagents", `${theme.icon.agents} ${this.#subagentCount}`);
-+	#subagentBadgeText(ctx: SegmentContext): string | undefined {
-+		const rendered = renderSegment("subagents", ctx);
-+		return rendered.visible ? rendered.content : undefined;
- 	}
- 
- 	/**
-@@ -3163,10 +3163,10 @@
- 	#separatorMetrics(plain: boolean, style: StatusLineSeparatorStyle): SeparatorMetrics {
- 		const themeEpoch = getThemeEpoch();
- 		const memo = plain ? this.#plainSeparatorMetrics : this.#styledSeparatorMetrics;
--		if (memo && memo.themeRef === theme && memo.themeEpoch === themeEpoch && (plain || memo.style === style)) {
-+		if (memo && memo.themeRef === theme && memo.themeEpoch === themeEpoch && memo.style === style) {
- 			return memo;
+ function contextSeg(input: SegInput): SegView {
+@@ -652,8 +667,11 @@
+ 			return gitSeg(input);
+ 		case "pr":
+ 			return prSeg(input);
+-		case "subagents":
+-			return facts.subagents > 0 ? statSeg(input, facts.subagents, "agents", "statusLineSubagents") : null;
++		case "subagents": {
++			if (!facts.subagents) return null;
++			const present = getStatusLinePresentation()?.subagents;
++			return present ? present(facts.subagents) : statSeg(input, facts.subagents, "agents", "statusLineSubagents");
++		}
+ 		case "token_in":
+ 			return statSeg(input, usage.input, "input", "statusLineSpend");
+ 		case "token_out":
+@@ -682,7 +700,7 @@
+ 		case "cost":
+ 			return costSeg(input);
+ 		case "context_pct":
+-			return contextSeg(input);
++			return getStatusLinePresentation()?.context?.(facts, input.symbols, input.accent) ?? contextSeg(input);
+ 		case "context_total": {
+ 			const window = facts.context.window;
+ 			if (!window) return null;
+@@ -766,8 +784,10 @@
+ 			pieces.push({ t: name, s: lookAccent(input, "accent") });
+ 			return view(input, [span(name)], pieces, facts.pinned ? "pin" : undefined);
  		}
--		const def = plain ? PLAIN_SEPARATOR : getSeparator(style, theme);
-+		const def = plain ? (style === "none" ? { left: "", right: "" } : PLAIN_SEPARATOR) : getSeparator(style, theme);
- 		const metrics: SeparatorMetrics = {
- 			themeRef: theme,
- 			themeEpoch,
-@@ -3189,8 +3189,8 @@
- 	 *   (embedded in the editor's top border).
- 	 * - `band`: the box layout opened by a soft flush-left cap, for the band
- 	 *   composer's frameless full-width top row.
--	 * - `plain-full`: no background, no powerline caps, dot separators, gap is
--	 *   plain spaces — the standalone bottom bar for pi/borderless composers.
-+	 * - `plain-full`: no background or caps, quiet separators, and a flexible
-+	 *   space gap — the standalone bottom bar for pi/borderless composers
- 	 * - `plain-left`: left segments only (claude composer; the right group
- 	 *   lives in the editor's top rule).
- 	 * - `plain-right`: right segments only (claude composer's top rule).
-@@ -3242,7 +3242,7 @@
- 		const transparentBg = bgAnsi === TRANSPARENT_BG_ANSI;
- 		const fgAnsi = theme.getFgAnsi("text");
- 		const sepAnsi = theme.getFgAnsi("statusLineSep");
--		const subagentBadge = this.#subagentBadgeText();
-+		const subagentBadge = this.#subagentBadgeText(ctx);
+-		case "usage":
+-			return usageSeg(input);
++		case "usage": {
++			const present = getStatusLinePresentation()?.usage;
++			return present ? present(facts, input.symbols) : usageSeg(input);
++		}
+ 		case "collab": {
+ 			const collab = facts.collab;
+ 			if (!collab) return null;
+diff --git a/packages/coding-agent/src/ui/status/look.ts b/packages/coding-agent/src/ui/status/look.ts
+--- a/packages/coding-agent/src/ui/status/look.ts
++++ b/packages/coding-agent/src/ui/status/look.ts
+@@ -11,6 +11,7 @@
+ export interface TextPiece {
+ 	readonly t: string;
+ 	readonly s?: string;
++	readonly fx?: "pulse";
+ 	readonly href?: string;
+ }
  
- 		// Collect visible segment contents
- 		const leftParts: string[] = [];
-@@ -3298,8 +3298,12 @@
- 				const glance = widget ? formatJobWidgetGlance(widget.view, theme, JOBS_SEGMENT_SPARK_CELLS) : "";
- 				const count = theme.fg("statusLineSubagents", `${theme.icon.job} ${runningBackgroundJobs}`);
- 				rightParts.unshift(glance ? `${count} ${glance}` : count);
-+				rightSegIds.unshift("status");
- 			}
--			if (subagentBadge) rightParts.unshift(subagentBadge);
-+			if (subagentBadge) {
-+				rightParts.unshift(subagentBadge);
-+				rightSegIds.unshift("subagents");
-+			}
- 		}
- 		const topFillWidth = Math.max(0, width);
- 		// These arrays are local to this render; overflow handling can mutate them.
-@@ -3350,14 +3354,20 @@
- 		const totalWidth = () => leftWidth + rightWidth + minimumGapWidth();
+@@ -56,6 +57,8 @@
+ /** A segment's terminal look. */
+ export type SegLook = {
+ 	readonly pieces: readonly LookPiece[];
++	/** Width-dependent cost detail for the terminal; native spans remain complete. */
++	readonly narrowPieces?: (width: number) => readonly LookPiece[];
+ 	/** Which end gives way when the segment is cut (default `end`). */
+ 	readonly truncate?: "start" | "end";
+ 	/** Seed of the session accent (`sessionAccent` tokens). */
+diff --git a/packages/coding-agent/src/ui/status/status-line.tsx b/packages/coding-agent/src/ui/status/status-line.tsx
+--- a/packages/coding-agent/src/ui/status/status-line.tsx
++++ b/packages/coding-agent/src/ui/status/status-line.tsx
+@@ -47,6 +47,9 @@
+ /** Cells the path and the session title shrink to before they drop. */
+ const ELASTIC_MIN = 8;
  
- 		if (topFillWidth > 0) {
-+			// Activity is secondary to quota, context, and cost
-+			const badgeIndex = rightSegIds.indexOf("subagents");
-+			if (badgeIndex >= 0 && totalWidth() > topFillWidth) {
-+				right.splice(badgeIndex, 1);
-+				rightWidths.splice(badgeIndex, 1);
-+				rightSegIds.splice(badgeIndex, 1);
-+				rightWidth = groupWidth(rightWidths, rightCapWidth, rightSepWidth);
-+			}
- 			// Truncate the session-name segment before dropping right segments —
- 			// the title is the only elastic one on the right, and dropping it
- 			// wholesale left narrow bars (and the ≤76-col composer previews)
- 			// without any title.
--			const nameSegIdx = rightSegIds.indexOf("session_name");
--			if (nameSegIdx >= 0 && totalWidth() > topFillWidth) {
--				// Badge/job parts were unshifted ahead of the tracked segment ids.
--				const nameIdx = nameSegIdx + (right.length - rightSegIds.length);
-+			const nameIdx = rightSegIds.indexOf("session_name");
-+			if (nameIdx >= 0 && totalWidth() > topFillWidth) {
- 				const currentNameVW = rightWidths[nameIdx];
- 				const minNameVW = 8;
- 				const shrinkBy = Math.min(Math.max(0, currentNameVW - minNameVW), totalWidth() - topFillWidth);
-@@ -3368,12 +3378,6 @@
- 					rightWidths[nameIdx] = nameWidth;
- 				}
- 			}
--			while (totalWidth() > topFillWidth && right.length > 0) {
--				const removedWidth = rightWidths[right.length - 1];
--				right.pop();
--				rightWidths.pop();
--				rightWidth = right.length > 0 ? rightWidth - removedWidth - rightSepWidth - 2 : 0;
--			}
- 			// Shrink path before dropping left segments — path is the only elastic segment
- 			const pathIdx = leftSegIds.indexOf("path");
- 			if (pathIdx >= 0 && totalWidth() > topFillWidth) {
-@@ -3410,6 +3414,15 @@
- 					}
- 				}
- 			}
-+			// After shortening the path, drop secondary metrics before context and quota
-+			while (totalWidth() > topFillWidth && right.length > 1) {
-+				const dropIdx = rightSegIds.findIndex(id => id !== "usage" && !isContextSegment(id));
-+				if (dropIdx < 0) break;
-+				right.splice(dropIdx, 1);
-+				rightWidths.splice(dropIdx, 1);
-+				rightSegIds.splice(dropIdx, 1);
-+				rightWidth = groupWidth(rightWidths, rightCapWidth, rightSepWidth);
-+			}
- 			const leftOverflowDropIndex = (): number => {
- 				// Preserve the current working directory as long as possible. The
- 				// previous right-to-left pop could collapse a normal-width bar to
-@@ -3429,6 +3442,14 @@
- 				leftSegIds.splice(dropIdx, 1);
- 				leftWidth = left.length > 0 ? leftWidth - removedWidth - leftSepWidth - 2 : 0;
- 			}
-+			while (totalWidth() > topFillWidth && right.length > 0) {
-+				const last = rightSegIds.findLastIndex(id => id !== "usage");
-+				const dropIdx = last >= 0 ? last : right.length - 1;
-+				right.splice(dropIdx, 1);
-+				rightWidths.splice(dropIdx, 1);
-+				rightSegIds.splice(dropIdx, 1);
-+				rightWidth = groupWidth(rightWidths, rightCapWidth, rightSepWidth);
-+			}
- 		}
- 
- 		const renderGroup = (parts: string[], direction: "left" | "right"): string => {
-@@ -4053,7 +4074,7 @@
- 			if (action) props.actions = { click: action };
- 			segs.push(describeSeg(key, props, view, dim));
- 		};
--		const subagentBadge = this.#subagentCount > 0;
-+		const subagentBadge = describeSegment("subagents", ctx);
- 		leftSegments.forEach((id, index) => {
- 			if (subagentBadge && id === "subagents") return;
- 			const view = describeSegment(id, ctx);
-@@ -4061,12 +4082,7 @@
++// Keep quota and context after secondary metrics and elastic labels yield.
++const isContext = (id: StatusLineSegmentId): boolean => id === "context_pct" || id === "context_total";
++
+ /** Terminal look facts of the panel. */
+ export type StatusPanelLook = {
+ 	readonly placement: StatusPlacement;
+@@ -61,7 +64,7 @@
+ /** The bar's segments, in order, for `settings` over `facts`. */
+ export function statusSegs(settings: StatusLineSettings, facts: StatusFacts): StatusSeg[] {
+ 	const effective = effectiveStatusSettings(settings);
+-	const badge = facts.subagents > 0;
++	const badge = segmentView("subagents", facts, effective);
+ 	const collect = (ids: readonly StatusLineSegmentId[]) =>
+ 		ids.flatMap(id => {
+ 			if (badge && id === "subagents") return [];
+@@ -72,19 +75,11 @@
+ 	const right = collect(effective.rightSegments);
+ 	const badges: StatusSeg[] = [];
+ 	if (badge) {
+-		const count = `${facts.subagents}`;
+ 		badges.push({
+ 			key: "subagent-badge",
+ 			side: "right",
+ 			priority: 0,
+-			icon: "agents",
+-			spans: [{ t: count, s: "statusLineSubagents" }],
+-			look: {
+-				pieces: [
+-					{ icon: "agents", s: "statusLineSubagents" },
+-					{ t: count, s: "statusLineSubagents" },
+-				],
+-			},
++			...badge,
  		});
- 		// Live-work badges lead the right group, as in the ANSI bar; they sit on
- 		// the inner edge, so they drop before any configured segment.
--		if (subagentBadge) {
+ 	}
+ 	if (facts.jobs > 0) {
+@@ -104,27 +99,25 @@
+ 			},
+ 		});
+ 	}
+-	const rightCount = badges.length + right.length;
++	const rightCount = right.length;
+ 	const out: StatusSeg[] = [];
+ 	left.forEach(({ id, view }, index) => {
+ 		const elastic = id === "path";
+ 		out.push({
+ 			key: id,
+ 			side: "left",
+-			priority: elastic ? rightCount + left.length + 2 : rightCount + 1 + (left.length - index),
++			priority: id === "usage" ? 1002 : isContext(id) ? 1001 : elastic ? 1000 : rightCount + 1 + (left.length - index),
+ 			...(elastic ? { min: ELASTIC_MIN } : {}),
+ 			...view,
+ 		});
+ 	});
+-	badges.forEach((seg, index) => {
+-		out.push({ ...seg, priority: rightCount - index });
+-	});
++	out.push(...badges);
+ 	right.forEach(({ id, view }, index) => {
+ 		const elastic = id === "session_name";
+ 		out.push({
+ 			key: id,
+ 			side: "right",
+-			priority: elastic ? right.length + 0.5 : right.length - index,
++			priority: id === "usage" ? 1002 : isContext(id) ? 1001 : elastic ? 1000 : right.length - index,
+ 			...(elastic ? { min: ELASTIC_MIN } : {}),
+ 			...view,
+ 		});
+@@ -174,6 +167,7 @@
+ /** Terminal look facts of a bar (`omp.status`). */
+ export type StatusBarLook = {
+ 	readonly groups: "both" | "left";
++	readonly separator?: StatusLineSeparatorStyle;
+ 	/** Segments of another bar to draw (the chrome's bars borrow the panel's). */
+ 	readonly segs?: readonly UiNode[];
+ };
+@@ -245,7 +239,10 @@
+ 		"top-rule-chip": top("top-rule-chip"),
+ 	};
+ 	const bottom = (groups: StatusBarLook["groups"]): UiNode =>
+-		(<status role="omp.status" term={(): StatusBarLook => ({ groups, segs: barSegs() })} />) as UiNode;
++		(<status
++			role="omp.status"
++			term={(): StatusBarLook => ({ groups, segs: barSegs(), separator: effectiveStatusSettings(props.settings()).separator })}
++		/>) as UiNode;
+ 	const bottoms = { full: bottom("both"), left: bottom("left") };
+ 	const chrome: StatusChrome = {
+ 		composerStatus(cx, attachment, width) {
+@@ -263,7 +260,10 @@
+ 				}}
+ 				role="omp.status"
+ 				transparent={() => props.settings().transparent === true}
+-				term={(): StatusBarLook => ({ groups: props.placement().bar === "left" ? "left" : "both" })}
++				term={(): StatusBarLook => ({
++					groups: props.placement().bar === "left" ? "left" : "both",
++					separator: effectiveStatusSettings(props.settings()).separator,
++				})}
+ 			>
+ 				<For each={keys}>
+ 					{key => {
+diff --git a/packages/coding-agent/src/ui/status/composer-facts.tsx b/packages/coding-agent/src/ui/status/composer-facts.tsx
+--- a/packages/coding-agent/src/ui/status/composer-facts.tsx
++++ b/packages/coding-agent/src/ui/status/composer-facts.tsx
+@@ -45,6 +45,7 @@
+ 	context_pct: true,
+ 	context_total: true,
+ 	git: true,
++	usage: true,
+ 	tree: true,
+ };
+ const PINNED_PRIORITY = 1000;
+@@ -302,7 +303,7 @@
+ 		const settings = effectiveStatusSettings(props.settings());
+ 		const state = props.facts();
+ 		const faint = state.focusedAgentId !== undefined;
+-		const badge = state.subagents > 0;
++		const badge = segmentView("subagents", state, settings);
+ 		const segs: JSXNode[] = [];
+ 		const push = (
+ 			key: string,
+@@ -338,11 +339,7 @@
+ 		};
+ 		collect("left", settings.leftSegments);
+ 		// Live-work badges lead the right group: on its inner edge, they drop before any configured segment.
+-		if (badge)
 -			push("subagent-badge", "right", 0, {
--				spans: [{ t: `${this.#subagentCount}`, s: "statusLineSubagents" }],
+-				spans: [{ t: `${state.subagents}`, s: "statusLineSubagents" }],
 -				icon: "agents",
 -			});
--		}
-+		if (subagentBadge) push("subagent-badge", "right", 0, subagentBadge);
- 		const runningBackgroundJobs = this.runningBackgroundJobCount();
- 		if (runningBackgroundJobs > 0) {
- 			push("jobs", "right", 0, {
-diff --git a/packages/tui/src/status-line/metrics.ts b/packages/tui/src/status-line/metrics.ts
---- a/packages/tui/src/status-line/metrics.ts
-+++ b/packages/tui/src/status-line/metrics.ts
-@@ -1,5 +1,6 @@
- import { formatNumber, normalizePremiumRequests } from "@oh-my-pi/pi-utils";
- import type { Theme } from "../theme";
-+import { getStatusLinePresentation } from "./presentation";
++		if (badge) push("subagent-badge", "right", 0, badge);
+ 		if (state.jobs > 0)
+ 			push("jobs", "right", 0, { spans: [{ t: `${state.jobs}`, s: "statusLineSubagents" }], icon: "job" });
+ 		collect("right", settings.rightSegments);
+diff --git a/packages/coding-agent/src/ui/styles/status/status-line.ts b/packages/coding-agent/src/ui/styles/status/status-line.ts
+--- a/packages/coding-agent/src/ui/styles/status/status-line.ts
++++ b/packages/coding-agent/src/ui/styles/status/status-line.ts
+@@ -101,7 +101,11 @@
+ 	}
  
- export { normalizePremiumRequests } from "@oh-my-pi/pi-utils";
- 
-@@ -12,6 +13,8 @@
- 	readonly pricingPeriod?: "peak" | "off-peak";
- 	/** Subagent-tree spend, rendered `(+…)` after the session's own spend; `cost` excludes it. */
- 	readonly subagentCost?: number;
-+	/** Available row width, or zero when the native host owns layout */
-+	readonly availableWidth?: number;
- 	readonly advisor?: {
- 		readonly cost: number;
- 		readonly usingSubscription: boolean;
-@@ -57,6 +60,8 @@
-  * amounts billed the same way render bare.
-  */
- export function formatBillingSummary(options: BillingSummaryOptions, uiTheme: Theme): string | undefined {
-+	const formatter = getStatusLinePresentation()?.billingSummary;
-+	if (formatter) return formatter(options, uiTheme);
- 	const premiumRequests = normalizePremiumRequests(options.premiumRequests);
- 	const advisorCost = options.advisor?.cost ?? 0;
- 	const subagentCost = options.subagentCost ?? 0;
+ 	piece(piece: LookPiece): string {
+-		if ("t" in piece) return this.link(this.style(piece.s, piece.t), piece.href);
++		if ("t" in piece) {
++			const pulse = piece.fx === "pulse" && !this.#cx.reduceMotion;
++			const dim = pulse && Math.floor(this.#cx.now() / 500) % 2 === 1;
++			return this.link(this.style(dim ? "muted" : piece.s, piece.t), piece.href);
++		}
+ 		if ("icon" in piece) {
+ 			const glyph = this.glyph(piece);
+ 			if (!glyph) return piece.else === undefined ? "" : this.style(piece.s, piece.else);
+@@ -159,17 +163,18 @@
+ 	/** The look at `width` cells, cut from the end it names. */
+ 	row(look: SegLook, width: number): string {
+ 		const ellipsis = this.#theme.symbols.ellipsis;
+-		const full = look.pieces.map(piece => this.piece(piece)).join("");
++		const pieces = width > 0 && width < 100 && look.narrowPieces ? look.narrowPieces(width) : look.pieces;
++		const full = pieces.map(piece => this.piece(piece)).join("");
+ 		if (visibleWidth(full) <= width) return full;
+ 		if (look.truncate !== "start") return truncate(full, width, ellipsis);
+ 		// Start-cut: the leading icons stay, the text keeps its tail (in its own style).
+ 		let lead = 0;
+-		while (lead < look.pieces.length && "icon" in look.pieces[lead]!) lead++;
+-		const prefix = look.pieces
++		while (lead < pieces.length && "icon" in pieces[lead]!) lead++;
++		const prefix = pieces
+ 			.slice(0, lead)
+ 			.map(piece => this.piece(piece))
+ 			.join("");
+-		const rest = look.pieces.slice(lead);
++		const rest = pieces.slice(lead);
+ 		const first = rest[0];
+ 		if (!first || !("t" in first)) return truncate(full, width, ellipsis);
+ 		const plain = rest.map(piece => ("t" in piece ? piece.t : "")).join("");
+@@ -195,7 +200,8 @@
+ 	const props = node.props() as { term?: StatusBarLook };
+ 	const groups = props.term?.groups ?? "both";
+ 	const segs = (props.term?.segs ?? node.children()).filter(child => child.kind === "seg");
+-	const { row, hits } = statusRow(cx, segs, { separator: separator(cx.theme), groups });
++	const sep = props.term?.separator === "none" ? "" : separator(cx.theme);
++	const { row, hits } = statusRow(cx, segs, { separator: sep, groups });
+ 	if (!row) return EMPTY_BLOCK;
+ 	return hits.length > 0 ? { rows: [row], hits } : { rows: [row] };
+ }
+diff --git a/packages/coding-agent/src/ui/styles/status/top.ts b/packages/coding-agent/src/ui/styles/status/top.ts
+--- a/packages/coding-agent/src/ui/styles/status/top.ts
++++ b/packages/coding-agent/src/ui/styles/status/top.ts
+@@ -190,7 +190,7 @@
+ 	const { theme, width } = cx;
+ 	const chip = look.attachment === "top-rule-chip";
+ 	const band = look.attachment === "top-band";
+-	const sep: Separator = chip ? { left: "·", right: "·" } : separatorOf(look.separator, theme);
++	const sep: Separator = chip && look.separator !== "none" ? { left: "·", right: "·" } : separatorOf(look.separator, theme);
+ 	const bg = look.transparent ? BG_DEFAULT : bgSgr(theme, "statusLineBg");
+ 	const caps = sep.caps && !look.transparent ? sep.caps : undefined;
+ 	const bandCap = band && caps ? theme.symbols.symbol("sep.powerlineCapLeft") : "";

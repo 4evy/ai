@@ -15,7 +15,8 @@
       "ui/keybinding-tips.patch",
       "ui/goal.patch",
       "ui/session-model.patch",
-      "ui/ribbon.patch"
+      "ui/ribbon.patch",
+      "ui/extension-views.patch"
     ],
     "sdk": [
       "ssh/ssh.patch",
@@ -23,7 +24,8 @@
       "mcp/mcp.patch",
       "ui/session-model.patch",
       "ui/ribbon.patch",
-      "ui/renderer-hooks.patch"
+      "ui/renderer-hooks.patch",
+      "ui/extension-views.patch"
     ]
   },
   "dependencies": {},
@@ -50,12 +52,12 @@
     },
     {
       "source": "overlays/ui/live-hud.ts",
-      "target": "packages/tui/src/chrome/live-hud.ts",
+      "target": "packages/coding-agent/src/ui/dock/live-hud.ts",
       "profiles": ["runtime", "sdk"]
     },
     {
       "source": "overlays/ui/status-line.ts",
-      "target": "packages/tui/src/status-line/presentation.ts",
+      "target": "packages/coding-agent/src/ui/status/presentation.ts",
       "profiles": ["runtime", "sdk"]
     },
     {

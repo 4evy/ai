@@ -1,60 +1,16 @@
+import { sanitizeStatusText } from "@oh-my-pi/pi-coding-agent/modes/view-model/chrome/shared";
+import type { StatusFacts } from "@oh-my-pi/pi-coding-agent/ui/status/facts";
 import {
-  getContextUsageLevel,
-  getContextUsageThemeColor,
-  getContextUsageTone,
-} from "@oh-my-pi/pi-tui/chrome/context-thresholds";
-import { sanitizeStatusText } from "@oh-my-pi/pi-tui/chrome/shared";
-import {
-  TRUNCATE_LENGTHS,
-  truncateToWidth,
-} from "@oh-my-pi/pi-tui/render/render-utils";
-import { SEGMENTS } from "@oh-my-pi/pi-tui/status-line/segments";
-import type {
-  SegmentContext,
-  SegmentView,
-  StatusLineSegment,
-} from "@oh-my-pi/pi-tui/status-line/types";
-import { type ThemeColor, theme } from "@oh-my-pi/pi-tui/theme";
-import {
-  getSessionAccentAnsi,
-  getSessionAccentHex,
-} from "@oh-my-pi/pi-tui/theme/session-color";
-
-type FooterSpan = {
-  t: string;
-  s?: ThemeColor;
-  fx?: "pulse";
-};
-type FooterView = Pick<SegmentView, "tone"> & { spans: FooterSpan[] };
-
-/** One presentation policy feeds both terminal renderers */
-function footerSegment(
-  id: StatusLineSegment["id"],
-  describe: (ctx: SegmentContext) => FooterView | null,
-): StatusLineSegment {
-  return {
-    id,
-    describe,
-    render(ctx) {
-      const view = describe(ctx);
-      if (!view) return { content: "", visible: false };
-      let content = "";
-      for (const part of view.spans) {
-        const color = part.fx === "pulse" && !ctx.speculationBlinkOn ? "muted" : part.s;
-        if (color === "accent" && ctx.sessionAccent !== false) {
-          const title =
-            ctx.session.sessionManager?.getSessionName() || ctx.previewTitle;
-          if (title) {
-            content += `${getSessionAccentAnsi(getSessionAccentHex(title, theme.sessionAccentInputs))}${part.t}\x1b[39m`;
-            continue;
-          }
-        }
-        content += color ? theme.fg(color, part.t) : part.t;
-      }
-      return { content, visible: true };
-    },
-  };
-}
+  contextColor,
+  contextLevel,
+  contextTone,
+} from "@oh-my-pi/pi-coding-agent/ui/status/format";
+import type { StatusLinePresentation } from "@oh-my-pi/pi-coding-agent/ui/status/presentation";
+import type { SegView } from "@oh-my-pi/pi-coding-agent/ui/status/segments";
+import { TRUNCATE_LENGTHS } from "@oh-my-pi/pi-coding-agent/utils/render-utils";
+import { truncate } from "@oh-my-pi/pi-tui/text/width";
+import type { SymbolSet } from "@oh-my-pi/pi-tui/theme/contract";
+import type { TspSpan } from "@oh-my-pi/pi-wire";
 
 function resetCountdown(value: number, unit: "m" | "h"): string {
   const boundary = unit === "m" ? 60 : 24;
@@ -65,10 +21,10 @@ function resetCountdown(value: number, unit: "m" | "h"): string {
   return remainder > 0 ? `${text} ${remainder}${unit}` : text;
 }
 
-function quotaView(ctx: SegmentContext): FooterView | null {
-  const usage = ctx.usage;
+function quotaView(facts: StatusFacts, symbols: SymbolSet): SegView | null {
+  const usage = facts.quota;
   if (!usage) return null;
-  const spans: FooterSpan[] = [];
+  const spans: TspSpan[] = [];
   const separate = () => {
     if (spans.length > 0) spans.push({ t: "   " });
   };
@@ -90,7 +46,10 @@ function quotaView(ctx: SegmentContext): FooterView | null {
       },
     );
     if (reset !== undefined) {
-      spans.push({ t: `${theme.sep.dot}${resetCountdown(reset, unit)}`, s: "muted" });
+      spans.push({
+        t: `${symbols.symbol("sep.dot")}${resetCountdown(reset, unit)}`,
+        s: "muted",
+      });
     }
   };
   if (usage.fiveHour)
@@ -117,58 +76,68 @@ function quotaView(ctx: SegmentContext): FooterView | null {
           ? "text"
           : "warning";
       spans.push({
-        t: `${theme.sep.dot}${expiring}exp ${resetCountdown(resets.expiryHours, "h")}`,
+        t: `${symbols.symbol("sep.dot")}${expiring}exp ${resetCountdown(resets.expiryHours, "h")}`,
         s: color,
       });
     } else if (resets.expired) {
       spans.push({ t: " expired", s: "error" });
     }
     if (resets.redeemableCount === 0 && resets.unavailableReason) {
-      const reason = truncateToWidth(
+      const reason = truncate(
         sanitizeStatusText(resets.unavailableReason),
         TRUNCATE_LENGTHS.SHORT,
       );
       if (reason) spans.push({ t: ` ${reason}`, s: "warning" });
     }
   }
-  return spans.length > 0 ? { spans } : null;
+  return spans.length > 0 ? { spans, look: { pieces: spans } } : null;
 }
 
-function contextView(ctx: SegmentContext): FooterView {
-  const level = getContextUsageLevel(ctx.contextPercent ?? 0, ctx.contextWindow);
-  const spans: FooterSpan[] = [
+function contextView(facts: StatusFacts, symbols: SymbolSet, accent?: string): SegView {
+  const { percent, window } = facts.context;
+  const level = contextLevel(percent ?? 0, window);
+  const spans: TspSpan[] = [
     { t: "Ctx ", s: "muted" },
-    {
-      t: ctx.contextPercent === null ? "?" : `${Math.round(ctx.contextPercent)}%`,
-      s: getContextUsageThemeColor(level),
-    },
+    { t: percent === null ? "?" : `${Math.round(percent)}%`, s: contextColor(level) },
   ];
+  const auto = symbols.icon("auto");
   if (
-    ctx.autoCompactEnabled &&
-    theme.icon.auto &&
-    (ctx.compactionSpeculation === "running" || ctx.compactionSpeculation === "armed")
+    facts.autoCompact &&
+    auto &&
+    (facts.speculation === "running" || facts.speculation === "armed")
   ) {
     spans.push({
-      t: ` ${theme.icon.auto}`,
+      t: ` ${auto}`,
       s: "accent",
-      ...(ctx.compactionSpeculation === "running" ? { fx: "pulse" as const } : {}),
+      ...(facts.speculation === "running" ? { fx: "pulse" as const } : {}),
     });
   }
-  const tone = getContextUsageTone(level);
-  return tone === undefined ? { spans } : { spans, tone };
+  const tone = contextTone(level);
+  return {
+    spans,
+    ...(tone === undefined ? {} : { tone }),
+    look: {
+      pieces: spans.map(({ t, s, fx }) => ({
+        t,
+        ...(s === undefined
+          ? {}
+          : { s: s === "accent" && accent ? "sessionAccent" : s }),
+        ...(fx === "pulse" ? { fx } : {}),
+      })),
+      ...(accent === undefined ? {} : { title: accent }),
+    },
+  };
 }
 
-const usageSegment = footerSegment("usage", quotaView);
-const contextSegment = footerSegment("context_pct", contextView);
-const subagentsSegment = footerSegment("subagents", (ctx) =>
-  ctx.subagentCount === 0
-    ? null
-    : { spans: [{ t: `Agt ${ctx.subagentCount}`, s: "statusLineSubagents" }] },
-);
-
-/** Install through the public registry, leaving billing and layout in the core */
-export function installCompactFooterSegments(): void {
-  SEGMENTS.usage = usageSegment;
-  SEGMENTS.context_pct = contextSegment;
-  SEGMENTS.subagents = subagentsSegment;
-}
+export const compactFooterSegments: Pick<
+  StatusLinePresentation,
+  "usage" | "context" | "subagents"
+> = {
+  usage: quotaView,
+  context: contextView,
+  subagents(count) {
+    if (!count) return null;
+    const spans = [{ t: `Agt ${count}`, s: "statusLineSubagents" }];
+    return { spans, look: { pieces: spans } };
+  },
+};

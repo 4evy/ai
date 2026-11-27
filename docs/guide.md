@@ -264,8 +264,8 @@ input receipts establish broker acceptance, not application acknowledgement.
 Use **Ctrl+O** to expand output and inspect retained-file paths and job
 metadata. Parse errors, truncated capture, readiness failures, and uncertain
 process state stay visible without expansion. The
-[renderers](../apps/omp/extensions/remote/jobs/render.ts) support both ordinary
-and native terminals while preserving the full model-facing output.
+[tool presenters](../apps/omp/extensions/remote/jobs/render.ts) feed the same
+view to ordinary and native terminals without changing model-facing output.
 
 Farstep management tools and Skylight retain their full arguments in the
 result card. Expand **Args** in native terminals, or expand the result in an
@@ -520,11 +520,11 @@ after changing the shared version.
 
 The [compact extension](../apps/omp/extensions/compact/index.ts) installs footer
 segments, billing and effort labels, tool previews, live HUD summaries, and
-ribbon painting. It uses OMP's checklist builder for todo cards and decorates
-the built-in Pi composer without changing its saved shape ID. Core patches
-retain native transcript framing, visual clipping, and session-owned observer
-hooks. Keep presentation policy in the extension and reuse upstream renderers
-and width bounds where they fit.
+ribbon painting. It uses the host's semantic checklist and composer shape
+hooks without changing the saved shape ID. Core patches retain transcript
+framing, visual clipping, and session-owned observer hooks. Keep presentation
+policy in the extension and reuse upstream presenters and width bounds where
+they fit.
 
 Transparent tool backgrounds belong in managed themes: set `toolPendingBg`,
 `toolSuccessBg`, and `toolErrorBg` to empty strings. Other themes retain their

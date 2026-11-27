@@ -1,17 +1,21 @@
-import type { BillingSummaryOptions } from "@oh-my-pi/pi-tui/status-line/metrics";
-import type { Theme } from "@oh-my-pi/pi-tui/theme";
+import type { StatusFacts } from "@oh-my-pi/pi-coding-agent/ui/status/facts";
+import type { Billing } from "@oh-my-pi/pi-coding-agent/ui/status/format";
+import type { SegView } from "@oh-my-pi/pi-coding-agent/ui/status/segments";
+import type { SymbolSet } from "@oh-my-pi/pi-tui/theme/contract";
 
-export interface BillingSummaryPresentation extends BillingSummaryOptions {
-  readonly availableWidth?: number;
-}
+export type BillingSummaryPresentation = Billing;
 
 /** Optional presentation policy, leaving accounting and layout with the host */
 export interface StatusLinePresentation {
   thinkingLevelLabel?: (level: string) => string;
   billingSummary?: (
     options: BillingSummaryPresentation,
-    theme: Theme,
+    symbols: SymbolSet,
+    availableWidth?: number,
   ) => string | undefined;
+  usage?: (facts: StatusFacts, symbols: SymbolSet) => SegView | null;
+  context?: (facts: StatusFacts, symbols: SymbolSet, accent?: string) => SegView;
+  subagents?: (count: number) => SegView | null;
 }
 
 let presentation: StatusLinePresentation | undefined;

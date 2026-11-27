@@ -65,8 +65,10 @@ export function registerJobTools(
       },
     }),
     jobPresentation({
-      ...scriptArguments,
-      resolveTitle: (args) => operationTitle(args, "Run"),
+      header: true,
+      command: scriptArguments.resolveCommand,
+      cwd: scriptArguments.resolveCwd,
+      title: (args) => operationTitle(args, "Run"),
     }),
   );
   registerCompiledTool(
@@ -80,9 +82,10 @@ export function registerJobTools(
       },
     }),
     jobPresentation({
-      ...scriptArguments,
-      resolveCommand: batchPreview,
-      resolveTitle: (args) => operationTitle(args, "Batch plan"),
+      header: true,
+      command: batchPreview,
+      cwd: scriptArguments.resolveCwd,
+      title: (args) => operationTitle(args, "Batch plan"),
     }),
   );
   registerCompiledTool(

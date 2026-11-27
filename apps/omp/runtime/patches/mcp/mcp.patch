@@ -73,7 +73,7 @@ diff --git a/packages/coding-agent/src/config/mcp-schema.json b/packages/coding-
 diff --git a/packages/coding-agent/src/discovery/builtin.ts b/packages/coding-agent/src/discovery/builtin.ts
 --- a/packages/coding-agent/src/discovery/builtin.ts
 +++ b/packages/coding-agent/src/discovery/builtin.ts
-@@ -196,6 +196,8 @@
+@@ -197,6 +197,8 @@
  			result.push({
  				name: serverName,
  				enabled,
@@ -106,7 +106,7 @@ diff --git a/packages/coding-agent/src/discovery/mcp-json.ts b/packages/coding-a
 diff --git a/packages/coding-agent/src/discovery/omp-plugins.ts b/packages/coding-agent/src/discovery/omp-plugins.ts
 --- a/packages/coding-agent/src/discovery/omp-plugins.ts
 +++ b/packages/coding-agent/src/discovery/omp-plugins.ts
-@@ -277,6 +277,8 @@
+@@ -263,6 +263,8 @@
  
  interface RawMcpServer {
  	enabled?: boolean;
@@ -115,7 +115,7 @@ diff --git a/packages/coding-agent/src/discovery/omp-plugins.ts b/packages/codin
  	timeout?: number;
  	requestIdFormat?: unknown;
  	instructions?: unknown;
-@@ -349,6 +351,8 @@
+@@ -335,6 +337,8 @@
  			items.push({
  				name: serverName,
  				...(cfg.enabled !== undefined && { enabled: cfg.enabled }),
@@ -127,7 +127,7 @@ diff --git a/packages/coding-agent/src/discovery/omp-plugins.ts b/packages/codin
 diff --git a/packages/coding-agent/src/extensibility/extensions/runner.ts b/packages/coding-agent/src/extensibility/extensions/runner.ts
 --- a/packages/coding-agent/src/extensibility/extensions/runner.ts
 +++ b/packages/coding-agent/src/extensibility/extensions/runner.ts
-@@ -612,6 +612,7 @@
+@@ -613,6 +613,7 @@
  });
  
  export class ExtensionRunner {
@@ -135,7 +135,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/runner.ts b/pack
  	#uiContext: ExtensionUIContext;
  	#mode: ExtensionMode = "print";
  	#toolApprovalPreviewWaiter?: (toolCallId: string) => Promise<void>;
-@@ -1976,6 +1977,7 @@
+@@ -1971,6 +1972,7 @@
  			cwd: this.cwd,
  			sessionManager: this.sessionManager,
  			modelRegistry: this.modelRegistry,
@@ -146,15 +146,15 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/runner.ts b/pack
 diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packages/coding-agent/src/extensibility/extensions/types.ts
 --- a/packages/coding-agent/src/extensibility/extensions/types.ts
 +++ b/packages/coding-agent/src/extensibility/extensions/types.ts
-@@ -93,6 +93,7 @@
+@@ -96,6 +96,7 @@
  import type { LocalProtocolOptions } from "../../internal-urls/local-protocol";
  import type { LoopLimitConfig } from "../../modes/loop-limit";
  import type { MemoryRuntimeContext } from "../../memory-backend";
 +import type { MCPManagerApi } from "../../mcp/manager";
- import type { CustomEditor } from "@oh-my-pi/pi-tui/prompt/custom-editor";
- import type { Theme } from "@oh-my-pi/pi-tui/theme";
- import type { NativeToolView } from "@oh-my-pi/pi-tui/tools/renderer";
-@@ -816,6 +817,8 @@
+ import type { AsyncJobSnapshot, SendUserMessageOptions } from "../../session/agent-session";
+ import type { EphemeralTurnOptions, EphemeralTurnResult } from "../../session/agent-session-types";
+ import type { CompactMode } from "../../session/compact-modes";
+@@ -841,6 +842,8 @@
  	sessionManager: ReadonlySessionManager;
  	/** Model registry for API key resolution */
  	modelRegistry: ModelRegistry;
@@ -1060,7 +1060,7 @@ diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/sr
 diff --git a/packages/coding-agent/src/mcp/tool-bridge.ts b/packages/coding-agent/src/mcp/tool-bridge.ts
 --- a/packages/coding-agent/src/mcp/tool-bridge.ts
 +++ b/packages/coding-agent/src/mcp/tool-bridge.ts
-@@ -347,6 +347,9 @@
+@@ -337,6 +337,9 @@
  	);
  }
  
@@ -1107,7 +1107,7 @@ diff --git a/packages/coding-agent/src/modes/components/extensions/mcp-runtime.t
 diff --git a/packages/coding-agent/src/modes/controllers/mcp-command-controller.ts b/packages/coding-agent/src/modes/controllers/mcp-command-controller.ts
 --- a/packages/coding-agent/src/modes/controllers/mcp-command-controller.ts
 +++ b/packages/coding-agent/src/modes/controllers/mcp-command-controller.ts
-@@ -916,7 +916,7 @@
+@@ -707,7 +707,7 @@
  	async #syncManagerConnection(name: string, config: MCPServerConfig): Promise<void> {
  		if (!this.ctx.mcpManager) return;
  		if (this.ctx.mcpManager.getConnectionStatus(name) !== "disconnected") return;
@@ -1116,7 +1116,7 @@ diff --git a/packages/coding-agent/src/modes/controllers/mcp-command-controller.
  		if (this.ctx.mcpManager.getConnectionStatus(name) === "connected") {
  			await this.ctx.session.refreshMCPTools(this.ctx.mcpManager.getTools());
  		}
-@@ -1745,7 +1745,7 @@
+@@ -1583,7 +1583,7 @@
  		}
  
  		const source = sources[name];
@@ -1136,7 +1136,7 @@ diff --git a/packages/coding-agent/src/sdk.ts b/packages/coding-agent/src/sdk.ts
  		// A dialog waits for the user, not the agent: the session lets the display sleep while one is open.
  		const trackUserWait: UserWaitTracker = dialog => (hasSession ? session.waitForUser(dialog) : dialog());
  		extensionRunner.setUserWaitTracker(trackUserWait);
-@@ -5589,6 +5590,7 @@
+@@ -5632,6 +5633,7 @@
  				hostMcpServerInstructions = source;
  			},
  			disconnectOwnedMcpManager: ownedMcpManager ? () => ownedMcpManager.disconnectAll() : undefined,
@@ -1147,7 +1147,7 @@ diff --git a/packages/coding-agent/src/sdk.ts b/packages/coding-agent/src/sdk.ts
 diff --git a/packages/coding-agent/src/session/agent-session-types.ts b/packages/coding-agent/src/session/agent-session-types.ts
 --- a/packages/coding-agent/src/session/agent-session-types.ts
 +++ b/packages/coding-agent/src/session/agent-session-types.ts
-@@ -437,6 +437,8 @@
+@@ -454,6 +454,8 @@
  	advisorConfigWarnings?: string[];
  	/** Disconnect the MCP manager owned by this session during disposal. */
  	disconnectOwnedMcpManager?: () => Promise<void>;
@@ -1159,7 +1159,7 @@ diff --git a/packages/coding-agent/src/session/agent-session-types.ts b/packages
 diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
 --- a/packages/coding-agent/src/session/agent-session.ts
 +++ b/packages/coding-agent/src/session/agent-session.ts
-@@ -1179,6 +1179,8 @@
+@@ -1191,6 +1191,8 @@
  	/** Settles when the open run ends or is abandoned; see {@link waitForRunEnd}. */
  	#runEnded: PromiseWithResolvers<void> | undefined;
  	#runCheckScheduled = false;
@@ -1168,15 +1168,15 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  	/** In-flight settle-callback flushes; the stranded-message drain after each may still start a loop. */
  	#settleCallbackFlushes = 0;
  	#commandMetadataChangedListeners: CommandMetadataChangedListener[] = [];
-@@ -1393,6 +1395,7 @@
+@@ -1403,6 +1405,7 @@
+ 	#onSseEvent: SimpleStreamOptions["onSseEvent"] | undefined;
  	#sideStreamFn: StreamFn;
- 	#convertToLlm: (messages: AgentMessage[]) => Message[] | Promise<Message[]>;
  	#disconnectOwnedMcpManager: (() => Promise<void>) | undefined;
 +	#disconnectMcpAtAgentEnd: (() => Promise<void>) | undefined;
  	#reloadOwnedMcpServers: (() => Promise<MCPLoadResult | undefined>) | undefined;
  	#projectScopeRefresher: (() => Promise<void>) | undefined;
  	#projectScopeRefresh: Promise<void> = Promise.resolve();
-@@ -1961,7 +1964,9 @@
+@@ -1969,7 +1972,9 @@
  		// advertise one yield schema while the runtime enforces the other, so join
  		// the transition before building the turn from a consistent contract.
  		void this.whenWorkPoolYieldSettled()
@@ -1187,7 +1187,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  				// Synchronous ownership check, atomic with the dispatch below:
  				// agent.prompt() claims streaming with no await in between, and the
  				// yield contract above mutates synchronously, so no install can
-@@ -2635,6 +2640,8 @@
+@@ -2679,6 +2684,8 @@
  			// either settles, so an async result cannot inject a prompt ahead of it.
  			isStreaming: () => this.isStreaming || this.isSessionTransitioning || this.#pendingAgentContinueCount > 0,
  			injectIdle: async delivered => {
@@ -1196,7 +1196,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  				const first = delivered[0];
  				if (!first) return;
  				// A background job may have made a prelude's first call: its guide rides the job's delivery.
-@@ -2823,6 +2830,7 @@
+@@ -2867,6 +2874,7 @@
  			skillsReloadable: config.skillsReloadable,
  		});
  		this.#disconnectOwnedMcpManager = config.disconnectOwnedMcpManager;
@@ -1204,7 +1204,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  		this.#reloadOwnedMcpServers = config.reloadOwnedMcpServers;
  		const ttsrHost: TtsrCoordinatorHost = {
  			agent: this.agent,
-@@ -4010,6 +4018,7 @@
+@@ -4060,6 +4068,7 @@
  	async #admitSubmission<T>(work: () => Promise<T>): Promise<T> {
  		this.#admittedSubmissionCount++;
  		try {
@@ -1212,7 +1212,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  			if (this.hasPendingDeferredExtensions) await this.loadDeferredExtensions();
  			return await this.#inLogContext(work);
  		} finally {
-@@ -5766,6 +5775,7 @@
+@@ -5815,6 +5824,7 @@
  		onStart?: () => void,
  	): Promise<AgentContinueOutcome> {
  		try {
@@ -1220,7 +1220,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  			// During an automatic-retry saga the primary model's selector cooldown
  			// can expire while a chain-tail fallback is still mid-backoff. Restoring
  			// the primary then would reset the retry budget and re-enter a model
-@@ -6291,7 +6301,7 @@
+@@ -6342,7 +6352,7 @@
  	 * without writing) therefore ends it here.
  	 */
  	#checkRun(): void {
@@ -1229,7 +1229,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  		if (this.isStreaming || this.#postPromptTasks.size > 0 || this.#abortUnwinds.size > 0) return;
  		if (this.#admittedSubmissionCount > 0 || this.#settleCallbackFlushes > 0) return;
  		// Transitions and `/compact` detach the agent while they abort and rebuild; the
-@@ -6317,14 +6327,55 @@
+@@ -6368,14 +6378,55 @@
  			return;
  		}
  		const end = this.#loopEnd;
@@ -1292,7 +1292,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  	}
  
  	/** Whether the latest model turn ended on its own with an answer: no error, abort, or stop mid-tool-use. */
-@@ -7055,7 +7106,7 @@
+@@ -7106,7 +7157,7 @@
  	beginDispose(): void {
  		this.#isDisposed = true;
  		for (const dispose of this.#disposers.splice(0)) dispose();
@@ -1301,7 +1301,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  		this.#modelDiscoveryAbortController.abort();
  		this.#queuedMessageDrainBlocked = false;
  		this.#usagePreflightReadyForNextModelCall = false;
-@@ -7200,7 +7251,7 @@
+@@ -7251,7 +7302,7 @@
  		try {
  			await withTimeout(
  				this.#disconnectOwnedMcpManager(),
@@ -1310,7 +1310,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  				"Timed out disconnecting owned MCP manager during dispose",
  			);
  		} catch (error) {
-@@ -7222,6 +7273,7 @@
+@@ -7273,6 +7324,7 @@
  
  	async #doDispose(options: AgentSessionDisposeOptions = {}): Promise<void> {
  		this.beginDispose();
@@ -1318,7 +1318,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  		// Stop cache warming before the drain windows below: an armed tick firing
  		// mid-dispose would issue a paid warm request and persist usage into the
  		// closing session writer.
-@@ -9996,6 +10048,10 @@
+@@ -10032,6 +10084,10 @@
  		const setupAbort = new AbortController();
  		this.#promptSetupAbortController = setupAbort;
  		try {
@@ -1329,7 +1329,7 @@ diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/codin
  			options?.onPromptAdmitted?.();
  			await this.#recovery.maybeRestoreRetryFallbackPrimary();
  			// Auto-prewalk: return from the previous task's handoff before the usage preflight checks the model,
-@@ -11270,6 +11326,8 @@
+@@ -11257,6 +11313,8 @@
  		const setupAbort = new AbortController();
  		this.#promptSetupAbortController = setupAbort;
  		try {
@@ -1355,18 +1355,24 @@ diff --git a/packages/coding-agent/src/thread/services/integrations.ts b/package
 diff --git a/packages/coding-agent/src/thread/services/mcp-remote.ts b/packages/coding-agent/src/thread/services/mcp-remote.ts
 --- a/packages/coding-agent/src/thread/services/mcp-remote.ts
 +++ b/packages/coding-agent/src/thread/services/mcp-remote.ts
-@@ -7,8 +7,8 @@
+@@ -7,8 +7,14 @@
  import type { TSchema } from "@oh-my-pi/pi-ai";
- import type { MCPToolDetails } from "@oh-my-pi/pi-tui/tools/mcp";
+ import type { MCPToolDetails } from "../../tools/details/mcp";
  import type { CustomTool } from "../../extensibility/custom-tools/types";
 -import type { MCPManagerApi, MCPToolScope } from "../../mcp/manager";
 -import type { MCPRequestOptions, MCPResource, MCPResourceReadResult, MCPResourceTemplate } from "../../mcp/types";
 +import type { MCPConnectionStatus, MCPManagerApi, MCPToolScope } from "../../mcp/manager";
-+import type { MCPRequestOptions, MCPResource, MCPResourceReadResult, MCPResourceTemplate, MCPServerConfig } from "../../mcp/types";
++import type {
++	MCPRequestOptions,
++	MCPResource,
++	MCPResourceReadResult,
++	MCPResourceTemplate,
++	MCPServerConfig,
++} from "../../mcp/types";
  import type { RemoteObject, RpcMethod } from "../rpc";
  
  /** Remote-object kind of a main-thread `MCPManager`. */
-@@ -36,6 +36,10 @@
+@@ -36,6 +42,10 @@
  	onToolsChanged: RpcMethod<[listener: () => void], () => void>;
  	onNotification: RpcMethod<[listener: McpNotificationListener], () => void>;
  	connectedServers: RpcMethod<[], string[]>;
@@ -1377,7 +1383,7 @@ diff --git a/packages/coding-agent/src/thread/services/mcp-remote.ts b/packages/
  	serverResources: RpcMethod<
  		[name: string],
  		{ resources: MCPResource[]; templates: MCPResourceTemplate[] } | undefined
-@@ -92,6 +96,22 @@
+@@ -92,6 +102,22 @@
  		return this.#remote.callSync("connectedServers");
  	}
  

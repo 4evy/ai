@@ -7,7 +7,7 @@ import type {
   BrowserLaunchOptions,
   BrowserLaunchSpec,
 } from "@oh-my-pi/pi-coding-agent/tools/browser/launch-adapter";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-pi/pi-coding-agent/tools/tool-errors";
 import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
 
 /** Keep upstream launch options intact and adapt only headed Linux launches */

@@ -1,17 +1,16 @@
 diff --git a/packages/coding-agent/src/session/model-controls.ts b/packages/coding-agent/src/session/model-controls.ts
 --- a/packages/coding-agent/src/session/model-controls.ts
 +++ b/packages/coding-agent/src/session/model-controls.ts
-@@ -341,7 +341,8 @@
+@@ -350,7 +350,7 @@
  	async setModelTemporary(
  		model: Model,
  		thinkingLevel?: ConfiguredThinkingLevel,
--		options?: { ephemeral?: boolean; prewalk?: boolean },
-+		// Records model usage by default, including ephemeral switches
-+		options?: { ephemeral?: boolean; prewalk?: boolean; recordUsage?: boolean },
+-		options?: { ephemeral?: boolean; prewalk?: boolean; metadataResolved?: boolean },
++		options?: { ephemeral?: boolean; prewalk?: boolean; metadataResolved?: boolean; recordUsage?: boolean },
  		selection: "explicit" | "automatic" = "explicit",
  		isCurrent?: () => boolean,
  	): Promise<boolean> {
-@@ -368,7 +369,10 @@
+@@ -380,7 +380,10 @@
  						? EPHEMERAL_MODEL_CHANGE_ROLE
  						: TEMPORARY_MODEL_CHANGE_ROLE,
  			);
@@ -26,7 +25,7 @@ diff --git a/packages/coding-agent/src/session/model-controls.ts b/packages/codi
 diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
 --- a/packages/coding-agent/src/session/agent-session.ts
 +++ b/packages/coding-agent/src/session/agent-session.ts
-@@ -13247,7 +13247,7 @@
+@@ -13264,7 +13264,7 @@
  	async setModelTemporary(
  		model: Model,
  		thinkingLevel?: ConfiguredThinkingLevel,
@@ -50,15 +49,15 @@ diff --git a/packages/coding-agent/src/modes/runtime-init.ts b/packages/coding-a
 diff --git a/packages/coding-agent/src/modes/controllers/extension-ui-controller.ts b/packages/coding-agent/src/modes/controllers/extension-ui-controller.ts
 --- a/packages/coding-agent/src/modes/controllers/extension-ui-controller.ts
 +++ b/packages/coding-agent/src/modes/controllers/extension-ui-controller.ts
-@@ -27,6 +27,7 @@
+@@ -29,6 +29,7 @@
  	SendUserMessageHandler,
  	TerminalInputHandler,
  } from "../../extensibility/extensions";
 +import { runExtensionSetModel } from "../../extensibility/extensions/compact-handler";
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
- import { cfgExtensionAssistantTextRenderers } from "../../extensibility/settings";
- import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
-@@ -284,12 +285,7 @@
+ import { extensionLinkClicksAvailable } from "../../extensibility/extensions/link-clicks";
+ import type { ExtensionUiHost } from "../../extensibility/extensions/render-types";
+@@ -338,12 +339,7 @@
  			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
  			getAllTools: () => this.ctx.session.getAllToolInfos(),
  			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
@@ -71,20 +70,6 @@ diff --git a/packages/coding-agent/src/modes/controllers/extension-ui-controller
 +			setModel: (model, options) => runExtensionSetModel(this.ctx.session, model, options),
  			getThinkingLevel: () => this.ctx.session.thinkingLevel,
  			setThinkingLevel: level => this.ctx.session.setThinkingLevel(level),
- 			getServiceTiers: () => this.ctx.session.serviceTierByFamily,
-@@ -509,12 +505,7 @@
- 			getActiveTools: () => this.ctx.session.getEnabledToolNames(),
- 			getAllTools: () => this.ctx.session.getAllToolInfos(),
- 			setActiveTools: toolNames => this.ctx.session.setActiveToolsByName(toolNames),
--			setModel: async model => {
--				const key = await this.ctx.session.modelRegistry.getApiKey(model);
--				if (!key) return false;
--				await this.ctx.session.setModel(model);
--				return true;
--			},
-+			setModel: (model, options) => runExtensionSetModel(this.ctx.session, model, options),
- 			getThinkingLevel: () => this.ctx.session.thinkingLevel,
- 			setThinkingLevel: (level, persist) => this.ctx.session.setThinkingLevel(level, persist),
  			getServiceTiers: () => this.ctx.session.serviceTierByFamily,
 diff --git a/packages/coding-agent/src/extensibility/extensions/compact-handler.ts b/packages/coding-agent/src/extensibility/extensions/compact-handler.ts
 --- a/packages/coding-agent/src/extensibility/extensions/compact-handler.ts
@@ -120,7 +105,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/compact-handler.
 diff --git a/packages/coding-agent/src/extensibility/extensions/loader.ts b/packages/coding-agent/src/extensibility/extensions/loader.ts
 --- a/packages/coding-agent/src/extensibility/extensions/loader.ts
 +++ b/packages/coding-agent/src/extensibility/extensions/loader.ts
-@@ -434,8 +434,8 @@
+@@ -439,8 +439,8 @@
  		return this.runtime.getCommands();
  	}
  
@@ -134,7 +119,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/loader.ts b/pack
 diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packages/coding-agent/src/extensibility/extensions/types.ts
 --- a/packages/coding-agent/src/extensibility/extensions/types.ts
 +++ b/packages/coding-agent/src/extensibility/extensions/types.ts
-@@ -2234,8 +2234,11 @@
+@@ -2257,8 +2257,11 @@
  	/** Get available slash commands in the current session. */
  	getCommands(): SlashCommandInfo[];
  
@@ -148,7 +133,7 @@ diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packa
  
  	/** Get current thinking level. */
  	getThinkingLevel(): ThinkingLevel | undefined;
-@@ -2486,7 +2489,7 @@
+@@ -2511,7 +2514,7 @@
  
  export type SetActiveToolsHandler = (toolNames: string[]) => Promise<void>;
  
@@ -169,7 +154,7 @@ diff --git a/packages/coding-agent/src/modes/acp/acp-agent.ts b/packages/coding-
  import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
  import { parseSkillInvocation } from "../../extensibility/skills";
  import { PYTHON_KERNEL_CANCEL_BUDGET_MS } from "../../eval/py/kernel";
-@@ -3334,14 +3334,7 @@
+@@ -3336,14 +3336,7 @@
  				getAllTools: () => record.session.getAllToolInfos(),
  				setActiveTools: toolNames => record.session.setActiveToolsByName(toolNames),
  				getCommands: () => getSessionSlashCommands(record.session),

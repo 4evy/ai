@@ -1,419 +1,271 @@
-diff --git a/packages/tui/src/chat/read-tool-group.ts b/packages/tui/src/chat/read-tool-group.ts
---- a/packages/tui/src/chat/read-tool-group.ts
-+++ b/packages/tui/src/chat/read-tool-group.ts
-@@ -3,6 +3,7 @@
- import { type Component } from "../tui";
- import { Container } from "../tui";
- import { Text } from "../components/text";
-+import { Box } from "../components/box";
- import { getLanguageFromPath, theme, type ThemeColor } from "../theme";
- import { parseLineRanges, selectorLineRanges } from "../tools/line-ranges";
- import {
-@@ -21,9 +22,9 @@
- 	PREVIEW_LIMITS,
- 	shortenPath,
- } from "../render/render-utils";
--import { fileHyperlink, renderCodeCell, renderMarkdownCell, urlHyperlinkAlways } from "../render";
-+import { fileHyperlink, renderCodeCell, renderMarkdownCell, renderOutputBlock, urlHyperlinkAlways } from "../render";
- import { wrapTreeLine } from "../render/hanging-wrap";
--import { wrapTextWithAnsi } from "../utils";
-+import { truncateToWidth, wrapTextWithAnsi } from "../utils";
- import { canonicalizeMessage } from "./thinking-display";
- import { internalUrlSchemeSpec, splitUrlScheme } from "../tools/url-scheme-host";
- import { SpotlightNotices } from "./spotlight";
-@@ -405,6 +406,7 @@
- 	#presented: boolean;
- 	#expanded = false;
- 	#toolActivityVisible = true;
-+	#allocation = Infinity;
- 	#showContentPreview: boolean;
- 	// A read group accretes entries across multiple assistant completions for as
- 	// long as the run of reads is uninterrupted. It remains active while its
-@@ -439,7 +441,21 @@
- 	 * read is a row of its own; hidden draws nothing.
- 	 */
- 	override render(width: number): readonly string[] {
--		if (!this.#toolActivityVisible) return [];
-+		if (!this.#toolActivityVisible || this.#allocation === 0) return [];
-+		const lines = this.#renderPresentation(width);
-+		if (lines.length <= this.#allocation) return lines;
-+		const title =
-+			this.#text.render(Math.max(1, width - 4))[0]?.trimStart() ??
-+			`Read ${this.#formatPathValue(this.#entries.values().next().value?.path ?? "…")}`;
-+		if (this.#allocation === 1) return [truncateToWidth(title, width)];
-+		return renderOutputBlock({ header: title, width, applyBg: false }, theme);
-+	}
-+
-+	setTranscriptAllocation(rows: number): void {
-+		this.#allocation = Math.max(0, Math.trunc(rows));
-+	}
-+
-+	#renderPresentation(width: number): readonly string[] {
- 		const entries = [...this.#entries.values()];
- 		const drawn = entries.map(entry => entry.presentation.draw());
- 		if (drawn.every(shown => shown.mode === "full")) return super.render(width);
-@@ -750,8 +766,8 @@
+diff --git a/packages/coding-agent/src/ui/styles/tools/block.ts b/packages/coding-agent/src/ui/styles/tools/block.ts
+--- a/packages/coding-agent/src/ui/styles/tools/block.ts
++++ b/packages/coding-agent/src/ui/styles/tools/block.ts
+@@ -21,7 +21,8 @@ import { truncate } from "@oh-my-pi/pi-tui/text/width";
+ import { SPINNER_INTERVAL_MS } from "@oh-my-pi/pi-tui/term/painters/spinner";
+ import { imageLabel, paintImage } from "@oh-my-pi/pi-tui/term/painters/image";
+ import { terminalPaddingX } from "../terminal-padding";
+-import { tint, tintRow } from "./default";
++import { toolBorder } from "./default";
++import { frameRows } from "./frame";
+ import { imageLink, resultPictures } from "./file-common";
+ import { lookFor, type ToolProps, toolProps } from "./look";
+ 
+@@ -105,9 +106,7 @@ function paintAllocated(node: UiNode, cx: PaintContext, rows: number): Block {
+ 		return {
+ 			rows: [truncate(`${compactGlyph(node, props, cx, true)} ${text}`, cx.width)],
+ 		};
+-	return {
+-		rows: [truncate(`${theme.fg("dim", "╭─")} ${text}`, cx.width), theme.fg("dim", "╰")],
+-	};
++	return { rows: frameRows(theme, cx.width, { head: text, sections: [] }) };
+ }
+ 
+ /** An extension presenter's compact presentation: glyph and label (or the summary), then its rows. */
+@@ -182,10 +181,9 @@ function paintLookRows(node: UiNode, cx: PaintContext): Block {
+ 	// A look that does not animate draws its still frame in the transcript (its spinner never ticks there).
+ 	const still = look.animated || look.clocked ? cx : withContext(cx, { reduceMotion: true });
+ 	if (look.boxed) {
+-		const inner = look.paint(node, withContext(still, { width: Math.max(1, cx.width - 2) }));
++		const inner = look.paint(node, withContext(still, { width: Math.max(1, cx.width - 4) }));
+ 		if (inner.rows.length === 0) return EMPTY_BLOCK;
+-		const key = tint(toolProps(node));
+-		const rows = ["", ...inner.rows.map(row => ` ${row}`), ""].map(row => tintRow(cx.theme, key, row, cx.width));
++		const rows = frameRows(cx.theme, cx.width, { sections: [{ lines: inner.rows }], border: toolBorder(toolProps(node)) });
+ 		return { rows };
  	}
+ 	const paddingX = look.inset ? terminalPaddingX() : 0;
+diff --git a/packages/coding-agent/src/ui/styles/tools/default.ts b/packages/coding-agent/src/ui/styles/tools/default.ts
+--- a/packages/coding-agent/src/ui/styles/tools/default.ts
++++ b/packages/coding-agent/src/ui/styles/tools/default.ts
+@@ -19,7 +19,7 @@ import type { Theme } from "@oh-my-pi/pi-tui/theme/contract";
+ import { argsSummaryCells, visibleArgKeys } from "../../tools/args";
+ import { ansiLines } from "@oh-my-pi/pi-tui/term/painters/ansi";
+ import { resultPictures } from "./file-common";
+-import { expandHint, isActive, moreLinesHint, statusGlyph } from "./frame";
++import { expandHint, frameInner, frameRows, isActive, moreLinesHint, statusGlyph } from "./frame";
+ import { jsonTreeRows } from "./json-tree";
+ import { defineToolLook, isExpanded, type ToolProps, toolProps } from "./look";
  
- 	/**
--	 * The read run as one inline `tool` on terminals that list the kind, else
--	 * the fallback: a bare `card` (role `omp.tool.read`) with `Read <path>` or
-+	 * The read run as one framed `tool` on terminals that list the kind, else
-+	 * the fallback: a `card` (role `omp.tool.read`) with `Read <path>` or
- 	 * `Read (N)` in the head, a `list` of path items (status tone, link,
- 	 * correction and conflict detail, nested usage) and a clamped preview per
- 	 * read when content previews are on. Compact reads become rows of their
-@@ -791,7 +807,7 @@
- 	}
+@@ -59,6 +59,7 @@ export interface DefaultCard {
+ 	readonly titleColor?: string;
+ 	/** Background key of the tint (none: untinted). */
+ 	readonly tint?: string;
++	readonly border?: string;
+ 	readonly args?: unknown;
+ 	readonly expanded: boolean;
+ 	/** Body nodes: `ansi` output, `text` notes. */
+@@ -125,18 +126,16 @@ function bodyRows(card: DefaultCard, theme: Theme, content: number): string[] {
+ 	return rows;
+ }
  
- 	/**
--	 * The data-first read (§7.3 read, read group, read error): one inline
-+	 * The data-first read (§7.3 read, read group, read error): one framed
- 	 * `tool` (role `omp.tool.read`). One file: `Read path:13-36`, a failure's
- 	 * message in the head. Several: `Read 3 files` over one 22px row per file
- 	 * (glyph, dim dir, strong name, range). Each content preview is numbered
-@@ -854,7 +870,7 @@
- 				title: "Read",
- 				status,
- 				tone: status === "error" ? "error" : undefined,
--				frame: "inline",
-+				frame: "card",
- 				collapsible,
- 				collapsed: collapsible ? !entries.some(entry => entry.expanded) : undefined,
- 				preview: collapsible ? TRIMMED_BODY_PREVIEW : undefined,
-@@ -1029,8 +1045,8 @@
- 		return card(
- 			{
- 				role: "omp.tool.read",
--				// A group is plain rows: the per-file previews are the only frames.
--				variant: "bare",
-+				// Per-file previews keep their own frames without a second group outline
-+				variant: previews.length > 0 ? "bare" : undefined,
- 				status,
- 				tone: status === "error" ? "error" : status === "running" ? "pending" : undefined,
- 				head,
-@@ -1072,6 +1088,17 @@
- 		return text([span(plainText(line), "dim")], { wrap: "word", key, role: "omp.usage" });
- 	}
- 
-+	/** Frame summaries independently so rich previews keep their existing borders */
-+	#addSummary(): void {
-+		const summary = new Box(1, 0, undefined, {
-+			chars: theme.boxRound,
-+			color: line => theme.fg("dim", line),
-+		});
-+		summary.setIgnoreTight(true);
-+		summary.addChild(this.#text);
-+		this.addChild(summary);
-+	}
+-/** The rows of a generic card at `width`: padded by one cell and one row, tinted. */
++/** Stroke of a generic or extension tool frame */
++export function toolBorder(props: ToolProps): string {
++	return props.status === "error" && props.tone !== "info" ? "error" : "dim";
++}
 +
- 	#updateDisplay(): void {
- 		this.#displayVersion++;
- 		const entries = [...this.#entries.values()].filter(entry => entry.presentation.shown.mode === "full");
-@@ -1086,7 +1113,7 @@
++/** The rows of a generic card at `width`. */
+ export function defaultCardRows(theme: Theme, card: DefaultCard, width: number): string[] {
+-	const content = Math.max(1, width - 2);
++	const content = Math.max(1, frameInner(width));
+ 	const head = `${card.glyph} ${theme.fg(card.titleColor ?? "accent", card.title)}`;
+-	const lines = [head, ...bodyRows(card, theme, content)];
+-	const rows = [tintRow(theme, card.tint, "", width)];
+-	for (const line of lines) {
+-		for (const row of line === "" ? [""] : wrap(line, content))
+-			rows.push(tintRow(theme, card.tint, ` ${row}`, width));
+-	}
+-	rows.push(tintRow(theme, card.tint, "", width));
+-	return rows;
++	return frameRows(theme, width, { head, sections: [{ lines: bodyRows(card, theme, content) }], border: card.border, bg: card.tint });
+ }
  
- 		if (displayRows.length === 0) {
- 			this.#text.setText(` ${theme.format.bullet} ${theme.fg("toolTitle", theme.bold("Read"))}`);
--			this.addChild(this.#text);
-+			this.#addSummary();
- 			return;
- 		}
+ function paintDefault(node: UiNode, cx: PaintContext): Block {
+@@ -150,7 +149,7 @@ function paintDefault(node: UiNode, cx: PaintContext): Block {
+ 				glyph: statusGlyph(node, cx),
+ 				title: styledText(cx.theme, props.title),
+ 				titleColor: props.tone === "info" ? "muted" : "accent",
+-				tint: tint(props),
++				border: toolBorder(props),
+ 				args: props.term?.args,
+ 				expanded: isExpanded(props),
+ 				body: drawnPictures.length > 0 ? children.filter(child => !drawnPictures.includes(child)) : children,
+diff --git a/packages/coding-agent/src/ui/styles/tools/legacy.ts b/packages/coding-agent/src/ui/styles/tools/legacy.ts
+--- a/packages/coding-agent/src/ui/styles/tools/legacy.ts
++++ b/packages/coding-agent/src/ui/styles/tools/legacy.ts
+@@ -9,7 +9,8 @@ import type { Block, PaintContext } from "@oh-my-pi/pi-tui/term/paint";
+ import { EMPTY_BLOCK } from "@oh-my-pi/pi-tui/term/paint";
+ import { paintRows } from "../../extensions/render-output";
+ import type { LegacyTerm, ToolRenderPart } from "../../tools/legacy";
+-import { tint, tintRow } from "./default";
++import { toolBorder } from "./default";
++import { frameInner, frameRows } from "./frame";
+ import { defineToolLook, toolProps } from "./look";
  
-@@ -1099,7 +1126,7 @@
- 				const usageRows = this.#usageRowsBySummaryRow(displayRows).get(0) ?? [];
- 				this.#appendUsageRows(lines, usageRows, "   ");
- 				this.#text.setText(lines.join("\n"));
--				this.addChild(this.#text);
-+				this.#addSummary();
- 			}
- 			for (const entry of this.#previewEntriesForRow(row)) {
- 				this.#addContentPreview(entry);
-@@ -1119,7 +1146,7 @@
- 		}
+ /** The rows of a tool's drawn parts at `width`. */
+@@ -22,12 +23,11 @@ export function legacyPartRows(cx: PaintContext, parts: readonly ToolRenderPart[
+ function paintLegacy(node: UiNode, cx: PaintContext): Block {
+ 	const term = toolProps(node).term as Partial<LegacyTerm> | undefined;
+ 	const width = cx.width;
+-	const inner = term?.boxed ? Math.max(1, width - 2) : width;
++	const inner = term?.boxed ? Math.max(1, frameInner(width)) : width;
+ 	const lines = legacyPartRows(cx, term?.parts ?? [], inner);
+ 	if (lines.length === 0) return EMPTY_BLOCK;
+ 	if (!term?.boxed) return { rows: lines };
+-	const key = tint(toolProps(node));
+-	return { rows: ["", ...lines.map(line => ` ${line}`), ""].map(row => tintRow(cx.theme, key, row, width)) };
++	return { rows: frameRows(cx.theme, width, { sections: [{ lines }], border: toolBorder(toolProps(node)) }) };
+ }
  
- 		this.#text.setText(lines.join("\n"));
--		this.addChild(this.#text);
-+		this.#addSummary();
+ defineToolLook("legacy", { paint: paintLegacy });
+diff --git a/packages/coding-agent/src/ui/styles/transcript/read-group.ts b/packages/coding-agent/src/ui/styles/transcript/read-group.ts
+--- a/packages/coding-agent/src/ui/styles/transcript/read-group.ts
++++ b/packages/coding-agent/src/ui/styles/transcript/read-group.ts
+@@ -1,5 +1,5 @@
+ /**
+- * `read-group`: a run of reads with the standard prose inset. No read yet:
++ * `read-group`: a run of reads with a framed summary. No read yet:
+  * `• Read`. One read: `✔ Read src/a.ts:1-20` (status glyph, accent path) with
+  * usage indented below. Several: `• Read (2)` over a branch tree of rows
+  * (dim directory, colored file name, muted selectors, a status glyph unless
+@@ -24,7 +24,7 @@ import {
+ } from "../../transcript/read-group";
+ import { codeCellRows, markdownCellRows } from "../tools/code-cell";
+ import { fileLink, webLink } from "../tools/file-common";
+-import { frameInner, hangingWrap, statusIcon } from "../tools/frame";
++import { frameInner, frameRows, hangingWrap, statusIcon } from "../tools/frame";
+ import { defineToolLook, toolProps } from "../tools/look";
+ import { pathText } from "../tools/search";
  
- 		for (const entry of entries) {
- 			if (this.#shouldRenderPreview(entry)) {
-diff --git a/packages/tui/src/chat/tool-execution.ts b/packages/tui/src/chat/tool-execution.ts
---- a/packages/tui/src/chat/tool-execution.ts
-+++ b/packages/tui/src/chat/tool-execution.ts
-@@ -49,7 +49,7 @@
- 	toolRenderers,
- } from "../tools/index";
- import { describeDefaultToolExecution, formatDefaultToolExecution } from "../tools/default-renderer";
--import { card, col, EMPTY_NODE, node, span, text, withHidden } from "../native/describe";
-+import { card, EMPTY_NODE, node, span, text, withHidden } from "../native/describe";
- import {
- 	type DescribeContext,
- 	type NativeChild,
-@@ -75,7 +75,13 @@
- 	resolveImageOptions,
- } from "../render/render-utils";
- import type { ToolCommandMountedState } from "../tools/tool-commands";
--import { isFramedBlockComponent, markFramedBlockComponent, renderStatusLine, WidthAwareText } from "../render/index";
-+import {
-+	isFramedBlockComponent,
-+	markFramedBlockComponent,
-+	renderOutputBlock,
-+	renderStatusLine,
-+	WidthAwareText,
-+} from "../render/index";
- import { cachedPngConversion, convertImageToPngShared, imagePayloadKey } from "../png-conversion";
- import { FenceFigure } from "./fence-figure";
- import { SpotlightNotices } from "./spotlight";
-@@ -451,8 +457,7 @@
- 	#shellStreamTick = 0;
- 	#contentBox: Box; // Used for custom tools and bash visual truncation
- 	#contentText: WidthAwareText; // Generic fallback (no custom/built-in renderer)
--	// Which container the constructor mounted: bespoke/built-in renderers use
--	// #contentBox, everything else the generic #contentText fallback.
-+	// Bespoke renderers populate #contentBox directly, otherwise it holds #contentText
- 	#usesContentBox = false;
- 	#multiFileBoxes: (Box | Spacer)[] = []; // Extra boxes for multi-file edit results
- 	#imageComponents: Image[] = [];
-@@ -485,9 +490,7 @@
- 	// previews, and Kitty PNG conversions. Folded into the dirty key so those
- 	// updates are not swallowed by the memo (see #updateDisplay).
- 	#displayInputVersion = 0;
--	// Set once #rebuildDisplay has populated the display. Replaces a
--	// #contentBox.children.length probe so the memo fast-path also covers the
--	// #contentText fallback path (which leaves #contentBox empty).
-+	// Set once #rebuildDisplay has populated either renderer path
- 	#displayBuilt = false;
- 	// Number of Image children the last rebuild emitted. Only when this is > 0 does
- 	// the memo key fold in viewport-dependent image sizing (resolveImageOptions),
-@@ -635,24 +638,16 @@
- 		this.#editMode = resolveEditModeForTool(toolName, tool);
- 		if (this.#editMode) this.#previewReady = Promise.withResolvers<void>();
- 
--		// Always create both - contentBox for custom tools/bash/tools with renderers, contentText for other built-ins.
--		// paddingY is 1 so background-tinted blocks (custom/extension tools and the
--		// generic fallback) get top/bottom breathing room. TranscriptContainer
--		// strips PLAIN-blank edges, so framed/minimal blocks (no bg set) drop these
--		// lines and keep their tight spacing — only tinted lines survive.
--		this.#contentBox = new Box(0, 1);
--		this.#contentText = new WidthAwareText(contentWidth => this.#renderDefaultCard(contentWidth), 1, 1);
-+		// Share the native Box outline without nesting a second frame around rich renderers
-+		this.#contentBox = new Box(0, 0);
-+		this.#contentText = new WidthAwareText(contentWidth => this.#renderDefaultCard(contentWidth), 0, 0);
- 
- 		// Use Box for custom tools or built-in tools with rich renderers.
- 		const hasCustomRenderer = !!(tool?.renderCall || tool?.renderResult);
- 		this.#usesContentBox = hasCustomRenderer || this.#renderer !== undefined;
--		if (this.#usesContentBox) {
--			this.addChild(this.#contentBox);
--		} else {
--			this.addChild(this.#contentText);
+@@ -124,20 +124,19 @@ function paintReadGroup(node: UiNode, cx: PaintContext): Block {
+ 		};
+ 	}
+ 	const bullet = theme.symbols.symbol("format.bullet");
+-	const pad = " ".repeat(terminalPaddingX());
+-	const indent = `${pad}  `;
++	const content = Math.max(1, frameInner(width));
++	const summary = (head: string, lines: readonly string[] = []) => frameRows(theme, width, { head, sections: [{ lines }] });
++	const indent = "  ";
+ 	const previews = (term.previews ?? []).flatMap(preview => previewRows(cx, preview, width));
+-	if (!term.count) return { rows: wrap(`${pad}${bullet} ${title(cx)}`, width) };
++	if (!term.count) return { rows: summary(`${bullet} ${title(cx)}`) };
+ 	if (term.count === 1) {
+-		const rows: string[] = [];
+ 		const single = term.single;
+-		if (single) {
+-			rows.push(...wrap(`${pad}${glyph(cx, single.status)} ${title(cx)} ${headPath(cx, single)}`.trimEnd(), width));
+-			for (const usage of single.usage) rows.push(...wrap(theme.fg("dim", indent + usage), width));
 -		}
--		// Tool blocks are visually distinct cards (background-tinted or framed),
--		// so keep their horizontal padding even when the user enables tight layout.
-+		if (!this.#usesContentBox) this.#contentBox.addChild(this.#contentText);
-+		this.addChild(this.#contentBox);
-+		// Keep card padding independent of tight transcript layout
- 		this.setIgnoreTight(true);
- 
- 		this.#updateSpinnerAnimation();
-@@ -1460,14 +1455,13 @@
- 		const late = this.#lateDiagnosticsParts();
- 		const body: NativeChild[] = [...(view.body ?? []), ...this.#nativeResultImages(view.body)];
- 		if (late.section) body.push(late.section);
--		const inline = view.inline === true;
- 		const hasBody = body.length > 0;
- 		const ms = this.#elapsedMs(status);
- 		const live = status === "running" || status === "pending";
- 		const intent = isRecord(this.#args) ? this.#args[INTENT_FIELD] : undefined;
- 		const badges = [...(head?.badges ?? []), ...(late.chip ? [late.chip] : [])];
- 		const title: TspText = head?.title ?? (head ? this.#toolLabel : (view.head ?? this.#toolLabel));
--		const preview = view.preview ?? (inline ? "none" : { lines: DEFAULT_TERMINAL_PREVIEW_LINES });
-+		const preview = view.preview ?? (view.inline ? "none" : { lines: DEFAULT_TERMINAL_PREVIEW_LINES });
- 		return node(
- 			"tool",
- 			{
-@@ -1489,7 +1483,7 @@
- 				age: live ? ms : undefined,
- 				took: live ? undefined : ms,
- 				intent: typeof intent === "string" && intent ? plainText(toolIntentLabel(intent)) : undefined,
--				frame: inline ? "inline" : "card",
-+				frame: "card",
- 				collapsible: hasBody,
- 				collapsed: hasBody ? this.#nativeCollapsed(status, view) : undefined,
- 				preview: hasBody ? (preview === "auto" ? { lines: DEFAULT_TERMINAL_PREVIEW_LINES } : preview) : undefined,
-@@ -1550,7 +1544,6 @@
- 			...(late.section ? [late.section] : []),
- 		];
- 		const role = `omp.tool.${this.#toolName}`;
--		if (view.inline) return col(children, { role });
- 		const hasBody = children.length > 1;
- 		return card(
- 			{
-@@ -1813,12 +1806,8 @@
- 			);
- 		}
- 		let lines = super.render(width);
--		if (this.#allocation < 3) {
--			// A squeezed allocation degrades only blocks that genuinely overflow it.
--			// The allocator measures blocks by trimmed height and never squeezes one
--			// below that, so inline tools whose real content is 1-2 rows (wait
--			// results, one-line receipts) keep that content instead of an equally
--			// tall but contentless frame.
-+		if (lines.length > this.#allocation) {
-+			// Keep the compact frame intact instead of clipping off its header
- 			const trimmed = trimBlankEdges(lines);
- 			if (trimmed.length > this.#allocation) return this.#renderCompact(width);
- 			lines = trimmed;
-@@ -1858,7 +1847,7 @@
- 	#renderCompact(width: number): readonly string[] {
- 		const text = this.#compactText(width);
- 		if (this.#allocation === 1) return [truncateToWidth(`${this.#compactGlyph()} ${text}`, width)];
--		return [truncateToWidth(`${theme.fg("dim", "╭─")} ${text}`, width), theme.fg("dim", "╰")];
-+		return renderOutputBlock({ header: text, width, applyBg: false }, theme);
+-		return { rows: [...rows, ...previews] };
++		return { rows: single
++			? [...summary(`${glyph(cx, single.status)} ${title(cx)} ${headPath(cx, single)}`.trimEnd(),
++				single.usage.map(usage => theme.fg("dim", usage))), ...previews]
++			: previews };
  	}
+-	const rows = wrap(`${pad}${bullet} ${title(cx)}${theme.fg("dim", ` (${term.count})`)}`, width);
++	const rows: string[] = [];
+ 	const tree = term.tree ?? [];
+ 	const branch = theme.symbols.symbol("tree.branch");
+ 	const last = theme.symbols.symbol("tree.last");
+@@ -154,12 +153,12 @@ function paintReadGroup(node: UiNode, cx: PaintContext): Block {
+ 				`${indent}${theme.fg("dim", connector)} `,
+ 				`${indent}${continuation} `,
+ 				`${status}${rowPath(cx, row)}`,
+-				width,
++				content,
+ 			),
+ 		);
+-		for (const usage of row.usage) rows.push(...wrap(theme.fg("dim", `${indent}${continuation} ${usage}`), width));
++		for (const usage of row.usage) rows.push(...wrap(theme.fg("dim", `${indent}${continuation} ${usage}`), content));
+ 	});
+-	return { rows: [...rows, ...previews] };
++	return { rows: [...summary(`${bullet} ${title(cx)}${theme.fg("dim", ` (${term.count})`)}`, rows), ...previews] };
+ }
  
- 	#activitySummary(): ToolActivitySummary {
-@@ -1915,11 +1904,7 @@
- 			return;
- 		}
+ defineToolLook("read-group", { paint: paintReadGroup, animated: true });
+diff --git a/packages/coding-agent/src/ui/transcript/read-group.tsx b/packages/coding-agent/src/ui/transcript/read-group.tsx
+--- a/packages/coding-agent/src/ui/transcript/read-group.tsx
++++ b/packages/coding-agent/src/ui/transcript/read-group.tsx
+@@ -849,7 +849,7 @@ interface GroupNodeProps {
+ }
  
--		// Non-self-framing tools (custom/extension renderers and the generic
--		// fallback) get a padded, state-tinted block — built-ins that draw their
--		// own frame opt out below via the framed-component mark. A benign skip
--		// (steering/peer interrupt aborted a still-pending call) never ran, so it
--		// gets the neutral pending tint rather than the error tint (#7199).
-+		// Preserve benign-skip state without turning interrupted pending work into an error
- 		const benignSkip = this.#isBenignSkip();
- 		const stateBgKey =
- 			this.#isPartial || benignSkip ? "toolPendingBg" : this.#result?.isError ? "toolErrorBg" : "toolSuccessBg";
-@@ -2019,11 +2004,6 @@
- 					this.#contentBox.addChild(new Text(theme.fg("toolOutput", replaceTabs(output)), 0, 0));
- 				}
- 			}
--			// Custom tools that draw their own frame (task) render flush; plain
--			// extension renderers get the padded, state-tinted block back.
--			const customFramed = this.#contentBox.children.some(isFramedBlockComponent);
--			this.#contentBox.setPaddingX(customFramed ? 0 : 1);
--			this.#contentBox.setBgFn(customFramed ? undefined : stateBgFn);
- 		} else if (this.#renderer) {
- 			// The active registry entry is a built-in tool with a rich renderer.
- 			const renderer = this.#renderer;
-@@ -2177,6 +2157,20 @@
- 			this.#refreshContentText(stateBgKey, stateBgFn);
- 		}
+ /**
+- * The reads as one inline `tool`: one file heads `Read path:13-36` (a
++ * The reads as one framed `tool`: one file heads `Read path:13-36` (a
+  * failure's message after it); several `Read N files` over a row per file
+  * and a section per previewed read.
+  */
+@@ -979,7 +979,7 @@ function GroupNode(props: GroupNodeProps): JSXNode {
+ 			name="read"
+ 			title="Read"
+ 			status={status}
+-			frame="inline"
++			frame={props.compact ? "inline" : "card"}
+ 			collapsible={collapsible}
+ 			collapsed={collapsible ? !entries.some(entry => entry.expanded) : undefined}
+ 			preview={collapsible ? TRIMMED_BODY_PREVIEW : undefined}
+@@ -991,7 +991,7 @@ function GroupNode(props: GroupNodeProps): JSXNode {
+ 			badges={head.badges}
+ 			tone={status === "error" ? "error" : undefined}
+ 			hidden={props.hidden}
+-			term={term}
++			term={{ ...term, activity: { label: "Read", detail: head.target } }}
+ 			onToggle={props.onToggle}
+ 		>
+ 			{body}
+diff --git a/packages/coding-agent/src/ui/transcript/tool-block.tsx b/packages/coding-agent/src/ui/transcript/tool-block.tsx
+--- a/packages/coding-agent/src/ui/transcript/tool-block.tsx
++++ b/packages/coding-agent/src/ui/transcript/tool-block.tsx
+@@ -674,12 +674,11 @@ export function toolNodeProps(input: ToolNodeInput): ToolNodeProps {
+ 		: undefined;
+ 	const settled = status !== "pending" && status !== "running";
+ 	const tone: TspTone | undefined = input.interruptSkip ? "info" : view?.tone;
+-	const inline = compact || view?.inline === true;
+ 	return {
+ 		name: input.name,
+ 		title: head?.title ?? view?.label ?? input.label,
+ 		status,
+-		frame: inline ? "inline" : "card",
++		frame: compact ? "inline" : "card",
+ 		collapsible,
+ 		...(input.id !== undefined ? { propKey: input.id } : {}),
+ 		role: `omp.tool.${input.name}`,
+diff --git a/packages/tui/src/term/backend.ts b/packages/tui/src/term/backend.ts
+--- a/packages/tui/src/term/backend.ts
++++ b/packages/tui/src/term/backend.ts
+@@ -607,8 +607,8 @@ export class TermBackend {
  
-+		// Plain built-ins, generic fallbacks, and extension renderers share one outline
-+		// Existing rich cards keep their own frame, and empty renderers stay invisible
-+		const framed = this.#contentBox.children.some(isFramedBlockComponent);
-+		this.#contentBox.setPaddingX(framed ? 0 : 1);
-+		this.#contentBox.setBgFn(undefined);
-+		this.#contentBox.setBorder(
-+			framed
-+				? undefined
-+				: {
-+						chars: theme.boxRound,
-+						color: line => theme.fg(this.#result?.isError && !benignSkip ? "error" : "dim", line),
-+					},
-+		);
-+
- 		// Handle images (same for both custom and built-in)
- 		for (const img of this.#imageComponents) {
- 			this.removeChild(img);
-diff --git a/packages/tui/src/chrome/transcript-container.ts b/packages/tui/src/chrome/transcript-container.ts
---- a/packages/tui/src/chrome/transcript-container.ts
-+++ b/packages/tui/src/chrome/transcript-container.ts
-@@ -899,9 +899,14 @@
- 			return drop > 0 ? output.slice(drop) : output;
- 		}
- 
--		// oxlint-disable-next-line unicorn/no-new-array -- length preallocation
--		const allocation: number[] = new Array(shown.length).fill(1);
--		let surplus = capacity - shown.length;
-+		// Reserve a closed compact frame for tools whenever the viewport can fit it
-+		const minimum = shown.map((candidate, index) =>
-+			Math.min(blocks[index]!.length, isToolActivityComponent(candidate.entry.component) ? 2 : 1),
-+		);
-+		const reserved = minimum.reduce((total, rows) => total + rows, 0);
-+		if (reserved > capacity) return this.#renderEmergency(shown, live.slice(0, unrendered), width, capacity, frame);
-+		const allocation = minimum;
-+		let surplus = capacity - reserved;
- 		// Surplus rows favor ordinary transcript blocks over dynamic tool-activity
- 		// cards (newest-first within each class), so a growing tool card collapses to
- 		// its compact form instead of clipping already-visible assistant text (#9718).
-@@ -914,7 +919,7 @@
- 		}
- 		for (const index of order) {
- 			if (surplus <= 0) break;
--			const extra = Math.min(Math.max(0, blocks[index]!.length - 1), surplus);
-+			const extra = Math.min(Math.max(0, blocks[index]!.length - allocation[index]!), surplus);
- 			allocation[index] += extra;
- 			surplus -= extra;
- 		}
-diff --git a/packages/tui/src/render/code-cell.ts b/packages/tui/src/render/code-cell.ts
---- a/packages/tui/src/render/code-cell.ts
-+++ b/packages/tui/src/render/code-cell.ts
-@@ -35,11 +35,11 @@
- 	duration?: number;
- 	output?: string;
- 	outputMaxLines?: number;
-+	/** Maximum wrapped source rows when collapsed */
- 	codeMaxLines?: number;
  	/**
--	 * Show the LAST `codeMaxLines` rows (the live streaming edge) instead of the
--	 * first, with a "… N earlier lines" marker on top. Lets a pending preview
--	 * follow code as it is written while staying bounded. Ignored when `expanded`.
-+	 * Follow the last collapsed source rows with an earlier-source affordance
-+	 * instead of showing the beginning, ignored when expanded
+ 	 * Share `capacity` rows among the live blocks `main[first + i]` (`live <= i < count`) whose rows
+-	 * overflow it, into `shown`: every active (unsettled) block keeps at least one row, the newest take
+-	 * the rest, settled blocks only what is left. When active blocks outnumber the rows the newest
++	 * overflow it, into `shown`: active blocks keep a row each, two for framed tools if they all fit.
++	 * The newest take the rest, settled blocks only what is left. When active blocks outnumber rows the newest
+ 	 * `capacity - 1` keep one each under a summary row; returns how many blocks that row stands for.
  	 */
- 	codeTail?: boolean;
- 	expanded?: boolean;
-@@ -147,7 +147,7 @@
- 	const rawCodeLines = splitTerminalOutputLines(normalizedCode);
- 	const maxCodeLines = expanded ? rawCodeLines.length : Math.min(rawCodeLines.length, codeMaxLines);
- 	const hiddenCodeLines = rawCodeLines.length - maxCodeLines;
--	const tail = options.codeTail === true && !expanded && hiddenCodeLines > 0;
-+	const tail = options.codeTail === true && !expanded;
- 	const startIndex = tail ? rawCodeLines.length - maxCodeLines : 0;
- 	const visibleCode = rawCodeLines.slice(startIndex, startIndex + maxCodeLines).join("\n");
- 	const codeLines = highlightCode(visibleCode, language);
-@@ -183,17 +183,35 @@
+ 	#allocate(
+@@ -642,12 +642,21 @@ export class TermBackend {
+ 			summary += u - lo + 1;
  		}
- 	}
- 
--	const displayCodeLines = lineNumberWidth > 0 ? numberedCodeLines : codeLines;
--	if (hiddenCodeLines > 0) {
--		const hint = formatExpandHint(theme, expanded, hiddenCodeLines > 0);
-+	// A single minified source line must not consume the whole collapsed cell
-+	const codePreview = formatOutputPaneLines(
-+		{
-+			lines: lineNumberWidth > 0 ? numberedCodeLines : codeLines,
-+			expanded,
-+			collapsedMaxLines: codeMaxLines,
-+			edge: options.codeTail ? "tail" : "head",
-+			visual: true,
-+			width: outputBlockContentWidth(width),
-+			showHiddenMarker: false,
-+		},
-+		theme,
-+	);
-+	const displayCodeLines = [...codePreview.lines];
-+	if (hiddenCodeLines > 0 || codePreview.hiddenCount > 0) {
-+		const hint = formatExpandHint(theme, expanded, true);
- 		const gutterPad = lineNumberWidth > 0 ? " ".repeat(lineNumberWidth + 1) : "";
- 		if (tail) {
- 			// Earlier rows scrolled above the live tail window — mark them on top so
- 			// the newest streamed line stays pinned to the bottom of the box.
--			const earlier = `… ${hiddenCodeLines} earlier line${hiddenCodeLines === 1 ? "" : "s"}${hint ? ` ${hint}` : ""}`;
-+			const label =
-+				codePreview.hiddenCount > 0
-+					? "Earlier source"
-+					: `… ${hiddenCodeLines} earlier line${hiddenCodeLines === 1 ? "" : "s"}`;
-+			const earlier = `${label}${hint ? ` ${hint}` : ""}`;
- 			displayCodeLines.unshift(theme.fg("dim", gutterPad + earlier));
- 		} else {
--			const moreLine = `${formatMoreItems(hiddenCodeLines, "line")}${hint ? ` ${hint}` : ""}`;
-+			const label = codePreview.hiddenCount > 0 ? "More source" : formatMoreItems(hiddenCodeLines, "line");
-+			const moreLine = `${label}${hint ? ` ${hint}` : ""}`;
- 			displayCodeLines.push(theme.fg("dim", gutterPad + moreLine));
- 		}
- 	}
+ 		let left = capacity - (summary > 0 ? 1 : 0);
+-		let owed = active.length;
++		const minimum = (index: number): number => {
++			const node = main[first + index]!;
++			return node.kind === "tool" && (node.props() as { frame?: string }).frame === "card" && shownRows(index) >= 2
++				? 2
++				: 1;
++		};
++		let framed = active.length;
++		if (summary === 0) for (const index of active) framed += minimum(index) - 1;
++		const keepFrames = summary === 0 && framed <= left;
++		let owed = keepFrames ? framed : active.length;
+ 		for (let i = count - 1, k = 0; i >= live && left > 0; i--) {
+ 			const kept = k < active.length && active[k] === i;
+ 			if (kept) {
+ 				k++;
+-				owed--;
++				owed -= keepFrames ? minimum(i) : 1;
+ 			}
+ 			const room = left - owed;
+ 			if (room <= 0) {

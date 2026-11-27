@@ -1,67 +1,32 @@
-import { plainToolCard } from "@oh-my-pi/pi-tui/render";
-import {
-  describeMCPResult,
-  type MCPToolDetails,
-  renderMCPResult,
-} from "@oh-my-pi/pi-tui/tools/mcp";
-import type { ToolRenderer, ToolRenderResult } from "@oh-my-pi/pi-tui/tools/renderer";
+import type { ToolPresenter } from "@oh-my-pi/pi-coding-agent/ui/tools/contract";
+import { mcpPresenter } from "@oh-my-pi/pi-coding-agent/ui/tools/mcp";
 import { isRecord } from "@oh-my-pi/pi-utils";
 
-// Use OMP's bounded JSON trees and expandable arguments in both renderers
-// Content and details remain untouched for the model and persisted history
-export function farstepPresentation(title: string) {
+// Use OMP's bounded JSON trees and expandable arguments without changing results
+export function farstepPresentation(title: string): { presenter: ToolPresenter } {
   const target = (input: unknown): string => {
     if (!isRecord(input)) return "";
     return [input.action, input.target ?? input.connection, input.path]
       .filter((value): value is string => typeof value === "string")
       .join(" · ");
   };
-  const views = new WeakMap<
-    ToolRenderResult<unknown>,
-    ToolRenderResult<MCPToolDetails>
-  >();
-  const viewResult = (result: ToolRenderResult<unknown>) => {
-    const cached = views.get(result);
-    if (cached) return cached;
-    const view = {
-      ...result,
-      details: {
-        ...(isRecord(result.details) ? result.details : {}),
-        serverName: "Farstep",
-        mcpToolName: title,
-      },
-    };
-    views.set(result, view);
-    return view;
-  };
+  const mcp = mcpPresenter(title);
   return {
-    renderCall: (args, options, theme) =>
-      plainToolCard(theme, () => ({
-        status: {
-          icon: options.isPartial ? "running" : "pending",
-          ...(options.spinnerFrame === undefined
-            ? {}
-            : { spinnerFrame: options.spinnerFrame }),
-          title,
-          description: target(args),
-        },
-        applyBg: false,
-      })),
-    renderResult: (result, options, theme, args) =>
-      renderMCPResult(
-        viewResult(result),
-        options,
-        theme,
-        isRecord(args) ? args : undefined,
-      ),
-    describeCall: (args) => ({ tool: { title, target: target(args) } }),
-    describeResult: (result, options, args) => ({
-      ...describeMCPResult(
-        viewResult(result),
-        options,
-        isRecord(args) ? args : undefined,
-      ),
-      tool: { title, target: target(args) },
-    }),
-  } satisfies ToolRenderer<unknown, unknown>;
+    presenter: {
+      merge: true,
+      inline: true,
+      call(args, state) {
+        const view = mcp.call?.(isRecord(args) ? args : {}, state);
+        return view && { ...view, head: { ...view.head, title, target: target(args) } };
+      },
+      result(result, state, args) {
+        const view = mcp.result?.(
+          { ...result, details: { serverName: "Farstep", mcpToolName: title } },
+          state,
+          isRecord(args) ? args : undefined,
+        );
+        return view && { ...view, head: { ...view.head, title, target: target(args) } };
+      },
+    },
+  };
 }

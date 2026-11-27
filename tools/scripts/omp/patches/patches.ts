@@ -103,6 +103,50 @@ const copyChange = Effect.fnUntraced(function* (source: string, target: string) 
   }
 });
 
+const fields = v.record(v.string(), v.unknown());
+const manifestExports = v.object({ exports: fields });
+const sourceExport = v.object({ types: v.string(), import: v.string() });
+
+const publishExports = Effect.fnUntraced(function* (
+  before: string,
+  after: string,
+  published: string,
+) {
+  yield* attempt(async () => {
+    const original = await Bun.file(before).text();
+    const patched = await Bun.file(after).text();
+    if (original === patched) return;
+
+    // npm publishes the source imports but rewrites their types to dist/types
+    const old = v.parse(manifestExports, JSON.parse(original)).exports;
+    const next = v.parse(manifestExports, JSON.parse(patched)).exports;
+    const manifest = v.parse(fields, await Bun.file(published).json());
+    const { exports } = v.parse(manifestExports, manifest);
+    for (const [key, value] of Object.entries(old)) {
+      if (JSON.stringify(next[key]) !== JSON.stringify(value))
+        throw new Error(`SDK patch changed upstream export ${key}`);
+    }
+    for (const [key, value] of Object.entries(next)) {
+      if (Object.hasOwn(old, key)) continue;
+      if (Object.hasOwn(exports, key))
+        throw new Error(`Published export already exists: ${key}`);
+      const entry = v.parse(sourceExport, value);
+      if (!/^\.\/src\/.*\.tsx?$/.test(entry.types))
+        throw new Error(`Unsupported SDK export types path: ${entry.types}`);
+      exports[key] = {
+        ...entry,
+        types: entry.types
+          .replace("./src/", "./dist/types/")
+          .replace(/\.tsx?$/, ".d.ts"),
+      };
+    }
+    await writeFile(
+      published,
+      `${JSON.stringify({ ...manifest, exports }, null, 2)}\n`,
+    );
+  });
+});
+
 const diff = Effect.fnUntraced(function* (before: string, after: string) {
   const sections: string[] = [];
   for (const file of yield* changedFiles(before, after)) {
@@ -159,6 +203,11 @@ const targetPatch = Effect.fnUntraced(function* (
   yield* attempt(() => cp(published, expected, { recursive: true }), {
     awaitOnInterrupt: true,
   });
+  yield* publishExports(
+    join(pristine, "packages", target.directory, "package.json"),
+    join(patched, "packages", target.directory, "package.json"),
+    join(expected, "package.json"),
+  );
   const oldSource = join(pristine, "packages", target.directory, "src");
   const nextSource = join(patched, "packages", target.directory, "src");
   for (const file of yield* changedFiles(oldSource, nextSource)) {

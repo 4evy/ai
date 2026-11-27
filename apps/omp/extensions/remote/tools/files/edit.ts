@@ -1,6 +1,7 @@
 import type { AgentToolResult, ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { EditTool } from "@oh-my-pi/pi-coding-agent/edit";
-import { type EditToolDetails, editToolRenderer } from "@oh-my-pi/pi-tui/tools/edit";
+import type { EditToolDetails } from "@oh-my-pi/pi-coding-agent/tools/details/edit";
+import { editToolPresenter } from "@oh-my-pi/pi-coding-agent/ui/tools/edit";
 import { remoteDefinitions } from "farstep/remote/remote";
 import { compileTool, registerCompiledTool } from "#apps/omp/lib/schema/tool";
 import type { Connections } from "../../connections/state";
@@ -66,6 +67,6 @@ export function registerEditTool(api: ExtensionAPI, { selected }: Connections) {
         };
       },
     }),
-    remoteFilePresentation(editToolRenderer),
+    remoteFilePresentation(editToolPresenter),
   );
 }

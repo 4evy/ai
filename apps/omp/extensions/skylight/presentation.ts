@@ -1,18 +1,12 @@
-import type { AgentToolResult, ToolDefinition } from "@oh-my-pi/pi-coding-agent";
-import { plainToolCard, type ToolCardSnapshot } from "@oh-my-pi/pi-tui/render";
-import {
-  describeMCPResult,
-  type MCPToolDetails,
-  renderMCPResult,
-} from "@oh-my-pi/pi-tui/tools/mcp";
+import type { MCPToolDetails } from "@oh-my-pi/pi-coding-agent/tools/details/mcp";
+import type {
+  ToolPresenter,
+  ToolResult,
+} from "@oh-my-pi/pi-coding-agent/ui/tools/contract";
+import { mcpPresenter } from "@oh-my-pi/pi-coding-agent/ui/tools/mcp";
 import { formatCount, isRecord } from "@oh-my-pi/pi-utils";
-import type { Guide } from "farstep/skylight/guides/guides";
 
-interface SkylightDetails extends MCPToolDetails {
-  topic?: Guide;
-}
-
-function outputMeta(result: AgentToolResult<SkylightDetails>): string[] {
+function outputMeta(result: ToolResult<MCPToolDetails>): string[] {
   const meta = result.details?.mcpMeta;
   const surface = meta?.["codex/toolSurface"];
   const duration = meta?.["codex/nodeReplExecutionDurationMs"];
@@ -34,43 +28,34 @@ function outputMeta(result: AgentToolResult<SkylightDetails>): string[] {
   return parts;
 }
 
-type SkylightPresentation = Pick<
-  ToolDefinition<Record<string, unknown>, SkylightDetails>,
-  "label" | "renderCall" | "renderResult" | "describeCall" | "describeResult"
->;
-
 export function skylightPresentation(
-  label: string,
+  title: string,
   target: (input: unknown) => string,
-): SkylightPresentation {
+): { label: string; presenter: ToolPresenter<unknown, MCPToolDetails> } {
+  const mcp = mcpPresenter(title);
   return {
-    label,
-    renderCall: (args, options, theme) => {
-      const snapshot = {
-        applyBg: false,
-        status: {
-          ...(options.isPartial ? { icon: "pending" } : {}),
-          title: label,
-          description: target(args),
-        },
-      } satisfies ToolCardSnapshot;
-      return plainToolCard(theme, () => snapshot);
-    },
-    renderResult: (result, options, theme, args) =>
-      renderMCPResult(result, options, theme, isRecord(args) ? args : undefined),
-    describeCall: (args) => ({
-      tool: { title: label, target: target(args) },
-    }),
-    describeResult: (result, options, args) => {
-      const view = describeMCPResult(
-        result,
-        options,
-        isRecord(args) ? args : undefined,
-      );
-      return {
-        ...view,
-        tool: { title: label, meta: outputMeta(result) },
-      };
+    label: title,
+    presenter: {
+      merge: true,
+      inline: true,
+      call(args, state) {
+        const view = mcp.call?.(isRecord(args) ? args : {}, state);
+        return view && { ...view, head: { ...view.head, title, target: target(args) } };
+      },
+      result(result, state, args) {
+        const view = mcp.result?.(result, state, isRecord(args) ? args : undefined);
+        return (
+          view && {
+            ...view,
+            head: {
+              ...view.head,
+              title,
+              target: target(args),
+              meta: outputMeta(result),
+            },
+          }
+        );
+      },
     },
   };
 }
