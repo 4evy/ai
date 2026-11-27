@@ -38,8 +38,8 @@ let
   ];
   vendorDir = craneLib.vendorMultipleCargoDeps {
     cargoLockList = [ ../../Cargo.lock ];
-    outputHashes."git+https://github.com/enigo-rs/enigo?rev=061570f04309ab5c1b68f1945d8c1ec168173e6e#061570f04309ab5c1b68f1945d8c1ec168173e6e" =
-      "sha256-R9BIMErH3mcX+8oAUzFZlB2ja1wT32KAiSribFzcGs0=";
+    outputHashes."git+https://github.com/enigo-rs/enigo?rev=bdbbb413f60c2cb82f74e10411de74e77fc56ea2#bdbbb413f60c2cb82f74e10411de74e77fc56ea2" =
+      "sha256-uLEtXo8HfdNYgOvQR18LS6KGY48kYZBIvsY+NmBlIW4=";
     overrideVendorCargoPackage =
       pkg: drv:
       if stdenv.hostPlatform.isDarwin && builtins.elem pkg.name swiftCrates then

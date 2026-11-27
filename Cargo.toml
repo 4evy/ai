@@ -38,7 +38,7 @@ dlopen2 = { version = "=0.9.0", default-features = false, features = [
   "wrapper",
 ] }
 # Stay on git until the crates.io release uses windows 0.62
-enigo = { git = "https://github.com/enigo-rs/enigo", rev = "061570f04309ab5c1b68f1945d8c1ec168173e6e", default-features = false }
+enigo = { git = "https://github.com/enigo-rs/enigo", rev = "bdbbb413f60c2cb82f74e10411de74e77fc56ea2", default-features = false }
 futures-util = "=0.3.34"
 gstreamer = "=0.25.4"
 gstreamer-app = "=0.25.2"
@@ -52,12 +52,12 @@ png = "=0.18.1"
 procfs = { version = "=0.18.0", default-features = false }
 process-wrap = { version = "=11.0.0", default-features = false }
 reis = "=0.7.1"
-rmcp = { version = "=3.11.0", default-features = false }
+rmcp = { version = "=3.12.0", default-features = false }
 rustix = "=1.1.6"
 schemars = "=1.2.3"
 scopeguard = { version = "=1.2.0", default-features = false }
-# Keep one Apple CF bridge until AXUIElement and Apple Metal support 0.12
-screencapturekit = "=11.1.2"
+# AXUIElement still needs apple-cf 0.11; 0.11.7 and 0.12.0 share a Swift bridge
+screencapturekit = "=12.0.0"
 serde = "=1.0.229"
 serde_json = "=1.0.154"
 smithay-client-toolkit = { version = "=0.21.1", default-features = false }
