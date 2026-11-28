@@ -56,7 +56,7 @@ Farstep.
 | `apps/omp/extensions/`, `apps/omp/lib/` | OMP tools, session policy, UI, adapters                                   |
 | `apps/omp/runtime/`                     | Upstream pin, maintained patches, overlays, generated npm patches         |
 | `apps/chatgpt/`                         | App integration, plugins, REPL, computer-use policy                       |
-| Other `apps/` directories               | CLI launchers, browser utilities, Ghidra integration                      |
+| Other `apps/` directories               | CLI launchers and browser utilities                                       |
 | `config/settings/`                      | Declared settings, host discovery, exports                                |
 | `tools/`                                | Recipes, maintenance scripts, Nix builds, distribution dependencies       |
 | `farstep/protocol/`                     | Shared wire contracts, schemas, limits, receipts                          |
@@ -397,8 +397,8 @@ preview package changes. See [setup.ts](../tools/scripts/setup/setup.ts).
 Build without installing with `just nix build OUTPUT --no-link`. Outputs include
 `ai-tools`, `ai-javascript`, `ai-shared`, `farstep`, `farstep-modules`,
 `farstep-javascript`, `farstep-desktop`, `farstep-service`, `farstep-sky`,
-`ai-configs`, `chatgpt`, and `ghidra-mcp`. Linux also exposes
-`farstep-extensions` and `farstep-kde-bridge`.
+`ai-configs`, and `chatgpt`. Linux also exposes `farstep-extensions` and
+`farstep-kde-bridge`.
 
 For declarative settings, import `ai.homeManagerModules.default`,
 `ai.nixosModules.default`, or `ai.darwinModules.default`. Set
@@ -409,8 +409,7 @@ settings. See [options](../tools/nix/common/common.nix) and the
 [Darwin adapter](../tools/nix/darwin/darwin.nix).
 
 Set `programs.ai.package` to replace the launcher bundle and its bundled data
-without changing the separately configurable Farstep, Ghidra, or ChatGPT
-packages.
+without changing the separately configurable Farstep or ChatGPT packages.
 
 Activation preserves undeclared writable settings. `just config generate` and
 `just config export` stage settings for inspection, not activation.
@@ -500,11 +499,6 @@ dependency of every component build.
 | Check or regenerate pinned Sky declarations | `just sky check`, `just sky sync`                                      |
 | Verify downloads or update Sky pins         | `just sky verify`, `just sky update`                                   |
 | Select a macOS ChatGPT archive              | `just nix update chatgpt --version=MAJOR.MINOR.BUILD`                  |
-| Install Ghidra on Unix                      | `ai ghidra install`                                                    |
-| Install Ghidra on Windows                   | `bun tools/scripts/cli/cli.ts ghidra install`                          |
-| Connect a Ghidra backend                    | `ai ghidra mcp headless`                                               |
-| Update Ghidra MCP                           | `just ghidra update`                                                   |
-| Update API headers                          | `just nix update ghidra-apple-api-types` or `ghidra-windows-api-types` |
 | Refresh Bun hashes or PowerShell analyzer   | `just nix update bun` or `powershell-analyzer`                         |
 | Regenerate Bun-to-Nix dependencies          | `just nix deps`                                                        |
 | Refresh flake inputs                        | `nix flake update`                                                     |
@@ -561,12 +555,12 @@ message. Inspect launcher stderr for fallback to an older cached runtime. See
 [patch maintenance](../tools/scripts/omp/patches/patches.ts) and
 [runtime launch](../tools/scripts/omp/runtime/launch.ts).
 
-Use the shared
-[`extractArchive`](../tools/scripts/archive/archive.ts) for maintenance and
-Ghidra payloads. It stages extraction before validating the single-root layout
-and moving children into the destination. Pass `false` only for flat payloads.
-ZIP extraction uses the installed archive library. Tar extraction stays native
-because the library materializes file symlinks instead of preserving them.
+Use the shared [`extractArchive`](../tools/scripts/archive/archive.ts) for
+maintenance payloads. It stages extraction before validating the single-root
+layout and moving children into the destination. Pass `false` only for flat
+payloads. ZIP extraction uses the installed archive library. Tar extraction
+stays native because the library materializes file symlinks instead of
+preserving them.
 
 The runtime profile exposes `/goal` to RPC hosts through the
 [goal patch](../apps/omp/runtime/patches/ui/goal.patch). For automatic goal
@@ -587,12 +581,20 @@ launcher environment changes. Sky archives and checksums live in
 [pins.json](../farstep/runtime/sky/runtime/pins.json). Platforms release
 independently, so a version string alone does not establish matching artifacts.
 
-Ghidra MCP is manually started in OMP with `mcp start`, selecting `ghidra`, and
-closes when its owning session finishes. Save analysis to a Ghidra project
-before backend shutdown. For bridge lifetimes and configuration, read
-[headless.sh](../apps/ghidra/mcp/headless.sh). API-type profile definitions live
-in
-[profiles.json](../apps/ghidra/extensions/profiles.json).
+Install and update Ghidra, its extensions, and its MCP servers through
+[ghidra-nix]. The `ai ghidra` commands and `programs.ai.ghidra` options have
+been removed. Use `programs.ghidra` on Linux or macOS; on Windows, run the
+Linux tools in WSL. For macOS shared-cache images, use `ipsw dyld extract`
+and import the resulting Mach-O in Ghidra.
+
+Use the `ghidra-*` AI client launchers from [ghidra-nix]. For OMP's
+Ghidra-backed `read` and `dsm`, use `ghidra-omp` from a revision with native
+runtime selection; older launchers only configure MCP. To use the MCP server
+in ordinary clients, set `programs.ai.host.ghidraBridge` to
+`programs.ghidra.ai.enabledServers.ghidra.command` from a configured Ghidra
+profile. The `ai` module does not start a separate backend.
+
+[ghidra-nix]: https://redirect.github.com/4evy/ghidra-nix
 
 Review pin, hash, lockfile, and generated-file changes together. Renovate's
 [artifact workflow](../tools/scripts/renovate/artifacts.ts) synchronizes derived

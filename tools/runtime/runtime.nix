@@ -4,7 +4,6 @@
   bun,
   makeBinaryWrapper,
   ai-javascript,
-  ghidra-mcp,
   nix,
   bash,
   curl,
@@ -57,7 +56,6 @@ stdenvNoCC.mkDerivation {
       --set AI_TOOLS_WRAPPER_BIN "$out/bin/ai" \
       --set-default CODEX_CLI_PATH "$out/bin/codex" \
       --prefix PATH : ${lib.strings.escapeShellArg runtimePath} \
-      --set-default GHIDRA_MCP_PACKAGE ${ghidra-mcp} \
       ${lib.strings.optionalString stdenv.hostPlatform.isLinux "--prefix LD_LIBRARY_PATH : ${lib.strings.escapeShellArg nativeLibraries} --prefix NIX_LD_LIBRARY_PATH : ${lib.strings.escapeShellArg nativeLibraries}"}
     ${lib.strings.concatMapAttrsStringSep "\n" (name: script: ''
       makeWrapper ${lib.meta.getExe bun} "$out/bin/${name}" \

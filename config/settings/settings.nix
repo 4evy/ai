@@ -6,7 +6,7 @@
 let
   claude = import ./claude/claude.nix;
   codex = import ./codex/codex.nix { inherit lib host; };
-  omp = import ./omp.nix { inherit host; };
+  omp = import ./omp.nix { inherit lib host; };
   opencode = import ./opencode.nix { inherit lib host; };
   file = format: settings: {
     inherit format settings;

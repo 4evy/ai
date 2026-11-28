@@ -30,31 +30,6 @@ let
       inherit codexHome;
       # Farstep is supplied through upstream shared MCP integration
       farstep = "";
-      ghidraBridge = lib.meta.getExe cfg.package;
-      ghidraArgs = [
-        "ghidra"
-        "mcp"
-        "bridge"
-      ];
-      ghidraOmpArgs =
-        cfg.host.ghidraArgs or (
-          if cfg.host ? ghidraBridge then
-            [ ]
-          else
-            [
-              "ghidra"
-              "mcp"
-              "headless"
-            ]
-        );
-      ghidraOmpEnvironment = cfg.ghidra.server.environment // {
-        GHIDRA_MCP_PORT = toString cfg.ghidra.server.port;
-      };
-      ghidraUrl = cfg.ghidra.url;
-      ghidraEnabled = cfg.ghidra.enable;
-      ghidraEnvironment = cfg.ghidra.bridge.environment // {
-        GHIDRA_MCP_PACKAGE = toString cfg.ghidra.package;
-      };
     }
     // cfg.host
     // lib.attrsets.optionalAttrs (resources != "" && (cfg.host.nodeRepl or "") != "") {
@@ -71,7 +46,6 @@ in
     ./claude/claude.nix
     ./omp/omp.nix
     ./farstep/farstep.nix
-    ./ghidra/ghidra.nix
     ./chatgpt/chatgpt.nix
   ];
 

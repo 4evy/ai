@@ -1,15 +1,4 @@
-{ host }:
-let
-  ghidra = import ./ghidra/ghidra.nix { inherit host; };
-  ghidraEnvironment = (host.ghidraOmpEnvironment or { }) // ghidra.env;
-  ghidraPort = ghidraEnvironment.GHIDRA_MCP_PORT or "8089";
-  localGhidra = builtins.elem ghidraEnvironment.GHIDRA_MCP_URL [
-    "http://127.0.0.1:${ghidraPort}"
-    "http://127.0.0.1:${ghidraPort}/"
-    "http://localhost:${ghidraPort}"
-    "http://localhost:${ghidraPort}/"
-  ];
-in
+{ lib, host }:
 {
   config = {
     modelRoles = {
@@ -48,27 +37,15 @@ in
       };
     };
   };
-  mcp.mcpServers.ghidra = ghidra // {
-    args =
-      host.ghidraOmpArgs or (host.ghidraArgs or (
-        if host ? ghidraBridge then
-          [ ]
-        else
-          [
-            "ghidra"
-            "mcp"
-            "headless"
-          ]
-      )
-      );
-    env = {
-      GHIDRA_MCP_START_HTTPD = if localGhidra then "1" else "0";
+  mcp.mcpServers = lib.attrsets.mapAttrs (
+    _: server:
+    server
+    // {
+      startup = "manual";
+      shutdown = "agent_end";
+      timeout = 1800000;
     }
-    // ghidraEnvironment;
-    startup = "manual";
-    shutdown = "agent_end";
-    timeout = 1800000;
-  };
+  ) (import ./ghidra/ghidra.nix { inherit lib host; });
   keybindings = {
     "app.editor.external" = [
       "ctrl+x"

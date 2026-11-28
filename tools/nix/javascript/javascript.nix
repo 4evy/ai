@@ -25,7 +25,6 @@ let
       ../../../apps/claude
       ../../../apps/opencode
       ../../../config/settings
-      ../../../apps/ghidra
       ../../../apps/chatgpt
       ../../../apps/omp
       ../../scripts

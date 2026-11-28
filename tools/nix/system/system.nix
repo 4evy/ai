@@ -27,16 +27,11 @@ in
     };
   };
   config = {
-    programs.ai.packages = lib.modules.mkMerge (
-      [ (selectedPackage aiBundleEnabled cfg.package) ]
-      ++ map (name: selectedPackage cfg.${name}.enable cfg.${name}.package) [
-        "farstep"
-        "ghidra"
-      ]
-      ++ [
-        (selectedPackage (cfg.chatgpt.enable && cfg.chatgpt.package != null) cfg.chatgpt.package)
-      ]
-    );
+    programs.ai.packages = lib.modules.mkMerge [
+      (selectedPackage aiBundleEnabled cfg.package)
+      (selectedPackage cfg.farstep.enable cfg.farstep.package)
+      (selectedPackage (cfg.chatgpt.enable && cfg.chatgpt.package != null) cfg.chatgpt.package)
+    ];
     environment.systemPackages = cfg.packages;
   };
 }

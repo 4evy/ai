@@ -34,13 +34,6 @@
       };
     };
   };
-  mcp_servers = {
-    ghidra = {
-      startup_timeout_sec = 60;
-      tool_timeout_sec = 1800;
-      default_tools_approval_mode = "approve";
-    };
-  };
   features = {
     prevent_idle_sleep = true;
     multi_agent_v2 = true;

@@ -40,8 +40,7 @@ export async function setup(
   }
   const update = parsed.value.update.length > 0;
   const dryRun = parsed.value.dryRun.length > 0;
-  if (process.platform !== "win32" && !update)
-    await installNixPackage("ai-tools", false, dryRun);
+  if (process.platform !== "win32" && !update) await installNixPackage(dryRun);
   for (const tool of new Set(parsed.value.tools.length ? parsed.value.tools : tools)) {
     if (tool === "omp") {
       if (dryRun) console.log("omp: prepare the pinned checkout runtime");

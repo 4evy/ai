@@ -15,9 +15,6 @@ mod nix 'tools/just/nix/nix.just'
 # Pinned OMP releases and patches
 mod omp 'tools/just/omp/omp.just'
 
-# Pinned Ghidra MCP source
-mod ghidra 'tools/just/ghidra/ghidra.just'
-
 # Bundled Sky synchronization and verification
 mod sky 'tools/just/sky/sky.just'
 

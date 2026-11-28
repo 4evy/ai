@@ -5,7 +5,6 @@
 }:
 pkgs:
 let
-  ghidraNative = pkgs.lib.trivial.importJSON ../../../apps/ghidra/native/source.json;
   bunTools = bun2nix.packages.${pkgs.stdenv.hostPlatform.system}.default.overrideAttrs (old: {
     # Bun 1.4 keeps the package records compatible but advances the lock version
     postPatch = (old.postPatch or "") + ''
@@ -38,38 +37,6 @@ let
           ../javascript/compiler;
       ai-shared = self.callPackage ../javascript/shared.nix { };
       ai-javascript = self.callPackage ../javascript/javascript.nix { };
-      # Nixpkgs now supplies Ghidra's JDK 25 runtime directly
-      ghidra-bin = pkgs.ghidra-bin.overrideAttrs (old: {
-        inherit (ghidraNative.ghidra) version;
-        versiondate = pkgs.lib.strings.removeSuffix ".zip" (
-          pkgs.lib.lists.last (pkgs.lib.strings.splitString "_" ghidraNative.ghidra.url)
-        );
-        src = pkgs.fetchurl {
-          inherit (ghidraNative.ghidra) url sha256;
-        };
-        nativeBuildInputs = old.nativeBuildInputs ++ [ pkgs.unzip ];
-      });
-      gradle = pkgs.gradle-packages.mkGradle {
-        inherit (ghidraNative.gradle) version;
-        hash = builtins.convertHash {
-          hash = ghidraNative.gradle.sha256;
-          hashAlgo = "sha256";
-          toHashFormat = "sri";
-        };
-        defaultJava = pkgs.openjdk25;
-      };
-      ghidra-apple-api-types =
-        self.callPackage ../../../apps/ghidra/extensions/apple-api-types/apple-api-types.nix
-          { };
-      ghidra-windows-api-types =
-        self.callPackage ../../../apps/ghidra/extensions/windows-api-types/windows-api-types.nix
-          { };
-      ghidra-mcp = self.callPackage ../../../apps/ghidra/mcp/package.nix {
-        apiTypeExtensions = [
-          self.ghidra-apple-api-types
-          self.ghidra-windows-api-types
-        ];
-      };
       farstep-desktop = self.callPackage ../../../farstep/nix/native.nix { };
       farstep-service = self.callPackage ../../../farstep/nix/service.nix { };
       farstep-javascript = self.callPackage ../../../farstep/nix/javascript.nix { };
@@ -79,11 +46,6 @@ let
       farstep = self.callPackage ../../../farstep {
         farstep-sky = self.farstep-sky or null;
       };
-      ghidra-mcp-bridge = self.ghidra-mcp.bridge;
-      ghidra-mcp-headless-server = self.ghidra-mcp.server;
-      ghidra-mcp-httpd = self.ghidra-mcp.httpd;
-      ghidra-mcp-headless = self.ghidra-mcp.headless;
-      ghidra-mcp-extension = self.ghidra-mcp.extension;
       powershell-analyzer = self.callPackage ../fmt/analyzer.nix { };
     }
     // pkgs.lib.attrsets.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
@@ -145,6 +107,4 @@ removeAttrs (scope.packages scope) [
   "ai-module-compiler-dependencies"
   "craneLib"
   "farstep-cargo"
-  "ghidra-bin"
-  "gradle"
 ]

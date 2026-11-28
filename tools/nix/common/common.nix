@@ -126,45 +126,6 @@ in
         };
       };
     };
-    ghidra = {
-      enable = lib.options.mkEnableOption "the Ghidra MCP backend and client integration";
-      package = lib.options.mkPackageOption packages "ghidra-mcp" {
-        pkgsText = "ai.packages.<system>";
-      };
-      url = lib.options.mkOption {
-        type = lib.types.str;
-        default = "http://127.0.0.1:${toString cfg.ghidra.server.port}";
-        defaultText = lib.options.literalExpression ''"http://127.0.0.1:''${toString config.programs.ai.ghidra.server.port}"'';
-        description = "Ghidra backend HTTP URL used by the stdio MCP bridge";
-      };
-      server = {
-        enable = lib.options.mkOption {
-          type = lib.types.bool;
-          default = true;
-          description = "Install a manually started persistent headless Ghidra backend user service";
-        };
-        port = lib.options.mkOption {
-          type = lib.types.port;
-          default = 8089;
-          description = "Loopback port of the managed headless Ghidra backend";
-        };
-        environment = lib.options.mkOption {
-          type = lib.types.attrsOf lib.types.str;
-          default = { };
-          description = "Environment passed to the headless backend, including JAVA_OPTS and initial program/project settings";
-        };
-        extraArgs = lib.options.mkOption {
-          type = lib.types.listOf lib.types.str;
-          default = [ ];
-          description = "Additional headless backend arguments, preserving spaces within each argument";
-        };
-      };
-      bridge.environment = lib.options.mkOption {
-        type = lib.types.attrsOf lib.types.str;
-        default = { };
-        description = "Environment passed to client bridges, including optional external debugger settings";
-      };
-    };
     chatgpt = {
       enable = lib.options.mkEnableOption "the ChatGPT desktop package";
       package = lib.options.mkPackageOption packages "chatgpt" {
@@ -193,7 +154,6 @@ in
       || cfg.claude.enable
       || cfg.opencode.enable
       || cfg.omp.enable
-      || cfg.ghidra.enable
       || cfg.chatgpt.enable;
 
     programs.ai = lib.modules.mkIf cfg.enable {
@@ -202,7 +162,6 @@ in
       opencode.enable = lib.modules.mkDefault true;
       omp.enable = lib.modules.mkDefault true;
       farstep.enable = lib.modules.mkDefault true;
-      ghidra.enable = lib.modules.mkDefault true;
     };
   };
 }

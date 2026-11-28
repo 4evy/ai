@@ -1,8 +1,14 @@
 { lib, host }:
 let
-  ghidra = {
-    ghidra = import ../ghidra/ghidra.nix { inherit host; };
-  };
+  ghidra = lib.attrsets.mapAttrs (
+    _: server:
+    server
+    // {
+      startup_timeout_sec = 60;
+      tool_timeout_sec = 1800;
+      default_tools_approval_mode = "approve";
+    }
+  ) (import ../ghidra/ghidra.nix { inherit lib host; });
   darwin = (host.os or "") == "darwin";
   resources = host.chatgptResources or "";
   nodeRepl = host.nodeRepl or "";

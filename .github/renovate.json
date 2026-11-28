@@ -47,98 +47,6 @@
     },
     {
       "customType": "regex",
-      "description": "Track Ghidra MCP at an exact development-branch commit",
-      "managerFilePatterns": ["/^apps/ghidra/mcp/source\\.json$/"],
-      "matchStrings": ["\"rev\":\\s*\"(?<currentDigest>[a-f0-9]{40})\""],
-      "currentValueTemplate": "dev",
-      "depNameTemplate": "bethington/ghidra-mcp",
-      "packageNameTemplate": "https://github.com/bethington/ghidra-mcp",
-      "datasourceTemplate": "git-refs",
-      "versioningTemplate": "git"
-    },
-    {
-      "customType": "regex",
-      "description": "Track the shared Ghidra bridge MCP Python SDK",
-      "managerFilePatterns": ["/^apps/ghidra/mcp/source\\.json$/"],
-      "matchStrings": [
-        "\"sdk\":\\s*\\{\\s*\"version\":\\s*\"(?<currentValue>[^\"\\s]+)\""
-      ],
-      "depNameTemplate": "mcp",
-      "datasourceTemplate": "pypi",
-      "versioningTemplate": "pep440"
-    },
-    {
-      "customType": "regex",
-      "description": "Track Apple API headers at an exact upstream commit",
-      "managerFilePatterns": [
-        "/^apps/ghidra/extensions/apple-api-types/source\\.json$/"
-      ],
-      "matchStrings": ["\"rev\":\\s*\"(?<currentDigest>[a-f0-9]{40})\""],
-      "currentValueTemplate": "master",
-      "depNameTemplate": "PoomSmart/IDAObjcTypes",
-      "packageNameTemplate": "https://github.com/PoomSmart/IDAObjcTypes",
-      "datasourceTemplate": "git-refs",
-      "versioningTemplate": "git"
-    },
-    {
-      "customType": "regex",
-      "description": "Track Windows API headers at an exact upstream commit",
-      "managerFilePatterns": [
-        "/^apps/ghidra/extensions/windows-api-types/source\\.json$/"
-      ],
-      "matchStrings": ["\"rev\":\\s*\"(?<currentDigest>[a-f0-9]{40})\""],
-      "currentValueTemplate": "master",
-      "depNameTemplate": "winsiderss/systeminformer",
-      "packageNameTemplate": "https://github.com/winsiderss/systeminformer",
-      "datasourceTemplate": "git-refs",
-      "versioningTemplate": "git"
-    },
-    {
-      "customType": "regex",
-      "description": "Track the Ghidra release",
-      "managerFilePatterns": ["/^apps/ghidra/native/source\\.json$/"],
-      "matchStrings": [
-        "\"ghidra\":\\s*\\{\\s*\"version\":\\s*\"(?<currentValue>[^\"\\s]+)\""
-      ],
-      "depNameTemplate": "NationalSecurityAgency/ghidra",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver",
-      "extractVersionTemplate": "^Ghidra_(?<version>.+)_build$"
-    },
-    {
-      "customType": "regex",
-      "description": "Track the Gradle distribution",
-      "managerFilePatterns": ["/^apps/ghidra/native/source\\.json$/"],
-      "matchStrings": [
-        "\"gradle\":\\s*\\{\\s*\"version\":\\s*\"(?<currentValue>[^\"\\s]+)\""
-      ],
-      "depNameTemplate": "gradle",
-      "datasourceTemplate": "gradle-version",
-      "versioningTemplate": "gradle"
-    },
-    {
-      "customType": "regex",
-      "description": "Track the uv distribution",
-      "managerFilePatterns": ["/^apps/ghidra/native/source\\.json$/"],
-      "matchStrings": ["\"uvVersion\":\\s*\"(?<currentValue>[^\"\\s]+)\""],
-      "depNameTemplate": "astral-sh/uv",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "Track the Ghidra-supported Temurin 25 distributions",
-      "managerFilePatterns": ["/^apps/ghidra/native/source\\.json$/"],
-      "matchStrings": [
-        "\"jdk\":\\s*\\{\\s*\"version\":\\s*\"jdk-(?<currentValue>[^\"\\s]+)\""
-      ],
-      "depNameTemplate": "adoptium/temurin25-binaries",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "maven",
-      "extractVersionTemplate": "^jdk-(?<version>.+)$"
-    },
-    {
-      "customType": "regex",
       "description": "Track the Nix Bun runtime",
       "managerFilePatterns": ["/^tools/nix/javascript/runtime/runtime\\.nix$/"],
       "matchStrings": ["version = \"(?<currentValue>[^\"\\s]+)\""],
@@ -247,12 +155,6 @@
       "groupName": "bun"
     },
     {
-      "description": "Refresh all native Ghidra artifacts as one distribution",
-      "matchManagers": ["custom.regex"],
-      "matchFileNames": ["apps/ghidra/native/source.json"],
-      "groupName": "ghidra-native"
-    },
-    {
       "description": "Do not resolve private Sky declarations through the public npm registry",
       "matchPackageNames": ["@oai/sky"],
       "enabled": false
@@ -280,8 +182,6 @@
       "farstep/runtime/sky/runtime/pins.json",
       "farstep/sky/**",
       "apps/omp/**",
-      "apps/ghidra/**/source.json",
-      "apps/ghidra/mcp/uv.lock",
       "tools/nix/javascript/runtime/runtime.nix",
       "tools/nix/fmt/analyzer.nix"
     ],

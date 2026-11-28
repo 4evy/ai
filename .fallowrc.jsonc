@@ -7,7 +7,6 @@
     "apps/browser/firefox/firefox.ts",
     "apps/codex/codex.ts",
     "apps/claude/claude.ts",
-    "apps/ghidra/macos/macos.ts",
     "apps/chatgpt/{launcher,configure/configure,plugins/plugins,policy/policy,repl/repl}.ts",
     "farstep/transport/relay/relay.ts",
     "farstep/runtime/main.ts",

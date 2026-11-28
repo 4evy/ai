@@ -1,6 +1,5 @@
 { lib, host }:
 let
-  ghidra = import ./ghidra/ghidra.nix { inherit host; };
   rule = action: resource: effect: { inherit action resource effect; };
 in
 {
@@ -50,16 +49,6 @@ in
     };
     mcp = {
       servers = {
-        ghidra = {
-          type = "local";
-          command = [ ghidra.command ] ++ ghidra.args;
-          environment = ghidra.env;
-          disabled = !ghidra.enabled;
-          timeout = {
-            catalog = 60000;
-            execution = 1800000;
-          };
-        };
         lldb = {
           type = "local";
           command = [
@@ -72,6 +61,16 @@ in
           };
         };
       }
+      // lib.attrsets.mapAttrs (_: server: {
+        type = "local";
+        command = [ server.command ] ++ server.args;
+        environment = server.env;
+        disabled = !server.enabled;
+        timeout = {
+          catalog = 60000;
+          execution = 1800000;
+        };
+      }) (import ./ghidra/ghidra.nix { inherit lib host; })
       // lib.attrsets.optionalAttrs ((host.farstep or "") != "") (
         lib.attrsets.mapAttrs (_: server: {
           type = "local";

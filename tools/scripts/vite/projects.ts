@@ -36,7 +36,6 @@ const settings: Record<string, Settings> = {
       "apps/claude",
       "apps/opencode",
       "config/settings",
-      "apps/ghidra",
       "tools/scripts",
     ],
     entries: [
@@ -47,8 +46,6 @@ const settings: Record<string, Settings> = {
       "apps/claude/claude.ts",
       "apps/opencode/opencode.ts",
       "config/settings/generate/generate.ts",
-      "apps/ghidra/macos/macos.ts",
-      "apps/ghidra/native/{install,runtime}.ts",
       "tools/scripts/format/format.ts",
       "tools/scripts/cli/cli.ts",
       "tools/scripts/omp/{update,runtime/{runtime,launch},patches/patches}.ts",
